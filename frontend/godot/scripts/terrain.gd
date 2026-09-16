@@ -1,11 +1,17 @@
 extends Node3D
 var training = false
+var range_flat=false
+var mobility_course=false
+var vegetation_density=1.0
 var map_seed = 1944
 var extent = 750.0
 var forest_center = Vector2(-380, -20)
 var forest_radius = 170.0
 
 func height_at(x: float, z: float) -> float:
+	if range_flat:
+		if mobility_course:return 9*exp(-pow((x-80)/45,2))*exp(-pow(z/250,2))
+		return 0.0
 	if training:
 		return 7.0 * exp(-pow((x-120)/55,2)) * exp(-pow(z/150,2))
 	var phase = float(map_seed % 37) * .03
@@ -71,6 +77,7 @@ func build(is_training: bool, seed_value: int, size: float):
 	terrain_mesh.material_override=m
 	add_child(terrain_mesh)
 	terrain_mesh.create_trimesh_collision()
+	if range_flat:return
 	var rng=RandomNumberGenerator.new()
 	rng.seed=map_seed
 	for i in range(18 if not training else 4):
@@ -96,7 +103,7 @@ func build(is_training: bool, seed_value: int, size: float):
 	cone.height=13
 	cone.radial_segments=7
 	mm.mesh=cone
-	mm.instance_count=350 if not training else 0
+	mm.instance_count=int(350*vegetation_density) if not training else 0
 	for i in range(mm.instance_count):
 		var a=rng.randf()*TAU
 		var r=sqrt(rng.randf())*forest_radius

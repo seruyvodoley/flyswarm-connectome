@@ -14,9 +14,10 @@
       "verified": false
     },
     "hull_width": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 3.14,
+      "source": "https://tiger1.info/EN/Hull-dimensions.html",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "overall_width": {
       "value": null,
@@ -29,24 +30,28 @@
       "verified": false
     },
     "ground_clearance": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 0.485,
+      "source": "https://tiger1.info/EN/Roof-height.html",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "track_width": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 0.725,
+      "source": "https://tiger1.info/EN/Hull-dimensions.html",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "wheel_diameter": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 0.8,
+      "source": "https://tankmuseum.org/tiger-wheels/",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "wheel_centres": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 0.515,
+      "source": "https://tiger1.info/EN/Suspension-main-axes.html",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "turret_ring_location": {
       "value": null,
@@ -54,14 +59,16 @@
       "verified": false
     },
     "turret_width": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 2.32,
+      "source": "https://tiger1.info/EN/Turret-asymmetry.html",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "turret_height": {
-      "value": null,
-      "source": null,
-      "verified": false
+      "value": 0.83,
+      "source": "https://tiger1.info/EN/Roof-height.html",
+      "verified": true,
+      "scope": "component target; not whole-vehicle acceptance"
     },
     "gun_calibre": {
       "value": null,
@@ -72,6 +79,11 @@
       "value": null,
       "source": null,
       "verified": false
+    },
+    "turret_roof_elevation": {
+      "value": 2.655,
+      "source": "https://tiger1.info/EN/Roof-height.html",
+      "verified": true
     }
   }
 }

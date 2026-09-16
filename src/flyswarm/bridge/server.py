@@ -1,5 +1,5 @@
 """python -m flyswarm.bridge.server --port 8765 [--collect DATASET.npz]."""
-import argparse,hashlib,json,socket,time
+import argparse,hashlib,json,socket,time,os,signal,threading,sys
 from pathlib import Path
 import numpy as np
 from flyswarm.brain import DualBrain
@@ -11,8 +11,24 @@ def main():
     p.add_argument('--port',type=int,default=8765);p.add_argument('--seed',type=int,default=204)
     p.add_argument('--policy');p.add_argument('--collect');p.add_argument('--once',action='store_true')
     p.add_argument('--feature-mode',choices=['connectome_only','connectome_plus_proprioception'],default='connectome_only')
+    p.add_argument('--status-file');p.add_argument('--parent-pid',type=int)
+    p.add_argument('--blue-controller',default='brain');p.add_argument('--red-controller',default='brain')
+    p.add_argument('--blue-policy');p.add_argument('--red-policy')
     a=p.parse_args()
-    brain=DualBrain(a.seed)
+    def status(stage,error=None):
+        if a.status_file:
+            dest=Path(a.status_file);dest.parent.mkdir(parents=True,exist_ok=True)
+            tmp=dest.with_suffix('.tmp');tmp.write_text(json.dumps({'stage':stage,'error':error,'pid':os.getpid()}));tmp.replace(dest)
+    def watch_parent():
+        while True:
+            time.sleep(1)
+            try:os.kill(a.parent_pid,0)
+            except ProcessLookupError:os._exit(0)
+    if a.parent_pid:threading.Thread(target=watch_parent,daemon=True).start()
+    try:brain=DualBrain(a.seed,status=status)
+    except Exception as exc:
+        status('ERROR',str(exc));return
+
     policies={}
     policy_hashes={}
     if a.policy:
@@ -22,11 +38,18 @@ def main():
         files=path.glob('*/policy.npz') if path.is_dir() else [path]
         policy_hashes={f.parent.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in files}
     if a.collect and a.policy:raise ValueError('Do not collect training data during policy evaluation')
+    team_policies={}
+    for team in ['blue','red']:
+        file=getattr(a,team+'_policy')
+        if file:
+            try:team_policies[team]=Readout.load(file)
+            except Exception as exc:status('ERROR',str(exc));return
     xs=[];ys=[];vehicles=[];seeds=[]
     metadata={'brain_seeds':[a.seed,a.seed+1000],'neuron_count':sum(b.n*b.batch for b in brain.brains),'feature_mode':a.feature_mode,'mode':'imitation' if a.collect else 'evaluation','policy_ids':{key:value.metadata for key,value in policies.items()},'policy_sha256':policy_hashes}
     with socket.socket() as server:
         server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         server.bind(('127.0.0.1',a.port));server.listen(1)
+        status('READY')
         print('READY 2 x FlyBrain(batch=8)',json.dumps(metadata),flush=True)
         while True:
             connection,_=server.accept()
@@ -39,13 +62,15 @@ def main():
                         traces,heard,ms=brain.step(obs,packet['audio'])
                         actions=[]
                         for o,t in zip(obs,traces):
-                            policy=policies.get(o['vehicle'],policies.get('shared'))
+                            team='blue' if o['id']<8 else 'red'
+                            policy=team_policies.get(team,policies.get(o['vehicle'],policies.get('shared')))
                             if policies and policy is None:raise ValueError(f"No policy for {o['vehicle']}")
                             mode=policy.mode if policy else a.feature_mode
                             x=features(t,o['proprio'],mode)
                             if a.collect:
                                 xs.append(x);ys.append(o['teacher']);vehicles.append(o['vehicle']);seeds.append(a.seed)
                                 action=np.array(o['teacher'])
+                            elif getattr(a,team+'_controller')=='rule':action=np.array(o['teacher'])
                             elif policy:action=policy.predict(x)
                             else:
                                 action=brain.baseline(t)

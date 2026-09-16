@@ -1,4 +1,14 @@
 extends Node3D
+signal completed(report)
+signal pause_requested
+signal backend_failed(message)
+var session_config
+var launch_args=PackedStringArray()
+var is_range=false
+var replay_buffer=[]
+var report_cache={}
+var progress_clock=0.0
+
 const Catalog=preload("res://scripts/catalog.gd")
 const Terrain=preload("res://scripts/terrain.gd")
 const Vehicle=preload("res://scripts/vehicle.gd")
@@ -46,25 +56,45 @@ var capture_changes=0
 var screenshot_path=""
 
 func option(name: String, fallback: String="") -> String:
-	var args=OS.get_cmdline_user_args()
+	var args=launch_args if session_config!=null else OS.get_cmdline_user_args()
 	for i in range(args.size()-1):
 		if args[i]==name:return args[i+1]
 	return fallback
-func has(name: String) -> bool:return name in OS.get_cmdline_user_args()
+func has(name: String) -> bool:return name in (launch_args if session_config!=null else OS.get_cmdline_user_args())
 func _ready():
+	if session_config!=null:
+		launch_args=session_config.cli_args()
+		debug=AppState.settings.debug or session_config.range_mode in ["armour","modules"]
 	start_wall=Time.get_ticks_usec()
 	camera_mode=int(option("--camera","1"))
 	normalized=has("--normalized")
 	training=has("--training")
+	is_range=has("--range") or (session_config!=null and session_config.map=="test_range")
 	requires_brain=has("--connect")
 	audio_mode=option("--audio","no_audio")
 	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
 	scenario.seed=int(option("--seed",str(scenario.seed)))
+	if is_range:scenario.size_m=2200
+	var replay_manifest={}
+	if has("--replay"):
+		var manifest_path=option("--replay").get_base_dir().path_join("manifest.json")
+		if FileAccess.file_exists(manifest_path):replay_manifest=JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+		if replay_manifest.get("map","").contains("Training"):
+			training=true
+			scenario=Catalog.read_json("scenarios/training_range.json")
+		if replay_manifest.has("vehicles") and replay_manifest.vehicles.size()==16:
+			for i in range(8):
+				scenario.blue[i]=replay_manifest.vehicles[i].id
+				scenario.red[i]=replay_manifest.vehicles[i+8].id
+		scenario.seed=int(replay_manifest.get("map_seed",scenario.seed))
 	time_limit=float(option("--seconds",str(scenario.time_limit_s)))
-	rng.seed=scenario.seed
+	rng.seed=int(option("--battle-seed",str(scenario.seed)))
 	tickets=[float(scenario.tickets),float(scenario.tickets)]
 	terrain=Terrain.new()
 	add_child(terrain)
+	terrain.range_flat=is_range
+	terrain.mobility_course=is_range and session_config!=null and session_config.range_mode=="mobility"
+	terrain.vegetation_density=AppState.settings.vegetation if session_config!=null else 1.0
 	terrain.build(training,int(scenario.seed),float(scenario.size_m))
 	tracks=load("res://scripts/tracks.gd").new()
 	add_child(tracks)
@@ -91,7 +121,7 @@ func _ready():
 	sun.rotation_degrees=Vector3(-42,-28,0)
 	sun.light_color=Color(1,.92,.77)
 	sun.light_energy=1.7
-	sun.shadow_enabled=true
+	sun.shadow_enabled=AppState.settings.shadows if session_config!=null else true
 	sun.directional_shadow_max_distance=300
 	add_child(sun)
 	for i in range(3):
@@ -120,6 +150,7 @@ func _ready():
 		var team=int(i/8)
 		var id=scenario.blue[i%8] if team==0 else scenario.red[i%8]
 		id=option("--mirror",id)
+		if is_range and session_config!=null:id=session_config.training_vehicle if team==0 else session_config.target_vehicle
 		var tank=Vehicle.new()
 		add_child(tank)
 		tank.setup(Catalog.vehicle(id,normalized),i,self)
@@ -129,6 +160,18 @@ func _ready():
 		tank.position=Vector3(x,terrain.height_at(x,z)+.1,z)
 		tank.rotation.y=0 if sign_value<0 else PI
 		vehicles.append(tank)
+		if is_range:
+			if i in [0,8]:
+				var distance=session_config.range_distance if session_config!=null else 500
+				tank.position=Vector3(0,.1,(-.5 if i==0 else .5)*distance)
+				tank.rotation.y=0 if i==0 else PI+deg_to_rad(session_config.target_angle if session_config!=null else 0)
+			else:
+				tank.alive=false; tank.hide();tank.position=Vector3(1500+i*20,-100,1500)
+				tank.collision_layer=0; tank.collision_mask=0
+				for plate in tank.armour_bodies:plate.collision_layer=0
+		if session_config!=null:
+			for mesh in tank.model.find_children("*","GeometryInstance3D",true,false):mesh.lod_bias=AppState.settings.lod
+
 	sensor_debug=MeshInstance3D.new()
 	add_child(sensor_debug)
 	camera=Camera3D.new()
@@ -160,7 +203,7 @@ func _ready():
 	record_path=option("--record","")
 	if record_path!="":
 		DirAccess.make_dir_recursive_absolute(record_path)
-		recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
+		if (session_config==null and not has("--no-replay")) or (session_config!=null and session_config.record):recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
 		var manifest={"date":Time.get_datetime_string_from_system(true),"map":scenario.name,"map_seed":scenario.seed,"mode":"NORMALIZED" if normalized else "HISTORICAL","audio":audio_mode,"controller":"backend" if requires_brain else "RULE_BASED_CONTROL","side_swap":has("--swap"),"vehicles":[],"seconds":time_limit}
 		var output=[]
 		OS.execute("git",["-C",ProjectSettings.globalize_path("res://../.."),"rev-parse","HEAD"],output)
@@ -168,6 +211,7 @@ func _ready():
 		output=[]
 		OS.execute("git",["-C",ProjectSettings.globalize_path("res://../.."),"status","--porcelain"],output)
 		manifest.git_dirty=not "".join(output).strip_edges().is_empty()
+		if session_config!=null:manifest.session=session_config.as_dict()
 		manifest.engine=Engine.get_version_info()
 		manifest.source_hashes={}
 		for source in ["battle.gd","vehicle.gd","terrain.gd","tracks.gd","combat.gd","bridge.gd","catalog.gd"]:
@@ -178,9 +222,13 @@ func _ready():
 	if replay_file!="":
 		replay_mode=true
 		var f=FileAccess.open(replay_file,FileAccess.READ)
-		assert(f!=null,"Replay missing")
+		if f==null:
+			if session_config!=null:backend_failed.emit("Replay file is missing")
+			return
 		while not f.eof_reached():
-			var row=JSON.parse_string(f.get_line())
+			var line=f.get_line()
+			if line.strip_edges().is_empty():continue
+			var row=JSON.parse_string(line)
 			if row is Dictionary:replay.append(row)
 		requires_brain=false
 	print("READY ",scenario.name," 16 vehicles; ","NORMALIZED" if normalized else "HISTORICAL", " backend=",requires_brain)
@@ -195,6 +243,7 @@ func has_los(a,b) -> bool:
 	return hit.is_empty() or (hit.collider.has_meta("vehicle") and hit.collider.get_meta("vehicle")==b)
 
 func _physics_process(delta):
+	if paused:return
 	if replay_mode:
 		replay_clock+=delta
 		while replay_index<replay.size() and replay[replay_index].time<=replay_clock:
@@ -208,6 +257,9 @@ func _physics_process(delta):
 				v.turret.rotation.y=state.turret
 				v.gun.rotation.x=-state.gun
 				v.alive=state.alive
+				v.metrics=state.get("metrics",v.metrics)
+				v.turret_angle=state.turret
+				v.gun_angle=state.gun
 				v.modules=state.modules
 			for n in replay_shell_nodes:n.queue_free()
 			replay_shell_nodes=[]
@@ -218,7 +270,10 @@ func _physics_process(delta):
 				objectives[i].owner=row.zones[i].owner
 				objectives[i].progress=row.zones[i].progress
 			replay_index+=1
-		if replay_index>=replay.size() and has("--quit"):get_tree().quit()
+		if replay_index>=replay.size():
+			if has("--quit"):get_tree().quit()
+			elif session_config!=null and not finished_report:finish()
+
 		return
 	if ended or paused:return
 	var started=Time.get_ticks_usec()
@@ -226,8 +281,11 @@ func _physics_process(delta):
 	if requires_brain:
 		if bridge.pending and (Time.get_ticks_usec()-bridge.sent_at)>10000000:
 			push_error("Brain response timeout; no silent baseline fallback")
-			get_tree().quit(2)
+			if session_config!=null:paused=true;backend_failed.emit("No neural response for 10 seconds.")
+			else:get_tree().quit(2)
 			return
+		if sim_time>0 and bridge.tcp.get_status()!=StreamPeerTCP.STATUS_CONNECTED and session_config!=null:
+			paused=true;backend_failed.emit("Connection to the local brain server was lost.");return
 		if bridge.commands.is_empty():
 			if not bridge.pending:
 				var observations=[]
@@ -237,7 +295,8 @@ func _physics_process(delta):
 				bridge.request(observations,audio_mode)
 			if (Time.get_ticks_usec()-start_wall)>180000000 and sim_time==0:
 				push_error("Brain backend timeout")
-				get_tree().quit(2)
+				if session_config!=null:paused=true;backend_failed.emit("Backend connection timed out.")
+				else:get_tree().quit(2)
 			return
 		for i in range(16):
 			vehicles[i].cmd=bridge.commands[i]
@@ -249,16 +308,30 @@ func _physics_process(delta):
 		if not requires_brain:
 			if frame%5==0:v.sense(delta*5)
 			v.cmd=v.teacher()
+		if is_range:
+			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
 			v.cmd[2]=0
 		v.step(delta)
+	if is_range:
+		vehicles[0].target=8
+		vehicles[0].target_range=vehicles[0].position.distance_to(vehicles[8].position)
 	step_shells(delta)
-	step_objectives(delta)
+	if not is_range:step_objectives(delta)
 	sim_time+=delta
 	frame+=1
 	physics_usec+=Time.get_ticks_usec()-started
-	if recorder and frame%5==0:recorder.store_line(JSON.stringify(snapshot()))
+	if frame%5==0:
+		var row=JSON.stringify(snapshot())
+		if recorder:recorder.store_line(row)
+		elif session_config!=null and not replay_mode:
+			replay_buffer.append(row)
+			if replay_buffer.size()>6000:replay_buffer.pop_front()
+	if record_path!="" and sim_time-progress_clock>=.5:
+		progress_clock=sim_time
+		FileAccess.open(record_path.path_join("live.json"),FileAccess.WRITE).store_string(JSON.stringify({"sim_time":sim_time,"wall_time":(Time.get_ticks_usec()-start_wall)/1000000.0}))
+
 	if sim_time>=time_limit or minf(tickets[0],tickets[1])<=0 or alive_count(0)==0 or alive_count(1)==0:
 		finish()
 
@@ -331,6 +404,7 @@ func alive_count(team: int) -> int:
 		if v.alive and v.team==team:count+=1
 	return count
 func effect(p: Vector3,c: Color,size: float,lifetime: float):
+	if session_config!=null and effects.size()>int(60*AppState.settings.effects):return
 	var mesh=MeshInstance3D.new()
 	var sphere=SphereMesh.new()
 	sphere.radius=size
@@ -354,7 +428,7 @@ func shell_snapshot() -> Array:
 	for s in shells:out.append([s.position.x,s.position.y,s.position.z])
 	return out
 
-func finish():
+func finish(notify_result=true):
 	if finished_report:return
 	finished_report=true
 	ended=true
@@ -371,11 +445,14 @@ func finish():
 	report.capture_changes=capture_changes
 	report.track_segments=tracks.segments
 	report.max_rut_depth_m=tracks.max_depth
+	report.completion="complete" if notify_result else "interrupted"
 	report.mode="NORMALIZED" if normalized else "HISTORICAL"
 	if record_path!="":
 		FileAccess.open(record_path.path_join("summary.json"),FileAccess.WRITE).store_string(JSON.stringify(report,"  "))
 		if recorder:recorder.flush()
 	print("SUMMARY ",JSON.stringify({"sim_s":sim_time,"wall_s":wall,"xRT":report.realtime_factor,"physics_ms":report.mean_physics_ms,"brain_tick_ms":report.brain_tick_ms,"alive":[alive_count(0),alive_count(1)]}))
+	report_cache=report
+	if session_config!=null and notify_result:completed.emit(report)
 	if has("--quit"):get_tree().quit()
 func _process(dt):
 	for i in range(effects.size()-1,-1,-1):
@@ -425,6 +502,9 @@ func _process(dt):
 	if requires_brain:connection="BRAIN WAITING" if not bridge.connected() else "2 × batch=8 · "+bridge.last_reply.get("mode","")
 	hud.text="KRASNY VALLEY   /   FLYSWARM RESEARCH\nGERMANY  %03d  (%d alive)     USSR  %03d  (%d alive)\nA %d   B %d   C %d   |   %.1fs   %s   %s\n%s\nBrain tick %d  %.1fms   IPC %.1fms   FPS %d" % [tickets[0],alive_count(0),tickets[1],alive_count(1),objectives[0].owner,objectives[1].owner,objectives[2].owner,sim_time,"NORMALIZED" if normalized else "HISTORICAL",audio_mode,connection,bridge.tick,bridge.last_reply.get("tick_ms",0),bridge.latency_ms,Engine.get_frames_per_second()]
 	detail.text="%s  ·  %s  ·  %s%d / local brain %d\nSpeed %.1f km/h    Gear %d    Ammo %d    Reload %.1fs\nTarget %d   Range %.0fm   LOS %s   Gun %.1f°\nDN %s   JO %.3f\nTAB agent  |  C camera  |  F1 debug  |  SPACE pause\nFree camera: WASD / Q E / arrows\n%s" % [v.cfg.display_name,v.cfg.role,"B" if v.team==0 else "R",v.agent_id%8+1,v.agent_id%8,v.speed*3.6,clampi(int(absf(v.speed)/3)+1,1,v.cfg.gears.size()),v.ammo_left,v.reload_left,v.target,v.target_range,str(v.seen),rad_to_deg(v.gun_angle),str(v.dn),v.audio_input,(str(v.modules)+"\n"+str(v.last_impact)) if debug else ""]
+	if is_range:
+		detail.text+="\nMANUAL · WASD drive · Q/E turret · R/F elevation · Space/LMB fire · ESC menu"
+		if debug:detail.text+="\nTARGET IMPACT: "+str(vehicles[8].last_impact)
 	if ended:detail.text+="\nBATTLE COMPLETE"
 	if screenshot_path!="" and sim_time>float(option("--capture-at","3.6")) and DisplayServer.get_name()!="headless":
 		await RenderingServer.frame_post_draw
@@ -436,10 +516,36 @@ func _unhandled_input(event):
 			KEY_TAB:selected=(selected+1)%16
 			KEY_C:camera_mode=(camera_mode+1)%4
 			KEY_F1:debug=not debug
-			KEY_SPACE:paused=not paused
-			KEY_ESCAPE:get_tree().quit()
+			KEY_SPACE:
+				if not is_range:paused=not paused
+			KEY_ESCAPE:
+				if session_config!=null:pause_requested.emit()
+				else:get_tree().quit()
+	if is_range and not paused and event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		vehicles[0].turret_angle+=event.relative.x*.003
+		vehicles[0].gun_angle-=event.relative.y*.002
 	if camera_mode==3:
 		if Input.is_physical_key_pressed(KEY_LEFT):camera.rotate_y(.035)
 		if Input.is_physical_key_pressed(KEY_RIGHT):camera.rotate_y(-.035)
 		if Input.is_physical_key_pressed(KEY_UP):camera.rotate_object_local(Vector3.RIGHT,.035)
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
+
+func manual_commands() -> Array:
+	if camera_mode==3:return [0,0,0,0,0,0]
+	var drive=float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
+	var steer=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
+	var turn=float(Input.is_physical_key_pressed(KEY_E))-float(Input.is_physical_key_pressed(KEY_Q))
+	var elevate=float(Input.is_physical_key_pressed(KEY_R))-float(Input.is_physical_key_pressed(KEY_F))
+	var fire=float(Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+	if session_config!=null and session_config.range_mode in ["free","mobility"]:fire=0
+	return [drive,0,steer,turn,elevate,fire]
+func save_replay():
+	if record_path=="":return
+	if not recorder:
+		recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
+		for row in replay_buffer:recorder.store_line(row)
+		replay_buffer.clear()
+	recorder.flush()
+func _exit_tree():
+	bridge.tcp.disconnect_from_host()
+	if recorder:recorder.flush();recorder.close()

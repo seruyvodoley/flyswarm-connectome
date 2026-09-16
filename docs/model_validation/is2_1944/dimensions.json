@@ -1,18 +1,18 @@
 {
   "asset": "is2_1944.glb",
   "dimensions_xyz_m": [
-    3.3499999046325684,
-    9.149999618530273,
-    4.890000118874013
+    3.2699999809265137,
+    9.131000280380249,
+    2.820000112056732
   ],
-  "triangles_lod0": 3848,
+  "triangles_lod0": 14796,
   "lod1": null,
   "lod2": null,
   "texture_sizes": [],
-  "status": "BLOCKOUT / HISTORICAL VALIDATION NOT PASSED",
+  "status": "INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED",
   "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
   "axis": "Blender x width, y overall length, z height incl antenna",
-  "height_without_antenna_m": 3.1574997901916504,
+  "height_without_antenna_m": 2.8375000953674316,
   "dimension_checks": {
     "hull_length": {
       "status": "FAIL",

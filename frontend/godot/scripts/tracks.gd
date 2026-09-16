@@ -46,7 +46,7 @@ func settlement(previous: float, equilibrium: float, shear_distance: float, slip
 
 func contact(v,dt: float) -> Dictionary:
 	var ground=soil(v.position)
-	var spacing=float(v.cfg.width_m)-float(v.cfg.track_width_m)
+	var spacing=float(v.cfg.get("track_spacing_m",float(v.cfg.width_m)-float(v.cfg.track_width_m)))
 	var area=2*float(v.cfg.track_width_m)*float(v.cfg.length_m)*.72
 	var pressure=float(v.cfg.mass_kg)*9.81*normal_at(v.position).y/maxf(.1,area)
 	var effort=absf(float(v.cmd[0]))*.65

@@ -26,3 +26,6 @@ data/local/
 .godot/
 results/replays/
 *.blend1
+
+# Local application builds
+build/

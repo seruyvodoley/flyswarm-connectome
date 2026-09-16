@@ -11,6 +11,7 @@ failed=False
 views={'front':(0,-18,1.5),'rear':(0,18,1.5),'left':(-18,0,1.5),'right':(18,0,1.5),'top':(0,0,22),'front_3q':(-13,-16,10),'rear_3q':(13,16,10)}
 for file in sorted((ROOT/'frontend/godot/assets/vehicles').glob('*.glb')):
  if file.name.startswith('._'):continue
+ if '--vehicle' in sys.argv and file.stem!=sys.argv[sys.argv.index('--vehicle')+1]:continue
  bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
  bpy.ops.import_scene.gltf(filepath=str(file))
  meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
@@ -21,7 +22,7 @@ for file in sorted((ROOT/'frontend/godot/assets/vehicles').glob('*.glb')):
  grey=bpy.data.materials.new('NeutralGrey');grey.diffuse_color=(.45,.45,.45,1)
  for o in meshes:o.data.materials.clear();o.data.materials.append(grey)
  out=OUT/file.stem;out.mkdir(parents=True,exist_ok=True)
- report={'asset':file.name,'dimensions_xyz_m':dims,'triangles_lod0':tris,'lod1':None,'lod2':None,'texture_sizes':[],'status':'BLOCKOUT / HISTORICAL VALIDATION NOT PASSED','historical_tolerance_check':'NOT RUN: complete independently sourced dimension sheet absent','axis':'Blender x width, y overall length, z height incl antenna'}
+ report={'asset':file.name,'dimensions_xyz_m':dims,'triangles_lod0':tris,'lod1':None,'lod2':None,'texture_sizes':[],'status':'INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED','historical_tolerance_check':'NOT RUN: complete independently sourced dimension sheet absent','axis':'Blender x width, y overall length, z height incl antenna'}
  sheet=json.loads((ROOT/'docs/references'/file.stem/'dimension_sheet.json').read_text())
  targets=sheet['dimensions']
  checks={}

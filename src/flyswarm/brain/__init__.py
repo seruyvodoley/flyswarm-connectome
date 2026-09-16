@@ -6,11 +6,13 @@ from flyswarm.sensory import visual,audio_signal
 WING=['DLMn a, b','DLMn c-f','DVMn 1a-c','DVMn 2a, b','DVMn 3a, b','MNwm35','MNwm36','b1 MN','b2 MN','b3 MN','hg1 MN','hg2 MN','hg3 MN','hg4 MN','i1 MN','i2 MN','iii1 MN','iii3 MN','ps1 MN','tp1 MN','tp2 MN','tpn MN']
 
 class DualBrain:
-    def __init__(self,seed=204):
+    def __init__(self,seed=204,status=None):
         from flybrain import FlyBrain
         from flybrain.data import has_data
         if not has_data():raise RuntimeError('MaleCNS dataset missing; configure flybrain data separately')
+        if status:status('Loading BLUE MaleCNS · FlyBrain(batch=8)')
         self.blue=FlyBrain(device='cpu',batch=8,seed=seed)
+        if status:status('Loading RED MaleCNS · FlyBrain(batch=8)')
         self.red=FlyBrain(device='cpu',batch=8,seed=seed+1000)
         assert self.blue is not self.red
         assert not np.shares_memory(self.blue.weights,self.red.weights)
@@ -28,6 +30,7 @@ class DualBrain:
             g['outputs']=[b.cells(['DNp09'],side='L'),b.cells(['DNp09'],side='R'),b.cells(['DNa02'],side='L'),b.cells(['DNa02'],side='R'),b.cells(['DNp01']),g['wing']]
             assert len(g['wing']) and len(g['ear'])
             self.groups.append(g)
+        if status:status("Warming up two independent brains")
         self.reset(seed)
     def reset(self,seed):
         self.seed=seed

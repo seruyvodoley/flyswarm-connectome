@@ -9,7 +9,7 @@
     "max_speed_kph": 40,
     "reverse_kph": 8,
     "cross_country_kph": 20,
-    "track_width_m": 0.55,
+    "track_width_m": 0.725,
     "traction": 0.65,
     "rolling_resistance": 0.055,
     "turn_rate_deg_s": 26,
@@ -101,7 +101,8 @@
         1.1,
         0
       ]
-    }
+    },
+    "track_spacing_m": 2.622
   },
   "provenance": {
     "mass_kg": {
@@ -135,10 +136,10 @@
       "note": "Provisional simulation parameter; not a verified engineering specification."
     },
     "track_width_m": {
-      "kind": "approximation",
-      "confidence": "low",
-      "source": "docs/known_approximations.md",
-      "note": "Provisional simulation parameter; not a verified engineering specification."
+      "kind": "historically_sourced",
+      "confidence": "medium",
+      "source": "https://tiger1.info/EN/Hull-dimensions.html",
+      "note": "Combat track width and track centre spacing from hull section drawing; transport tracks differ."
     },
     "traction": {
       "kind": "approximation",
@@ -265,6 +266,12 @@
       "confidence": "low",
       "source": "docs/known_approximations.md",
       "note": "Analytical damage volumes, not surveyed internal layout."
+    },
+    "track_spacing_m": {
+      "kind": "historically_sourced",
+      "confidence": "medium",
+      "source": "https://tiger1.info/EN/Hull-dimensions.html",
+      "note": "Combat track width and track centre spacing from hull section drawing; transport tracks differ."
     }
   }
 }

@@ -1,7 +1,7 @@
 extends RefCounted
 
 static func read_json(path: String) -> Dictionary:
-	var full = ProjectSettings.globalize_path("res://../../data/" + path)
+	var full = "res://data/"+path if FileAccess.file_exists("res://data/"+path) else ProjectSettings.globalize_path("res://../../data/" + path)
 	var f = FileAccess.open(full, FileAccess.READ)
 	assert(f != null, "Missing data: " + full)
 	var value = JSON.parse_string(f.get_as_text())

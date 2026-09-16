@@ -225,6 +225,9 @@ func step(dt: float):
 func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	if not alive:return
 	last_impact=Combat.impact(shell.ammo,shell.distance,shell.velocity,normal,cfg.armour_data[zone])
+	last_impact.shell=shell.ammo.get("id","unknown")
+	last_impact.impact_speed_m_s=shell.velocity.length()
+	last_impact.nominal_thickness_mm=cfg.armour_data[zone].thickness_mm
 	last_impact.zone=zone
 	last_impact.distance=shell.distance
 	last_impact.damaged=[]

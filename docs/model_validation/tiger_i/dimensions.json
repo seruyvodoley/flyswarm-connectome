@@ -1,28 +1,24 @@
 {
   "asset": "tiger_i.glb",
   "dimensions_xyz_m": [
-    3.8999998569488525,
-    8.22499966621399,
-    4.890000118874013
+    3.5505213737487793,
+    8.505000114440918,
+    2.9275000020861626
   ],
-  "triangles_lod0": 4020,
+  "triangles_lod0": 224036,
   "lod1": null,
   "lod2": null,
   "texture_sizes": [],
-  "status": "BLOCKOUT / HISTORICAL VALIDATION NOT PASSED",
+  "status": "INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED",
   "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
   "axis": "Blender x width, y overall length, z height incl antenna",
-  "height_without_antenna_m": 3.1574997901916504,
+  "height_without_antenna_m": 2.875,
   "dimension_checks": {
     "hull_length": {
       "status": "FAIL",
       "reason": "independent variant-specific reference not verified"
     },
     "overall_length_gun_forward": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
-    "hull_width": {
       "status": "FAIL",
       "reason": "independent variant-specific reference not verified"
     },
@@ -34,31 +30,7 @@
       "status": "FAIL",
       "reason": "independent variant-specific reference not verified"
     },
-    "ground_clearance": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
-    "track_width": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
-    "wheel_diameter": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
-    "wheel_centres": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
     "turret_ring_location": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
-    "turret_width": {
-      "status": "FAIL",
-      "reason": "independent variant-specific reference not verified"
-    },
-    "turret_height": {
       "status": "FAIL",
       "reason": "independent variant-specific reference not verified"
     },

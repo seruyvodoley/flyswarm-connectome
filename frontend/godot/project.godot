@@ -1,7 +1,9 @@
 config_version=5
 [application]
 config/name="FlySwarm • Krasny Valley"
-run/main_scene="res://scenes/Battle.tscn"
+run/main_scene="res://scenes/Bootstrap.tscn"
+[autoload]
+AppState="*res://scripts/app/app_state.gd"
 [display]
 window/size/viewport_width=1440
 window/size/viewport_height=900

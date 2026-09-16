@@ -70,7 +70,28 @@ var ended=false
 var finished_report=false
 var shot_distances=[]
 var capture_changes=0
+var objective_captures=[0,0]
+var objective_neutralizations=[0,0]
 var screenshot_path=""
+
+# ============================================================
+# TEST RANGE KILLCAM / HIT FEEDBACK
+# ============================================================
+
+var range_feedback: Label
+var range_feedback_timer=0.0
+
+var range_killcam_active=false
+var range_killcam_elapsed=0.0
+var range_killcam_duration=3.6
+var range_killcam_target=8
+var range_killcam_saved_camera=1
+var range_target_destroyed=false
+
+var range_killcam_panel: PanelContainer
+var range_killcam_title: Label
+var range_killcam_body: Label
+var range_killcam_path: MeshInstance3D
 
 func option(name: String, fallback: String="") -> String:
 	var args=launch_args if session_config!=null else OS.get_cmdline_user_args()
@@ -150,7 +171,7 @@ func _ready():
 	for i in range(3):
 		var v=scenario.objectives[i]
 		var pos=Vector3(v[0],terrain.height_at(v[0],v[1]),v[1])
-		objectives.append({"position":pos,"owner":-1,"progress":0.0})
+		objectives.append({"position":pos,"owner":-1,"progress":0.0,"contested":false,"inside":[0,0]})
 		var marker=MeshInstance3D.new()
 		var mesh=CylinderMesh.new()
 		mesh.top_radius=scenario.zone_radius
@@ -173,6 +194,8 @@ func _ready():
 		label.outline_size=4
 		add_child(label)
 		objectives[i].marker=marker
+		objectives[i].label=label
+		update_objective_visual(i)
 	for i in range(16):
 		var team=int(i/8)
 		var id=scenario.blue[i%8] if team==0 else scenario.red[i%8]
@@ -231,6 +254,71 @@ func _ready():
 	detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	detail.add_theme_font_size_override("font_size",12)
 	canvas.add_child(detail)
+
+	# --------------------------------------------------------
+	# Test Range hit feedback / killcam UI
+	# --------------------------------------------------------
+
+	range_feedback=Label.new()
+	range_feedback.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	range_feedback.offset_left=-310
+	range_feedback.offset_right=310
+	range_feedback.offset_top=82
+	range_feedback.offset_bottom=132
+	range_feedback.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	range_feedback.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+	range_feedback.add_theme_font_size_override("font_size",22)
+	range_feedback.add_theme_color_override("font_shadow_color",Color.BLACK)
+	range_feedback.add_theme_constant_override("shadow_offset_x",2)
+	range_feedback.add_theme_constant_override("shadow_offset_y",2)
+	range_feedback.visible=false
+	canvas.add_child(range_feedback)
+
+	range_killcam_panel=PanelContainer.new()
+	range_killcam_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	range_killcam_panel.offset_left=-330
+	range_killcam_panel.offset_right=330
+	range_killcam_panel.offset_top=-225
+	range_killcam_panel.offset_bottom=-28
+	range_killcam_panel.visible=false
+
+	var killcam_style=StyleBoxFlat.new()
+	killcam_style.bg_color=Color(.025,.035,.04,.92)
+	killcam_style.border_color=Color(.62,.54,.36,.9)
+	killcam_style.set_border_width_all(1)
+	killcam_style.set_corner_radius_all(5)
+	killcam_style.content_margin_left=20
+	killcam_style.content_margin_right=20
+	killcam_style.content_margin_top=14
+	killcam_style.content_margin_bottom=14
+	range_killcam_panel.add_theme_stylebox_override("panel",killcam_style)
+
+	var killcam_box=VBoxContainer.new()
+	killcam_box.add_theme_constant_override("separation",8)
+	range_killcam_panel.add_child(killcam_box)
+
+	range_killcam_title=Label.new()
+	range_killcam_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	range_killcam_title.add_theme_font_size_override("font_size",28)
+	killcam_box.add_child(range_killcam_title)
+
+	range_killcam_body=Label.new()
+	range_killcam_body.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	range_killcam_body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	range_killcam_body.add_theme_font_size_override("font_size",16)
+	killcam_box.add_child(range_killcam_body)
+
+	var reset_target_button=Button.new()
+	reset_target_button.text=AppState.tr_text("RESET TARGET")
+	reset_target_button.custom_minimum_size.y=40
+	reset_target_button.pressed.connect(reset_range_target)
+	killcam_box.add_child(reset_target_button)
+
+	canvas.add_child(range_killcam_panel)
+
+	range_killcam_path=MeshInstance3D.new()
+	range_killcam_path.visible=false
+	add_child(range_killcam_path)
 
 	# Clickable observer controls.
 	camera_button=Button.new()
@@ -349,6 +437,11 @@ func has_los(a,b) -> bool:
 
 func _physics_process(delta):
 	if paused:return
+
+	# Killcam is presentation-only. Freeze the manual range simulation while
+	# the observer camera inspects the destroyed target.
+	if is_range and range_killcam_active:
+		return
 	if replay_mode:
 		replay_clock+=delta
 		while replay_index<replay.size() and replay[replay_index].time<=replay_clock:
@@ -374,8 +467,13 @@ func _physics_process(delta):
 				var n=terrain.box(Vector3(xyz[0],xyz[1],xyz[2]),Vector3(.2,.2,.6),Color(1,.7,.2),false)
 				replay_shell_nodes.append(n)
 			for i in range(3):
-				objectives[i].owner=row.zones[i].owner
-				objectives[i].progress=row.zones[i].progress
+				var zone_state=row.zones[i]
+				objectives[i].owner=int(zone_state.get("owner",-1))
+				objectives[i].progress=float(zone_state.get("progress",0.0))
+				objectives[i].contested=zone_state.get("contested",false)
+				var replay_inside=zone_state.get("inside",[0,0])
+				objectives[i].inside=replay_inside.duplicate() if replay_inside is Array else [0,0]
+				update_objective_visual(i)
 			replay_index+=1
 		if replay_index>=replay.size():
 			if has("--quit"):get_tree().quit()
@@ -440,7 +538,13 @@ func _physics_process(delta):
 		progress_clock=sim_time
 		FileAccess.open(record_path.path_join("live.json"),FileAccess.WRITE).store_string(JSON.stringify({"sim_time":sim_time,"wall_time":(Time.get_ticks_usec()-start_wall)/1000000.0}))
 
-	if sim_time>=time_limit or minf(tickets[0],tickets[1])<=0 or alive_count(0)==0 or alive_count(1)==0:
+	var elimination_end = (
+		minf(tickets[0], tickets[1]) <= 0 or
+		alive_count(0) == 0 or
+		alive_count(1) == 0
+	)
+
+	if sim_time>=time_limit or (not is_range and elimination_end):
 		finish()
 
 func fire(v):
@@ -463,7 +567,7 @@ func fire(v):
 	vis.material_override=material
 	add_child(vis)
 	vis.position=p
-	shells.append({"position":p,"velocity":dir*v.cfg.ammo_data.muzzle_velocity_m_s,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"distance":0.0,"age":0.0,"visual":vis})
+	shells.append({"position":p,"velocity":dir*v.cfg.ammo_data.muzzle_velocity_m_s,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"origin":p,"distance":0.0,"age":0.0,"visual":vis})
 	effect(p,Color(1,.65,.16),.7,.10)
 	shot_distances.append(v.target_range)
 
@@ -481,7 +585,21 @@ func step_shells(dt: float):
 		var hit=get_world_3d().direct_space_state.intersect_ray(q)
 		if not hit.is_empty():
 			var victim=hit.collider.get_meta("vehicle") if hit.collider.has_meta("vehicle") else null
-			if victim!=null:victim.hit(s,hit.position,hit.normal,hit.collider.get_meta("zone"))
+
+			if victim!=null:
+				victim.hit(
+					s,
+					hit.position,
+					hit.normal,
+					hit.collider.get_meta("zone")
+				)
+
+				if is_range and victim.agent_id==8 and int(s.owner)==0:
+					on_range_target_impact(
+						victim,
+						s,
+						hit.position
+					)
 			effect(hit.position,Color(.69,.51,.27),1.3,.6)
 		if not hit.is_empty() or s.age>8 or s.distance>2500:
 			s.visual.queue_free()
@@ -490,46 +608,468 @@ func step_shells(dt: float):
 			s.position=to
 			s.visual.position=to
 
+func objective_capture_multiplier(count: int) -> float:
+	if count <= 0:
+		return 0.0
+
+	var bonus = float(scenario.get("capture_multi_bonus_per_extra_vehicle", 0.35))
+	var cap = float(scenario.get("capture_multi_cap", 2.0))
+
+	return minf(
+		cap,
+		1.0 + bonus * float(count - 1)
+	)
+
+
+func objective_destination(vehicle) -> Vector3:
+	# Rule AI знает о целях сценария.
+	# MaleCNS по-прежнему НЕ получает XYZ точек или скрытую команду
+	# "ехать на B".
+	var preferred = vehicle.agent_id % objectives.size()
+	var preferred_zone = objectives[preferred]
+
+	if int(preferred_zone.get("owner", -1)) != vehicle.team:
+		return preferred_zone["position"]
+
+	if bool(preferred_zone.get("contested", false)):
+		return preferred_zone["position"]
+
+	var best = -1
+	var best_distance = INF
+
+	for offset in range(objectives.size()):
+		var index = (preferred + offset) % objectives.size()
+		var zone = objectives[index]
+
+		if int(zone.get("owner", -1)) == vehicle.team:
+			if not bool(zone.get("contested", false)):
+				continue
+
+		var distance = vehicle.global_position.distance_squared_to(
+			zone["position"]
+		)
+
+		if distance < best_distance:
+			best_distance = distance
+			best = index
+
+	if best >= 0:
+		return objectives[best]["position"]
+
+	# Все точки уже наши: возвращаемся к исходной назначенной точке
+	# и фактически обороняем её.
+	return preferred_zone["position"]
+
+
+func objective_hud_status(zone: Dictionary) -> String:
+	var inside = zone.get("inside", [0, 0])
+
+	if bool(zone.get("contested", false)):
+		return "%s %d:%d" % [
+			AppState.tr_text("CONTESTED"),
+			int(inside[0]),
+			int(inside[1])
+		]
+
+	var control = float(zone.get("progress", 0.0))
+	var percent = clampi(
+		int(round(absf(control) * 100.0)),
+		0,
+		100
+	)
+
+	var owner = int(zone.get("owner", -1))
+
+	if owner == 0:
+		return "%s %d%%" % [
+			AppState.tr_text("BLUE"),
+			percent
+		]
+
+	if owner == 1:
+		return "%s %d%%" % [
+			AppState.tr_text("RED"),
+			percent
+		]
+
+	if control > 0.001:
+		return "%s ↑ %d%%" % [
+			AppState.tr_text("BLUE"),
+			percent
+		]
+
+	if control < -0.001:
+		return "%s ↑ %d%%" % [
+			AppState.tr_text("RED"),
+			percent
+		]
+
+	return AppState.tr_text("NEUTRAL")
+
+
+func update_objective_visual(index: int):
+	if index < 0 or index >= objectives.size():
+		return
+
+	var zone = objectives[index]
+
+	var neutral = Color(0.34, 0.36, 0.34)
+	var blue = Color(0.22, 0.42, 0.78)
+	var red = Color(0.76, 0.25, 0.18)
+	var contested = Color(0.90, 0.70, 0.16)
+
+	var control = float(zone.get("progress", 0.0))
+	var colour = neutral
+
+	if bool(zone.get("contested", false)):
+		colour = contested
+	elif control > 0.0:
+		colour = neutral.lerp(
+			blue,
+			clampf(control, 0.0, 1.0)
+		)
+	elif control < 0.0:
+		colour = neutral.lerp(
+			red,
+			clampf(-control, 0.0, 1.0)
+		)
+
+	var marker = zone.get("marker", null)
+
+	if is_instance_valid(marker):
+		if marker.material_override != null:
+			marker.material_override.albedo_color = colour
+
+	var objective_label = zone.get("label", null)
+
+	if is_instance_valid(objective_label):
+		objective_label.text = (
+			["A", "B", "C"][index]
+			+ "\n"
+			+ objective_hud_status(zone)
+		)
+
+
 func step_objectives(dt: float):
+	# Signed Domination control:
+	#
+	#   +1.0  BLUE owns
+	#    0.0  neutral
+	#   -1.0  RED owns
+	#
+	# Поэтому полный переворот:
+	#
+	# enemy-owned -> neutral -> friendly-owned
+
+	for index in range(objectives.size()):
+		var zone = objectives[index]
+
+		var counts = [0, 0]
+		var occupants = [[], []]
+
+		for vehicle in vehicles:
+			if not vehicle.alive:
+				continue
+
+			if vehicle.position.distance_to(
+				zone["position"]
+			) >= float(scenario.zone_radius):
+				continue
+
+			counts[vehicle.team] += 1
+			occupants[vehicle.team].append(vehicle)
+
+			vehicle.metrics.objective_presence_s += dt
+
+		zone["inside"] = [
+			counts[0],
+			counts[1]
+		]
+
+		var contested_now = (
+			counts[0] > 0
+			and counts[1] > 0
+		)
+
+		zone["contested"] = contested_now
+
+		# ====================================================
+		# CONTESTED
+		# ====================================================
+
+		if contested_now:
+			# Противники в круге блокируют изменение прогресса.
+			for team in range(2):
+				for vehicle in occupants[team]:
+					vehicle.metrics.contest_s += dt
+
+		# ====================================================
+		# ONE TEAM ONLY
+		# ====================================================
+
+		elif counts[0] > 0 or counts[1] > 0:
+			var team = 0
+			if counts[1] > 0:
+				team = 1
+
+			var direction = 1.0
+			if team == 1:
+				direction = -1.0
+
+			var multiplier = objective_capture_multiplier(
+				counts[team]
+			)
+
+			var capture_seconds = maxf(
+				0.001,
+				float(scenario.capture_seconds)
+			)
+
+			var previous = float(
+				zone.get("progress", 0.0)
+			)
+
+			var updated = clampf(
+				previous
+				+ direction
+				* (dt / capture_seconds)
+				* multiplier,
+				-1.0,
+				1.0
+			)
+
+			zone["progress"] = updated
+
+			# Только реальное движение capture bar считается вкладом
+			# в захват. Простое стояние на уже своей точке сюда не входит.
+			var effective_effort = (
+				absf(updated - previous)
+				* capture_seconds
+			)
+
+			if effective_effort > 0.0:
+				var per_vehicle = (
+					effective_effort
+					/ maxf(
+						1.0,
+						float(counts[team])
+					)
+				)
+
+				for vehicle in occupants[team]:
+					vehicle.metrics.capture_s += per_vehicle
+
+			# ====================================================
+			# ENEMY OWNED -> NEUTRAL
+			# ====================================================
+
+			var owner = int(
+				zone.get("owner", -1)
+			)
+
+			if owner == 0 and updated <= 0.0:
+				zone["owner"] = -1
+
+				objective_neutralizations[1] += 1
+				capture_changes += 1
+
+			elif owner == 1 and updated >= 0.0:
+				zone["owner"] = -1
+
+				objective_neutralizations[0] += 1
+				capture_changes += 1
+
+			# ====================================================
+			# NEUTRAL -> OWNED
+			# ====================================================
+
+			owner = int(
+				zone.get("owner", -1)
+			)
+
+			if owner == -1:
+				if updated >= 1.0:
+					zone["owner"] = 0
+
+					objective_captures[0] += 1
+					capture_changes += 1
+
+				elif updated <= -1.0:
+					zone["owner"] = 1
+
+					objective_captures[1] += 1
+					capture_changes += 1
+
+		update_objective_visual(index)
+
+	# ========================================================
+	# DOMINATION TICKET BLEED
+	# ========================================================
+	#
+	# Равное число точек:
+	#     bleed отсутствует
+	#
+	# 2 : 1
+	#     отстающая сторона теряет 1× base
+	#
+	# 2 : 0 / 3 : 1
+	#     2×
+	#
+	# 3 : 0
+	#     3×
+
+	var owned = [0, 0]
+
 	for zone in objectives:
-		var counts=[0,0]
-		for v in vehicles:
-			if v.alive and v.position.distance_to(zone.position)<scenario.zone_radius:
-				counts[v.team]+=1
-				v.metrics.capture_s+=dt
-		if counts[0]>0 and counts[1]==0:zone.progress=minf(1,zone.progress+dt/scenario.capture_seconds)
-		if counts[1]>0 and counts[0]==0:zone.progress=maxf(-1,zone.progress-dt/scenario.capture_seconds)
-		var old=zone.owner
-		if zone.progress>=1:zone.owner=0
-		if zone.progress<=-1:zone.owner=1
-		if old!=zone.owner:capture_changes+=1
-		if zone.owner>=0:
-			tickets[1-zone.owner]=maxf(0,tickets[1-zone.owner]-dt*scenario.ticket_bleed_per_s)
-			zone.marker.material_override.albedo_color=Color(.22,.38,.65) if zone.owner==0 else Color(.65,.27,.17)
+		var owner = int(
+			zone.get("owner", -1)
+		)
+
+		if owner >= 0:
+			owned[owner] += 1
+
+	var difference = owned[0] - owned[1]
+
+	var bleed = float(
+		scenario.ticket_bleed_per_s
+	)
+
+	if difference > 0:
+		tickets[1] = maxf(
+			0.0,
+			tickets[1]
+				- dt
+				* bleed
+				* float(difference)
+		)
+
+	elif difference < 0:
+		tickets[0] = maxf(
+			0.0,
+			tickets[0]
+				- dt
+				* bleed
+				* float(-difference)
+		)
+
+
 func alive_count(team: int) -> int:
 	var count=0
 	for v in vehicles:
 		if v.alive and v.team==team:count+=1
 	return count
-func effect(p: Vector3,c: Color,size: float,lifetime: float):
-	if session_config!=null and effects.size()>int(60*AppState.settings.effects):return
+func effect(
+	p: Vector3,
+	c: Color,
+	size: float,
+	lifetime: float,
+	expansion: float=.25,
+	rise_speed: float=0.0
+):
+	# Bounded visual effect.
+	#
+	# Old implementation multiplied scale every frame for the whole lifetime.
+	# A destroyed tank started at 5 m radius and grew for 8 seconds, producing
+	# a cloud hundreds of metres wide.
+	#
+	# This implementation has an explicit MAXIMUM expansion.
+
+	if session_config!=null:
+		var limit=int(60*AppState.settings.effects)
+		if effects.size()>=maxi(6,limit):
+			return
+
 	var mesh=MeshInstance3D.new()
+
 	var sphere=SphereMesh.new()
 	sphere.radius=size
-	sphere.height=size*2
-	sphere.radial_segments=8
-	sphere.rings=4
+	sphere.height=size*2.0
+	sphere.radial_segments=10
+	sphere.rings=6
 	mesh.mesh=sphere
-	mesh.material_override=terrain.material(c)
+
+	var material=StandardMaterial3D.new()
+	material.albedo_color=c
+	material.roughness=.9
+	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+
+	# Bright orange/yellow effects get a small self-lit component.
+	# Smoke remains normally shaded.
+	if maxf(c.r,maxf(c.g,c.b))>.55:
+		material.emission_enabled=true
+		material.emission=Color(c.r,c.g,c.b)
+
+	mesh.material_override=material
+
 	add_child(mesh)
-	mesh.position=p
-	effects.append({"node":mesh,"life":lifetime,"initial":lifetime})
+	mesh.global_position=p
+
+	effects.append({
+		"node":mesh,
+		"life":lifetime,
+		"initial":lifetime,
+		"expansion":maxf(0.0,expansion),
+		"rise_speed":rise_speed,
+		"base_alpha":c.a
+	})
+
+
+func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
+	# A tank destruction is a compact flash/fire/smoke event.
+	# Catastrophic ammo-rack destruction is somewhat stronger, but still
+	# deliberately bounded to a few metres rather than dozens/hundreds.
+
+	var intensity=1.15 if catastrophic else 1.0
+
+	# Very short internal flash.
+	effect(
+		p+Vector3(0,.7,0),
+		Color(1.0,.58,.12,1.0),
+		.85*intensity,
+		.16,
+		.40,
+		.2
+	)
+
+	# Fireball.
+	effect(
+		p+Vector3(0,1.0,0),
+		Color(.72,.27,.055,.92),
+		1.20*intensity,
+		.42,
+		.45,
+		.35
+	)
+
+	# Several compact smoke lobes instead of one enormous expanding sphere.
+	var smoke_count=5 if catastrophic else 4
+
+	for i in range(smoke_count):
+		var angle=rng.randf_range(0.0,TAU)
+		var radius=rng.randf_range(.25,1.25)
+
+		var offset=Vector3(
+			cos(angle)*radius,
+			rng.randf_range(.8,2.0),
+			sin(angle)*radius
+		)
+
+		effect(
+			p+offset,
+			Color(.13,.12,.105,.72),
+			rng.randf_range(.65,.95)*intensity,
+			rng.randf_range(2.0,2.8),
+			.85,
+			rng.randf_range(.45,.75)
+		)
+
+
 func snapshot() -> Dictionary:
 	var states=[]
 	for v in vehicles:
 		states.append({"id":v.agent_id,"vehicle":v.cfg.id,"position":[v.position.x,v.position.y,v.position.z],"yaw":v.rotation.y,"turret":v.turret_angle,"gun":v.gun_angle,"alive":v.alive,"modules":v.modules.duplicate(),"metrics":v.metrics.duplicate(),"target":v.target,"impact":v.last_impact.duplicate(true)})
 	var zones=[]
-	for z in objectives:zones.append({"owner":z.owner,"progress":z.progress})
+	for z in objectives:zones.append({"owner":z.owner,"progress":z.progress,"contested":z.contested,"inside":z.inside.duplicate()})
 	return {"time":sim_time,"vehicles":states,"tickets":tickets.duplicate(),"zones":zones,"brain":bridge.last_reply.get("mode","DISCONNECTED"),"projectiles":shell_snapshot(),"communication":current_communication().duplicate(true)}
 func shell_snapshot() -> Array:
 	var out=[]
@@ -551,6 +1091,8 @@ func finish(notify_result=true):
 	report.shot_distances=shot_distances
 	report.backend_metadata=bridge.last_reply.get("metadata",{})
 	report.capture_changes=capture_changes
+	report.objective_captures=objective_captures.duplicate()
+	report.objective_neutralizations=objective_neutralizations.duplicate()
 	report.track_segments=tracks.segments
 	report.max_rut_depth_m=tracks.max_depth
 	report.completion="complete" if notify_result else "interrupted"
@@ -565,9 +1107,64 @@ func finish(notify_result=true):
 func _process(dt):
 	for i in range(effects.size()-1,-1,-1):
 		var fx=effects[i]
-		fx.life-=dt
-		fx.node.scale*=1+dt*.5
-		if fx.life<=0:fx.node.queue_free();effects.remove_at(i)
+
+		fx["life"]=float(fx["life"])-dt
+
+		var initial=maxf(
+			.001,
+			float(fx.get("initial",1.0))
+		)
+
+		var progress=clampf(
+			1.0-float(fx["life"])/initial,
+			0.0,
+			1.0
+		)
+
+		# Smooth 0 -> 1 without unbounded multiplicative growth.
+		var smooth=progress*progress*(3.0-2.0*progress)
+
+		var maximum_scale=1.0+float(
+			fx.get("expansion",.25)
+		)
+
+		fx["node"].scale=Vector3.ONE*lerpf(
+			1.0,
+			maximum_scale,
+			smooth
+		)
+
+		fx["node"].position.y+=float(
+			fx.get("rise_speed",0.0)
+		)*dt
+
+		var material=fx["node"].material_override
+
+		if material is StandardMaterial3D:
+			var colour=material.albedo_color
+
+			colour.a=float(
+				fx.get("base_alpha",1.0)
+			)*pow(
+				maxf(0.0,1.0-progress),
+				1.35
+			)
+
+			material.albedo_color=colour
+
+		if float(fx["life"])<=0.0:
+			fx["node"].queue_free()
+			effects.remove_at(i)
+	if range_feedback_timer>0.0:
+		range_feedback_timer=maxf(0.0,range_feedback_timer-dt)
+
+		if range_feedback_timer<=0.0 and is_instance_valid(range_feedback):
+			range_feedback.visible=false
+
+	if is_range and range_killcam_active:
+		update_range_killcam(dt)
+		return
+
 	var v=vehicles[selected] if not vehicles.is_empty() else null
 	if v==null:return
 	sensor_debug.visible=debug
@@ -636,7 +1233,9 @@ func _process(dt):
 
 	hud.text=AppState.tr_format("hud.header",[
 		tickets[0],alive_count(0),tickets[1],alive_count(1),
-		objectives[0].owner,objectives[1].owner,objectives[2].owner,
+		objective_hud_status(objectives[0]),
+		objective_hud_status(objectives[1]),
+		objective_hud_status(objectives[2]),
 		sim_time,physics_name,audio_name,connection,
 		bridge.tick,bridge.last_reply.get("tick_ms",0),bridge.latency_ms,
 		Engine.get_frames_per_second()
@@ -684,9 +1283,19 @@ func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_TAB:selected=(selected+1)%16
-			KEY_C:cycle_camera()
+			KEY_C:
+				if is_range and range_killcam_active:
+					end_range_killcam()
+				else:
+					cycle_camera()
 			KEY_T:cycle_comms()
 			KEY_F1:debug=not debug
+			KEY_ENTER:
+				if is_range:
+					reset_range_target()
+			KEY_KP_ENTER:
+				if is_range:
+					reset_range_target()
 			KEY_SPACE:
 				if not is_range:paused=not paused
 			KEY_ESCAPE:
@@ -897,7 +1506,365 @@ func refresh_comm_panel():
 	comm_text.text="\n".join(lines)
 	update_comm_links(events)
 
+
+func range_impact_result(impact: Dictionary) -> String:
+	if bool(impact.get("ricochet",false)):
+		return AppState.tr_text("RICOCHET")
+
+	if bool(impact.get("penetrated",false)):
+		return AppState.tr_text("PENETRATION")
+
+	return AppState.tr_text("NO PENETRATION")
+
+
+func show_range_feedback(message: String, duration: float=1.8):
+	if not is_instance_valid(range_feedback):
+		return
+
+	range_feedback.text=message
+	range_feedback.visible=true
+	range_feedback_timer=duration
+
+
+func range_kill_reason(target) -> String:
+	if not bool(target.modules.get("ammo_rack", true)):
+		return AppState.tr_text("Ammo rack detonation")
+
+	var driver_down = not bool(target.modules.get("driver", true))
+	var gunner_down = not bool(target.modules.get("gunner", true))
+	var commander_down = not bool(target.modules.get("commander", true))
+
+	if driver_down and gunner_down and commander_down:
+		return AppState.tr_text("Crew incapacitated")
+
+	return AppState.tr_text("Critical internal damage")
+
+
+func on_range_target_impact(target, shell: Dictionary, point: Vector3):
+	if not is_range:
+		return
+
+	var impact=target.last_impact
+	if not impact is Dictionary:
+		return
+
+	var result=range_impact_result(impact)
+
+	var capability=float(
+		impact.get("capability",0.0)
+	)
+
+	var effective=float(
+		impact.get("effective",0.0)
+	)
+
+	var zone=str(
+		impact.get("zone","?")
+	)
+
+	var damaged=impact.get("damaged",[])
+	var damaged_text=""
+
+	if damaged is Array and not damaged.is_empty():
+		damaged_text=" · "+", ".join(
+			PackedStringArray(damaged)
+		)
+
+	show_range_feedback(
+		"%s · %s · %.0f / %.0f mm%s" % [
+			result,
+			zone,
+			capability,
+			effective,
+			damaged_text
+		]
+	)
+
+	if not target.alive:
+		start_range_killcam(
+			target,
+			shell,
+			point
+		)
+
+
+func clear_range_killcam_path():
+	if is_instance_valid(range_killcam_path):
+		range_killcam_path.mesh=null
+		range_killcam_path.visible=false
+
+
+func draw_range_killcam_path(
+	origin: Vector3,
+	impact_point: Vector3
+):
+	if not is_instance_valid(range_killcam_path):
+		return
+
+	var mesh=ImmediateMesh.new()
+	var material=StandardMaterial3D.new()
+
+	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color=Color(1.0,.76,.20,1.0)
+	material.no_depth_test=true
+
+	mesh.surface_begin(
+		Mesh.PRIMITIVE_LINES,
+		material
+	)
+
+	mesh.surface_add_vertex(origin)
+	mesh.surface_add_vertex(impact_point)
+
+	mesh.surface_end()
+
+	range_killcam_path.mesh=mesh
+	range_killcam_path.visible=true
+
+
+func start_range_killcam(
+	target,
+	shell: Dictionary,
+	impact_point: Vector3
+):
+	if not is_range:
+		return
+
+	range_target_destroyed=true
+	range_killcam_active=true
+	range_killcam_elapsed=0.0
+	range_killcam_target=target.agent_id
+	range_killcam_saved_camera=camera_mode
+
+	camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+	camera.fov=55
+
+	var impact=target.last_impact
+	var ammo=shell.get("ammo",{})
+
+	var shell_name=str(
+		ammo.get(
+			"id",
+			impact.get("shell","unknown")
+		)
+	)
+
+	var damaged=impact.get("damaged",[])
+	var damaged_text=AppState.tr_text("none")
+
+	if damaged is Array and not damaged.is_empty():
+		damaged_text=", ".join(
+			PackedStringArray(damaged)
+		)
+
+	var reason=range_kill_reason(target)
+
+	range_killcam_title.text=AppState.tr_text(
+		"TARGET DESTROYED"
+	)
+
+	var killcam_lines = PackedStringArray()
+	killcam_lines.append(AppState.tr_text("Killcam"))
+	killcam_lines.append(target.cfg.display_name)
+	killcam_lines.append("")
+	killcam_lines.append(
+		AppState.tr_text("Shell")
+		+ ": "
+		+ shell_name
+	)
+	killcam_lines.append(
+		AppState.tr_text("Hit zone")
+		+ ": "
+		+ str(impact.get("zone", "?"))
+	)
+	killcam_lines.append(
+		AppState.tr_text("Impact distance")
+		+ ": %.0f m" % float(impact.get("distance", 0.0))
+	)
+	killcam_lines.append(
+		AppState.tr_text("Damaged modules")
+		+ ": "
+		+ damaged_text
+	)
+	killcam_lines.append(
+		AppState.tr_text("Destruction reason")
+		+ ": "
+		+ reason
+	)
+	killcam_lines.append("")
+	killcam_lines.append(
+		AppState.tr_text("Press C to skip killcam")
+		+ " · "
+		+ AppState.tr_text("Press Enter to reset target")
+	)
+
+	range_killcam_body.text = "\n".join(killcam_lines)
+
+	range_killcam_panel.visible=true
+
+	var origin=shell.get(
+		"origin",
+		vehicles[0].muzzle.global_position
+	)
+
+	if origin is Vector3:
+		draw_range_killcam_path(
+			origin,
+			impact_point
+		)
+
+	show_range_feedback(
+		AppState.tr_text("TARGET DESTROYED"),
+		2.0
+	)
+
+
+func update_range_killcam(dt: float):
+	if not range_killcam_active:
+		return
+
+	range_killcam_elapsed+=dt
+
+	if range_killcam_target < 0 or range_killcam_target >= vehicles.size():
+		end_range_killcam()
+		return
+
+	var target=vehicles[range_killcam_target]
+
+	var centre = target.global_position + Vector3(0, 1.5, 0)
+
+	# Slow cinematic orbit around the wreck.
+	var angle = target.rotation.y + 2.35 + range_killcam_elapsed * 0.32
+
+	var radius=11.5
+
+	var desired = centre + Vector3(
+		sin(angle) * radius,
+		5.2,
+		cos(angle) * radius
+	)
+
+	camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+	camera.position=camera.position.lerp(
+		desired,
+		minf(1.0,dt*4.5)
+	)
+
+	camera.look_at(
+		centre,
+		Vector3.UP
+	)
+
+	if range_killcam_elapsed>=range_killcam_duration:
+		end_range_killcam()
+
+
+func end_range_killcam():
+	if not range_killcam_active:
+		return
+
+	range_killcam_active=false
+	range_killcam_elapsed=0.0
+
+	camera_mode=range_killcam_saved_camera
+	update_camera_button()
+
+	clear_range_killcam_path()
+
+	# Keep the summary panel visible until the user restores the target.
+	if range_target_destroyed:
+		range_killcam_panel.visible=true
+
+
+func reset_range_target():
+	if not is_range:
+		return
+
+	if vehicles.size()<=8:
+		return
+
+	var target=vehicles[8]
+
+	range_killcam_active=false
+	range_target_destroyed=false
+	range_killcam_elapsed=0.0
+
+	clear_range_killcam_path()
+
+	if is_instance_valid(range_killcam_panel):
+		range_killcam_panel.visible=false
+
+	target.alive=true
+	target.show()
+
+	target.speed=0.0
+	target.velocity=Vector3.ZERO
+	target.yaw_rate=0.0
+
+	target.turret_angle=0.0
+	target.gun_angle=0.0
+
+	target.reload_left=0.0
+	target.ammo_left=int(target.cfg.ammo_count)
+
+	target.cmd=[
+		0.0,0.0,0.0,
+		0.0,0.0,0.0
+	]
+
+	target.target=-1
+	target.seen=false
+	target.last_impact={}
+
+	for key in target.modules:
+		target.modules[key]=true
+
+	# Remove destruction-char material override and restore materials embedded
+	# in the GLB.
+	for mesh in target.model.find_children(
+		"*",
+		"MeshInstance3D",
+		true,
+		false
+	):
+		mesh.material_override=null
+
+	var distance=500
+	var angle=0
+
+	if session_config!=null:
+		distance=int(session_config.range_distance)
+		angle=int(session_config.target_angle)
+
+	target.position = Vector3(0.0, 0.1, 0.5 * float(distance))
+
+	target.rotation = Vector3(
+		0.0,
+		PI + deg_to_rad(float(angle)),
+		0.0
+	)
+
+	if target.turret:
+		target.turret.rotation.y=0.0
+
+	if target.gun:
+		target.gun.rotation.x=0.0
+
+	camera_mode=1
+	update_camera_button()
+
+	vehicles[0].target=8
+	vehicles[0].target_range = vehicles[0].position.distance_to(target.position)
+
+	show_range_feedback(
+		AppState.tr_text("TARGET RESTORED"),
+		1.5
+	)
+
+
 func manual_commands() -> Array:
+	if range_killcam_active:
+		return [0,0,0,0,0,0]
 	if camera_mode in [0,3]:return [0,0,0,0,0,0]
 	var drive=float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	var steer=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))

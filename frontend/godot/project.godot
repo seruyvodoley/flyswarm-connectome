@@ -5,6 +5,8 @@ run/main_scene="res://scenes/Bootstrap.tscn"
 [autoload]
 AppState="*res://scripts/app/app_state.gd"
 [display]
+window/stretch/aspect="expand"
+window/stretch/mode="canvas_items"
 window/size/viewport_width=1440
 window/size/viewport_height=900
 window/size/window_width_override=1280

@@ -173,6 +173,7 @@ func test_range():
 	dropdown("Target angle",["0°","30°","45°","60°"],[0,30,45,60],s.target_angle,func(v):s.target_angle=v)
 	dropdown("Mode",["Free drive","Mobility","Gunnery","Armour","Module damage"],["free","mobility","gunnery","armour","modules"],s.range_mode,func(v):s.range_mode=v)
 	text_block("W/S drive · A/D steer · Q/E turret · R/F elevation · left mouse/Space fire\nRight mouse drag aims. C camera · F1 armour debug · ESC pause/menu. Target remains stationary.")
+	text_block("To destroy the target: destroy its ammo rack, or disable driver + gunner + commander. Every hit shows penetration feedback. A kill starts Killcam; Enter restores the target.")
 	button(body,"START",AppState.launch);back()
 func replays():
 	title("RECORDED WORLD STATES","Replays")

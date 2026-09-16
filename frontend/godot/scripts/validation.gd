@@ -42,11 +42,76 @@ func run():
 	await physics_frame
 	check(not scene.has_los(a,b),"building blocks LOS")
 	blocker.queue_free()
+	# Domination capture validation.
 	for v in scene.vehicles:v.position=Vector3(-600,100,-600)
-	a.position=scene.objectives[0].position
-	scene.step_objectives(13)
-	check(scene.objectives[0].owner==0,"capture")
-	check(scene.tickets[1]<300,"ticket bleed")
+
+	var zone=scene.objectives[0]
+	var capture_time=float(scene.scenario.capture_seconds)
+
+	# Neutral -> BLUE.
+	a.position=zone.position
+	scene.step_objectives(capture_time+.1)
+	check(zone.owner==0,"neutral point captured by BLUE")
+	check(zone.progress>=.999,"BLUE capture reaches full control")
+
+	# With 1–0 objective control only RED should bleed.
+	var tickets_before=scene.tickets.duplicate()
+	scene.step_objectives(1.0)
+	check(scene.tickets[1]<tickets_before[1],"leading objective control bleeds trailing team")
+	check(is_equal_approx(scene.tickets[0],tickets_before[0]),"leading team does not simultaneously bleed")
+
+	# Enemy presence contests and freezes progress.
+	b.position=zone.position
+	var contested_progress=float(zone.progress)
+	scene.step_objectives(2.0)
+	check(zone.contested,"mixed teams mark objective contested")
+	check(is_equal_approx(zone.progress,contested_progress),"contested point freezes capture progress")
+
+	# RED alone first neutralizes BLUE.
+	a.position=Vector3(-600,100,-600)
+	scene.step_objectives(capture_time+.1)
+	check(zone.owner==-1,"enemy capture neutralizes before flipping ownership")
+	check(zone.progress<=0,"neutralization crosses centre control")
+
+	# While neutral, the objective itself causes no ticket bleed.
+	var neutral_tickets=scene.tickets.duplicate()
+	scene.step_objectives(.5)
+	check(is_equal_approx(scene.tickets[0],neutral_tickets[0]) and is_equal_approx(scene.tickets[1],neutral_tickets[1]),"neutral objective causes no domination bleed")
+
+	# Continue RED capture.
+	scene.step_objectives(capture_time+.1)
+	check(zone.owner==1,"neutral objective subsequently captured by RED")
+	check(zone.progress<=-.999,"RED capture reaches full control")
+
+	# Multiple vehicles accelerate capture with bounded diminishing returns.
+	b.position=Vector3(-600,100,-600)
+	zone.owner=-1
+	zone.progress=0.0
+	zone.contested=false
+	zone.inside=[0,0]
+
+	a.position=zone.position
+	scene.step_objectives(3.0)
+	var single_progress=absf(float(zone.progress))
+
+	zone.owner=-1
+	zone.progress=0.0
+	zone.contested=false
+	zone.inside=[0,0]
+	a.position=zone.position
+	scene.vehicles[1].position=zone.position
+	scene.step_objectives(3.0)
+	var double_progress=absf(float(zone.progress))
+
+	check(double_progress>single_progress,"multiple friendly vehicles accelerate capture")
+	check(scene.objective_capture_multiplier(16)<=float(scene.scenario.capture_multi_cap),"capture acceleration is capped")
+
+	# Clear objective state before the remaining physics validation.
+	for v in scene.vehicles:v.position=Vector3(-600,100,-600)
+	zone.owner=-1
+	zone.progress=0
+	zone.contested=false
+	zone.inside=[0,0]
 	for v in scene.vehicles:
 		v.position=Vector3(0,100,0)
 		v.rotation=Vector3.ZERO

@@ -7,7 +7,7 @@ const EN = {
 	"hud.header":
 		"KRASNY VALLEY   /   FLYSWARM RESEARCH\n"
 		+ "GERMANY  %03d  (%d alive)     USSR  %03d  (%d alive)\n"
-		+ "A %d   B %d   C %d   |   %.1fs   %s   %s\n"
+		+ "A %s   B %s   C %s   |   %.1fs   %s   %s\n"
 		+ "%s\n"
 		+ "Brain tick %d  %.1fms   IPC %.1fms   FPS %d",
 
@@ -338,6 +338,34 @@ const RU = {
 	"yes": "да",
 	"no": "нет",
 
+	# Objectives
+	"BLUE": "СИНИЕ",
+	"RED": "КРАСНЫЕ",
+	"NEUTRAL": "НЕЙТР.",
+	"CONTESTED": "СПОРНАЯ",
+
+	# Test Range killcam
+	"TARGET DESTROYED": "ЦЕЛЬ УНИЧТОЖЕНА",
+	"TARGET RESTORED": "ЦЕЛЬ ВОССТАНОВЛЕНА",
+	"RESET TARGET": "ВОССТАНОВИТЬ ЦЕЛЬ",
+	"Killcam": "Киллкам",
+	"PENETRATION": "ПРОБИТИЕ",
+	"RICOCHET": "РИКОШЕТ",
+	"NO PENETRATION": "НЕ ПРОБИЛ",
+	"Ammo rack detonation": "Поражение боеукладки",
+	"Crew incapacitated": "Экипаж выведен из строя",
+	"Critical internal damage": "Критические внутренние повреждения",
+	"Shell": "Снаряд",
+	"Hit zone": "Зона попадания",
+	"Impact distance": "Дистанция попадания",
+	"Damaged modules": "Повреждённые модули",
+	"Destruction reason": "Причина уничтожения",
+	"Press C to skip killcam": "C — пропустить киллкам",
+	"Press Enter to reset target": "Enter — восстановить цель",
+	"none": "нет",
+	"To destroy the target: destroy its ammo rack, or disable driver + gunner + commander. Every hit shows penetration feedback. A kill starts Killcam; Enter restores the target.":
+		"Чтобы уничтожить цель: поразите боеукладку либо выведите из строя водителя + наводчика + командира. После каждого попадания показывается результат. После уничтожения запускается киллкам; Enter восстанавливает цель.",
+
 	# Cameras
 	"Battlefield": "Поле боя",
 	"Third-person": "От третьего лица",
@@ -366,7 +394,7 @@ const RU = {
 	"hud.header":
 		"КРАСНАЯ ДОЛИНА   /   ИССЛЕДОВАНИЕ FLYSWARM\n"
 		+ "ГЕРМАНИЯ  %03d  (%d в строю)     СССР  %03d  (%d в строю)\n"
-		+ "A %d   B %d   C %d   |   %.1fс   %s   %s\n"
+		+ "A %s   B %s   C %s   |   %.1fс   %s   %s\n"
 		+ "%s\n"
 		+ "Brain tick %d  %.1fмс   IPC %.1fмс   FPS %d",
 

@@ -22,7 +22,7 @@ var cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
 var modules={}
 var volumes={}
 var armour_bodies=[]
-var metrics={"distance_travelled":0.0,"stationary_s":0.0,"reverse_s":0.0,"shots":0,"penetrations":0,"kills":0,"capture_s":0.0,"target_switches":0,"target_visible_s":0.0,"chassis_aim_s":0.0}
+var metrics={"distance_travelled":0.0,"stationary_s":0.0,"reverse_s":0.0,"shots":0,"penetrations":0,"kills":0,"capture_s":0.0,"objective_presence_s":0.0,"contest_s":0.0,"target_switches":0,"target_visible_s":0.0,"chassis_aim_s":0.0}
 var last_impact={}
 var dn=[0,0,0,0,0]
 var audio_input=0.0
@@ -144,7 +144,10 @@ func sense(dt: float):
 	if previous_target!=target and previous_target>=0: metrics.target_switches+=1
 
 func teacher() -> Array:
-	var destination=world.objectives[agent_id%3].position
+	# Rule AI may reason about scenario objectives. MaleCNS observations remain
+	# unchanged: no objective XYZ or hidden "go capture B" command is injected
+	# into the biological controller.
+	var destination=world.objective_destination(self)
 	var delta=destination-global_position
 	var heading=wrapf(atan2(delta.x,delta.z)-rotation.y,-PI,PI)
 	var steer=clampf(heading*2,-1,1)
@@ -251,7 +254,7 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 		speed=0
 		world.tickets[team]-=world.scenario.loss_cost
 		world.vehicles[shell.owner].metrics.kills+=1
-		world.effect(global_position+Vector3(0,2,0),Color(.15,.13,.11),5,8)
+		world.vehicle_destroyed_effect(global_position+Vector3(0,1.0,0),not modules.ammo_rack)
 		var charred=StandardMaterial3D.new()
 		charred.albedo_color=Color(.12,.10,.08)
 		charred.roughness=1

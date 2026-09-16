@@ -43,5 +43,8 @@
     "su100"
   ],
   "spawn_z": 400,
-  "spawn_spacing": 28
+  "spawn_spacing": 28,
+  "objective_mode": "domination",
+  "capture_multi_bonus_per_extra_vehicle": 0.35,
+  "capture_multi_cap": 2.0
 }

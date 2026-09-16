@@ -1,0 +1,270 @@
+{
+  "id": "is2_1944",
+  "name": "IS-2 model 1944",
+  "nation": "ussr",
+  "role": "heavy",
+  "parameters": {
+    "mass_kg": 46000,
+    "engine_kw": 387.8,
+    "max_speed_kph": 37,
+    "reverse_kph": 10,
+    "cross_country_kph": 18,
+    "track_width_m": 0.55,
+    "traction": 0.65,
+    "rolling_resistance": 0.055,
+    "turn_rate_deg_s": 26,
+    "steering_loss": 0.45,
+    "brake_m_s2": 3.5,
+    "neutral_steering": false,
+    "gears": [
+      0.18,
+      0.3,
+      0.46,
+      0.65,
+      0.82,
+      1.0
+    ],
+    "reload_s": 24,
+    "turret_rate_deg_s": 13,
+    "elevation_deg": [
+      -3,
+      20
+    ],
+    "traverse_limit_deg": 180,
+    "ammo_count": 28,
+    "gun": "d25t",
+    "armour": "is2_1944",
+    "length_m": 6.77,
+    "width_m": 3.07,
+    "hull_height_m": 1.9,
+    "turreted": true,
+    "wheel_count": 6,
+    "fuel_litres": 500,
+    "modules": {
+      "driver": [
+        -0.6,
+        1.1,
+        1.86175
+      ],
+      "gunner": [
+        -0.55,
+        2.15,
+        0.4
+      ],
+      "commander": [
+        -0.55,
+        2.2,
+        -0.5
+      ],
+      "loader": [
+        0.6,
+        2,
+        0.2
+      ],
+      "engine": [
+        0,
+        1.1,
+        -2.20025
+      ],
+      "transmission": [
+        0,
+        0.7,
+        -2.708
+      ],
+      "breech": [
+        0,
+        2.1,
+        0.7
+      ],
+      "turret_drive": [
+        0,
+        1.8,
+        0
+      ],
+      "track_left": [
+        -1.535,
+        0.6,
+        0
+      ],
+      "track_right": [
+        1.535,
+        0.6,
+        0
+      ],
+      "fuel": [
+        0.8,
+        1.1,
+        -1.86175
+      ],
+      "ammo_rack": [
+        0.8,
+        1.1,
+        0
+      ]
+    }
+  },
+  "provenance": {
+    "mass_kg": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "engine_kw": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "max_speed_kph": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "reverse_kph": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "cross_country_kph": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "track_width_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "traction": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "rolling_resistance": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "turn_rate_deg_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "steering_loss": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "brake_m_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "neutral_steering": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "gears": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "reload_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "turret_rate_deg_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "elevation_deg": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "traverse_limit_deg": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "ammo_count": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "gun": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "armour": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "length_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "width_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "hull_height_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "turreted": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "wheel_count": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "fuel_litres": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "modules": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Analytical damage volumes, not surveyed internal layout."
+    }
+  }
+}

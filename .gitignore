@@ -17,7 +17,12 @@ results/tmp/
 results/flyswarm_05_two_brains_8v8_raw.csv
 # Local connectome data; canonical dataset is outside this repository
 fly-data/
-data/
+data/local/
 # Temporary files
 *.tmp
 *.bak
+
+# Godot imports and local recordings
+.godot/
+results/replays/
+*.blend1

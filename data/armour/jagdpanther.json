@@ -1,0 +1,64 @@
+{
+  "zones": {
+    "upper_front": {
+      "thickness_mm": 80,
+      "slope_deg": 55,
+      "material": "homogeneous approximation"
+    },
+    "lower_front": {
+      "thickness_mm": 60,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "side": {
+      "thickness_mm": 50,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "rear": {
+      "thickness_mm": 40,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "turret_front": {
+      "thickness_mm": 80,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "turret_side": {
+      "thickness_mm": 50,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "turret_rear": {
+      "thickness_mm": 40,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "mantlet": {
+      "thickness_mm": 100,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "roof": {
+      "thickness_mm": 25,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "casemate_front": {
+      "thickness_mm": 80,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    },
+    "casemate_side": {
+      "thickness_mm": 50,
+      "slope_deg": 0,
+      "material": "homogeneous approximation"
+    }
+  },
+  "provenance": {
+    "kind": "approximation",
+    "source": "docs/known_approximations.md",
+    "note": "Coarse nominal zones and assumed layout; verify plate/variant details before quantitative historical claims."
+  }
+}

@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+TASK_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$TASK_ROOT"
+TASK_PYTHON=${PYTHON:-"$TASK_ROOT/.venv/bin/python"}
+export PYTHONPATH="$TASK_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+if [ -n "${GODOT:-}" ]; then TASK_GODOT=$GODOT
+elif command -v godot >/dev/null 2>&1; then TASK_GODOT=$(command -v godot)
+elif command -v godot4 >/dev/null 2>&1; then TASK_GODOT=$(command -v godot4)
+elif [ -x "$HOME/Applications/Godot.app/Contents/MacOS/Godot" ]; then TASK_GODOT="$HOME/Applications/Godot.app/Contents/MacOS/Godot"
+else TASK_GODOT=/Applications/Godot.app/Contents/MacOS/Godot
+fi
+TASK_ACTION=${1:-run-demo}
+if [ "$#" -gt 0 ]; then shift; fi
+# A fresh checkout has GLBs but no local Godot import cache.
+case "$TASK_ACTION" in
+ run-demo|run-battle|run-training|run-tests|run-ballistics-test|headless)
+  if [ ! -d frontend/godot/.godot/imported ]; then
+   "$TASK_GODOT" --headless --editor --path frontend/godot --import
+  fi ;;
+esac
+case "$TASK_ACTION" in
+ run-demo) exec "$TASK_GODOT" --path frontend/godot -- "$@" ;;
+ run-battle) exec "$TASK_GODOT" --path frontend/godot -- --connect "$@" ;;
+ run-brains) exec "$TASK_PYTHON" -m flyswarm.bridge.server "$@" ;;
+ run-training) exec "$TASK_PYTHON" tools/training_smoke.py --godot "$TASK_GODOT" "$@" ;;
+ run-tests) "$TASK_PYTHON" -m unittest discover -s tests -v; exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;
+ run-ballistics-test) exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;
+ headless) exec "$TASK_GODOT" --headless --path frontend/godot -- "$@" ;;
+ *) echo "Unknown command: $TASK_ACTION" >&2; exit 2 ;;
+esac

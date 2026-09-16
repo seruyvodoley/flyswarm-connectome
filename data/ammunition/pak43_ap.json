@@ -1,0 +1,37 @@
+{
+  "id": "pak43_ap",
+  "type": "APHE approximation",
+  "mass_kg": 10.2,
+  "muzzle_velocity_m_s": 1000,
+  "drag_per_m": 4e-05,
+  "penetration_mm": [
+    [
+      100,
+      230
+    ],
+    [
+      500,
+      210
+    ],
+    [
+      1000,
+      187
+    ],
+    [
+      1500,
+      163
+    ],
+    [
+      2000,
+      145
+    ]
+  ],
+  "normalization_deg": 3,
+  "ricochet_deg": 72,
+  "explosive_filler_kg": null,
+  "provenance": {
+    "kind": "approximation",
+    "source": "docs/known_approximations.md",
+    "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation."
+  }
+}

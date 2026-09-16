@@ -44,7 +44,7 @@ communication и текущая архитектура two-brain 8v8.
 Структура:
 
 ```text
-src/flyswarm/              каркас будущего общего пакета
+src/flyswarm/              3D neural backend и исторический Python-проект
 experiments/single_agent/  нейронные экраны, tracking, pursuit/escape pathways
 experiments/flytank/       FlyTank 0.2–0.4
 experiments/swarm/         FlySwarm 0.1–0.5
@@ -98,7 +98,7 @@ python -m compileall -x '/\._' experiments src archive
 python -m unittest discover -s tests -v
 # Необязательно: pip install -r requirements-dev.txt
 # python -m pytest -q
-pythontools/smoke_flyswarm05.py
+python tools/smoke_flyswarm05.py
 ```
 
 На внешнем macOS-диске исключение `/\._` пропускает служебные AppleDouble
@@ -116,3 +116,47 @@ Phase 2 refactor: extract common world/combat/audio/perception code into
 смысл `segment_circle_t`: сейчас возвращается проекция ближайшей точки,
 а не первое пересечение с окружностью. Сохранить исторические baseline и
 архитектуру двух независимых мозгов при дальнейших изменениях.
+
+
+## 3D research prototype (Godot + Python)
+
+Новая 3D-среда находится в `frontend/godot`; исторические 2D-эксперименты
+сохранены без изменений. Это рабочий прототип, **не завершённый исторический
+симулятор**: все шесть GLB пока являются blockout-моделями и не прошли
+проверку визуальной достоверности. Таблицы брони/боеприпасов приближённые.
+
+Проверено: Godot 4.7.2, Blender 5.0.1, macOS M2 8 GB, Python 3.11.
+`tools/run` использует `.venv/bin/python` и Godot из PATH или Applications.
+Другие пути можно задать переменными `PYTHON` и `GODOT`.
+
+```bash
+# Самостоятельный 3D-бой с явно обозначенным rule-based контроллером
+./tools/run run-demo
+# Ограниченный запуск и запись в новый локальный каталог
+./tools/run headless --seconds 30 --quit --record /tmp/flyswarm-demo-new
+# Python + Godot проверки без загрузки MaleCNS
+./tools/run run-tests
+# Настоящие два FlyBrain(batch=8): запустить в двух терминалах
+./tools/run run-brains
+./tools/run run-battle --seconds 5 --quit
+# Короткий train → save → reload → frozen eval с реальным connectome
+./tools/run run-training --seconds 1
+# Чтение записанного replay
+./tools/run run-demo --replay /tmp/flyswarm-demo-new/replay.jsonl
+```
+
+TAB выбирает агента, C переключает четыре камеры, F1 показывает сенсоры,
+SPACE ставит на паузу. В свободной камере WASD / Q / E / стрелки.
+Без Python HUD сообщает `BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL`.
+При `--connect` отказ backend останавливает интеграцию; скрытой подмены мозга нет.
+
+Карты: Krasny Valley 1.5 км, отдельный `--training` стенд. Флаги
+`--normalized`, `--swap`, `--mirror`, `--audio no_audio|team_audio|all_audio`
+задают сравнительные условия. Пример readout в `results/models/3d/shared`
+обучен только на 800 smoke samples и не предназначен для оценки качества боя.
+
+Документация: [архитектура](docs/simulator_architecture.md),
+[физика и следы](docs/vehicle_physics.md), [броня](docs/armour_and_ballistics.md),
+[нейронный интерфейс](docs/brain_vehicle_interface.md), [обучение](docs/training.md),
+[известные ограничения](docs/known_approximations.md),
+[проверка моделей](docs/vehicle_visual_references.md).

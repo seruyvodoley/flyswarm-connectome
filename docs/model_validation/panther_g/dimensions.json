@@ -1,0 +1,74 @@
+{
+  "asset": "panther_g.glb",
+  "dimensions_xyz_m": [
+    3.4700000286102295,
+    8.999999761581421,
+    4.890000118874013
+  ],
+  "triangles_lod0": 4020,
+  "lod1": null,
+  "lod2": null,
+  "texture_sizes": [],
+  "status": "BLOCKOUT / HISTORICAL VALIDATION NOT PASSED",
+  "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
+  "axis": "Blender x width, y overall length, z height incl antenna",
+  "height_without_antenna_m": 3.1574997901916504,
+  "dimension_checks": {
+    "hull_length": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "overall_length_gun_forward": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "hull_width": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "overall_width": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "height_without_antenna": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "ground_clearance": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "track_width": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "wheel_diameter": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "wheel_centres": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "turret_ring_location": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "turret_width": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "turret_height": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "gun_calibre": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    },
+    "barrel_length": {
+      "status": "FAIL",
+      "reason": "independent variant-specific reference not verified"
+    }
+  }
+}

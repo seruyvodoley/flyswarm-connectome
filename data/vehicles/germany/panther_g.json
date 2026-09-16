@@ -1,0 +1,270 @@
+{
+  "id": "panther_g",
+  "name": "Panther G",
+  "nation": "germany",
+  "role": "medium",
+  "parameters": {
+    "mass_kg": 44000,
+    "engine_kw": 522.0,
+    "max_speed_kph": 55,
+    "reverse_kph": 4,
+    "cross_country_kph": 25,
+    "track_width_m": 0.55,
+    "traction": 0.65,
+    "rolling_resistance": 0.055,
+    "turn_rate_deg_s": 26,
+    "steering_loss": 0.45,
+    "brake_m_s2": 3.5,
+    "neutral_steering": true,
+    "gears": [
+      0.18,
+      0.3,
+      0.46,
+      0.65,
+      0.82,
+      1.0
+    ],
+    "reload_s": 8,
+    "turret_rate_deg_s": 30,
+    "elevation_deg": [
+      -8,
+      20
+    ],
+    "traverse_limit_deg": 180,
+    "ammo_count": 82,
+    "gun": "kwk42",
+    "armour": "panther_g",
+    "length_m": 6.87,
+    "width_m": 3.27,
+    "hull_height_m": 1.9,
+    "turreted": true,
+    "wheel_count": 8,
+    "fuel_litres": 500,
+    "modules": {
+      "driver": [
+        -0.6,
+        1.1,
+        1.88925
+      ],
+      "gunner": [
+        -0.55,
+        2.15,
+        0.4
+      ],
+      "commander": [
+        -0.55,
+        2.2,
+        -0.5
+      ],
+      "loader": [
+        0.6,
+        2,
+        0.2
+      ],
+      "engine": [
+        0,
+        1.1,
+        -2.2327500000000002
+      ],
+      "transmission": [
+        0,
+        0.7,
+        2.2327500000000002
+      ],
+      "breech": [
+        0,
+        2.1,
+        0.7
+      ],
+      "turret_drive": [
+        0,
+        1.8,
+        0
+      ],
+      "track_left": [
+        -1.635,
+        0.6,
+        0
+      ],
+      "track_right": [
+        1.635,
+        0.6,
+        0
+      ],
+      "fuel": [
+        0.8,
+        1.1,
+        -1.88925
+      ],
+      "ammo_rack": [
+        0.8,
+        1.1,
+        0
+      ]
+    }
+  },
+  "provenance": {
+    "mass_kg": {
+      "kind": "historically_sourced",
+      "confidence": "medium",
+      "source": "https://tankmuseum.org/tank-nuts/tank-collection/panther/",
+      "note": "Museum specification; vehicle/variant operating conditions may differ."
+    },
+    "engine_kw": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "max_speed_kph": {
+      "kind": "historically_sourced",
+      "confidence": "medium",
+      "source": "https://tankmuseum.org/tank-nuts/tank-collection/panther/",
+      "note": "Museum specification; vehicle/variant operating conditions may differ."
+    },
+    "reverse_kph": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "cross_country_kph": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "track_width_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "traction": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "rolling_resistance": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "turn_rate_deg_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "steering_loss": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "brake_m_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "neutral_steering": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "gears": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "reload_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "turret_rate_deg_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "elevation_deg": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "traverse_limit_deg": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "ammo_count": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "gun": {
+      "kind": "historically_sourced",
+      "confidence": "medium",
+      "source": "https://tankmuseum.org/tank-nuts/tank-collection/panther/",
+      "note": "Museum specification; vehicle/variant operating conditions may differ."
+    },
+    "armour": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "length_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "width_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "hull_height_m": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "turreted": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "wheel_count": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "fuel_litres": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Provisional simulation parameter; not a verified engineering specification."
+    },
+    "modules": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Analytical damage volumes, not surveyed internal layout."
+    }
+  }
+}

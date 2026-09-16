@@ -1,0 +1,9 @@
+{
+  "training_mse": 0.030822873489404583,
+  "samples": 800,
+  "policy": "results/models/3d/shared/policy.npz",
+  "stage": 3,
+  "method": "imitation; not emergence",
+  "sha256": "94b8ebe0433a81989d9a55677c021989eac7968d9c9dc63e311ba2300034c9f7",
+  "purpose": "One-second train/save/reload smoke only; not a validated combat policy"
+}

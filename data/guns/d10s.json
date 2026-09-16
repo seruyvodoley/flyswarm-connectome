@@ -1,0 +1,10 @@
+{
+  "id": "d10s",
+  "calibre_mm": 100,
+  "ammo": "d10s_ap",
+  "dispersion_mrad": 1.2,
+  "provenance": {
+    "kind": "approximation",
+    "source": "docs/known_approximations.md"
+  }
+}

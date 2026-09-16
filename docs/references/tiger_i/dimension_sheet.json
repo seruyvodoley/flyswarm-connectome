@@ -1,0 +1,77 @@
+{
+  "variant": "Tiger I, late production 1944",
+  "units": "metres",
+  "status": "INCOMPLETE; do not approve model",
+  "dimensions": {
+    "hull_length": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "overall_length_gun_forward": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "hull_width": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "overall_width": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "height_without_antenna": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "ground_clearance": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "track_width": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "wheel_diameter": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "wheel_centres": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "turret_ring_location": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "turret_width": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "turret_height": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "gun_calibre": {
+      "value": null,
+      "source": null,
+      "verified": false
+    },
+    "barrel_length": {
+      "value": null,
+      "source": null,
+      "verified": false
+    }
+  }
+}

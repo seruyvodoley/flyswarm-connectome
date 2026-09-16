@@ -1,0 +1,284 @@
+[
+  {
+    "original": "src/brain_smoke_test.py",
+    "current": "experiments/single_agent/brain_smoke_test.py",
+    "sha256": "b52755628d9aef452434c4dfb4b20addc4e27c5d02ba2b3ab0fbd94aeb31460c",
+    "bytes": 1608
+  },
+  {
+    "original": "src/experiment_001_left_right.py",
+    "current": "experiments/single_agent/experiment_001_left_right.py",
+    "sha256": "f91395747034c776a37eabc3dae684b351450c557a2a2dba03912b14cfa6961e",
+    "bytes": 3194
+  },
+  {
+    "original": "src/experiment_001b_repeats.py",
+    "current": "experiments/single_agent/experiment_001b_repeats.py",
+    "sha256": "e75fc5c9d2be83eafccea8efdf2775f49b8370e60b0c6e16859a410aad83226b",
+    "bytes": 3477
+  },
+  {
+    "original": "src/experiment_002_tracking.py",
+    "current": "experiments/single_agent/experiment_002_tracking.py",
+    "sha256": "c2e626e39750e3733087acb2b992686e1b97c27318b2af86cb8848ec79c877d5",
+    "bytes": 9475
+  },
+  {
+    "original": "src/experiment_002_tracking_WORKING.py",
+    "current": "archive/prototypes/experiment_002_tracking_WORKING.py",
+    "sha256": "c2e626e39750e3733087acb2b992686e1b97c27318b2af86cb8848ec79c877d5",
+    "bytes": 9475
+  },
+  {
+    "original": "src/experiment_003_controls.py",
+    "current": "experiments/controls/experiment_003_controls.py",
+    "sha256": "ca6412e3eefa8838304e5ea7c622558e7d0641f29c78060e76ea6eb5910e6302",
+    "bytes": 15572
+  },
+  {
+    "original": "src/experiment_004_motor_screen.py",
+    "current": "experiments/single_agent/experiment_004_motor_screen.py",
+    "sha256": "5d23aaf5dcfe5499a679c25a5070ce4f5323e158d94f84fda776bdd03302bf75",
+    "bytes": 7054
+  },
+  {
+    "original": "src/experiment_005_dn_screen.py",
+    "current": "experiments/single_agent/experiment_005_dn_screen.py",
+    "sha256": "89a54f3aac762b08fd056bd1372dbe352c7fb0ce2f2d4184ab7d28557c09daa3",
+    "bytes": 8035
+  },
+  {
+    "original": "src/experiment_006_chase_pathway.py",
+    "current": "experiments/single_agent/experiment_006_chase_pathway.py",
+    "sha256": "4b31694f6460625b84ed4b21a35496ef4d3a55509c7624147e1af4c790ee3cb6",
+    "bytes": 5411
+  },
+  {
+    "original": "src/experiment_007_escape_curve.py",
+    "current": "experiments/single_agent/experiment_007_escape_curve.py",
+    "sha256": "79015c9ff76a7778175a893d0243a065548bea96e2c939d0a6f70b494d9d8c2f",
+    "bytes": 4606
+  },
+  {
+    "original": "src/experiment_008_escape_ablation.py",
+    "current": "experiments/controls/experiment_008_escape_ablation.py",
+    "sha256": "0fba7f5a319194169da7342092798fa39aa281c539d0ffc424954277c14569a3",
+    "bytes": 18467
+  },
+  {
+    "original": "src/experiment_010a_fire_threshold.py",
+    "current": "experiments/controls/experiment_010a_fire_threshold.py",
+    "sha256": "32e389d10d9c10e19a49bb4319b27b1538f30fe462763f994327c0d57f9a4c1f",
+    "bytes": 6005
+  },
+  {
+    "original": "src/experiment_010b_fire_controls.py",
+    "current": "experiments/controls/experiment_010b_fire_controls.py",
+    "sha256": "7d5550d74dde93e55779f11b82a4f899a34d9db9b73676dfb371948a335985cc",
+    "bytes": 24519
+  },
+  {
+    "original": "src/flyswarm_01_batch.py",
+    "current": "experiments/swarm/flyswarm_01_batch.py",
+    "sha256": "6bcf9e2ba238d98efb012efd344ca4208b7171549bd69c875042fe3df202e4cc",
+    "bytes": 20539
+  },
+  {
+    "original": "src/flyswarm_01_batch_WORKING.py",
+    "current": "archive/prototypes/flyswarm_01_batch_WORKING.py",
+    "sha256": "6bcf9e2ba238d98efb012efd344ca4208b7171549bd69c875042fe3df202e4cc",
+    "bytes": 20539
+  },
+  {
+    "original": "src/flyswarm_02_battle.py",
+    "current": "experiments/swarm/flyswarm_02_battle.py",
+    "sha256": "0068b1d1f8207fe5d86f0251842624826f6464082d57159d1e7fcf480a4ea764",
+    "bytes": 30191
+  },
+  {
+    "original": "src/flyswarm_02_battle_WORKING.py",
+    "current": "archive/prototypes/flyswarm_02_battle_WORKING.py",
+    "sha256": "0068b1d1f8207fe5d86f0251842624826f6464082d57159d1e7fcf480a4ea764",
+    "bytes": 30191
+  },
+  {
+    "original": "src/flyswarm_03_learned_fire.py",
+    "current": "experiments/swarm/flyswarm_03_learned_fire.py",
+    "sha256": "777d3988b815f6397b4029fca197b96501551c0a0356ca5aebd3abe0e9098976",
+    "bytes": 45445
+  },
+  {
+    "original": "src/flyswarm_04_audio.py",
+    "current": "experiments/swarm/flyswarm_04_audio.py",
+    "sha256": "07261eb864dc745138dd9657249092495b3b31227f2a80c761c304bcc9a47399",
+    "bytes": 46954
+  },
+  {
+    "original": "src/flytank_02_turret.py",
+    "current": "experiments/flytank/flytank_02_turret.py",
+    "sha256": "193ec9667ba8f2b78d5723d6b52f4359dc0b872158ad5a356daba3731f149ba5",
+    "bytes": 13427
+  },
+  {
+    "original": "src/flytank_03_pursuit.py",
+    "current": "experiments/flytank/flytank_03_pursuit.py",
+    "sha256": "7dd7bf4c191c2fdf7c7ec6f15acba27ac9e1f36219eab269a3268c0261c424ba",
+    "bytes": 20289
+  },
+  {
+    "original": "src/flytank_04_chase_escape.py",
+    "current": "experiments/flytank/flytank_04_chase_escape.py",
+    "sha256": "37fda7c0bab117914b99d3a10961d42413ebccbc83c0ae3ce1d655c0c89df238",
+    "bytes": 22492
+  },
+  {
+    "original": "results/experiment_001_left_right.csv",
+    "current": "results/summaries/experiment_001_left_right.csv",
+    "sha256": "c856f0521aaffe777d8ad87c1e817b1d163f07ea82ce1499b937e2294d806abd",
+    "bytes": 282
+  },
+  {
+    "original": "results/experiment_001b_repeats.csv",
+    "current": "results/summaries/experiment_001b_repeats.csv",
+    "sha256": "38a6f4bc61a48b0fa1689642f7e010a1ec6f6005944397fc1b8f74b7117671d6",
+    "bytes": 657
+  },
+  {
+    "original": "results/experiment_002_tracking.csv",
+    "current": "results/raw/experiment_002_tracking.csv",
+    "sha256": "998882ab7ad821fb3da31f7c0cb2a51b81207627081f186ab23d3abcf55a3ec1",
+    "bytes": 66633
+  },
+  {
+    "original": "results/experiment_003_config.json",
+    "current": "results/summaries/experiment_003_config.json",
+    "sha256": "f9c4778a240be28d59ba73ee6a642002c2f7efb5412df9d42a71bed8fd7e9e69",
+    "bytes": 3920
+  },
+  {
+    "original": "results/experiment_003_steps.csv",
+    "current": "results/raw/experiment_003_steps.csv",
+    "sha256": "075a1cb13c1e20992cde67ddd537c839bc3a2be21057a79e3d6e78f154e8ed3c",
+    "bytes": 2803524
+  },
+  {
+    "original": "results/experiment_003_summary.csv",
+    "current": "results/summaries/experiment_003_summary.csv",
+    "sha256": "4e5a99f4d3be958c8a93fd0694de0e047c6698525978a8524e6b9e10b1d504be",
+    "bytes": 6232
+  },
+  {
+    "original": "results/experiment_004_motor_screen.csv",
+    "current": "results/summaries/experiment_004_motor_screen.csv",
+    "sha256": "8d2d6feb5c695f2e9fce193de2f612cdcde63d437ccf701927bcde819a91715f",
+    "bytes": 3057
+  },
+  {
+    "original": "results/experiment_005_dn_screen_raw.csv",
+    "current": "results/raw/experiment_005_dn_screen_raw.csv",
+    "sha256": "226f385ffc797836947b3f5c930c2d1a92287e13af6234d02e8043f60aa33a44",
+    "bytes": 1078197
+  },
+  {
+    "original": "results/experiment_005_dn_screen_summary.csv",
+    "current": "results/summaries/experiment_005_dn_screen_summary.csv",
+    "sha256": "2c8df35b4300f01eb07f08068843428302930dc92663ed1030545bcc50f15ef3",
+    "bytes": 265764
+  },
+  {
+    "original": "results/experiment_006_chase_raw.csv",
+    "current": "results/summaries/experiment_006_chase_raw.csv",
+    "sha256": "d0f909e441656dc7a3f69386fe54a9fe872d2cdcc8f6c45b1ea87e357f690ceb",
+    "bytes": 16453
+  },
+  {
+    "original": "results/experiment_007_escape_curve_raw.csv",
+    "current": "results/summaries/experiment_007_escape_curve_raw.csv",
+    "sha256": "30b891d19a8178365044c4671317abf6b1111f3a4c55869a36cd1cb4918bf2f3",
+    "bytes": 5626
+  },
+  {
+    "original": "results/experiment_007_escape_curve_summary.csv",
+    "current": "results/summaries/experiment_007_escape_curve_summary.csv",
+    "sha256": "f2e4d2871559b81ca7f153e476b58a4d9ebc43cc56f2d5ba665fa3c2ab32a771",
+    "bytes": 992
+  },
+  {
+    "original": "results/experiment_008_escape_ablation.csv",
+    "current": "results/summaries/experiment_008_escape_ablation.csv",
+    "sha256": "540f9b23107507abfb2725a725026a45f0a51a94421d53edbcaed1357133466b",
+    "bytes": 2268
+  },
+  {
+    "original": "results/experiment_010a_fire_threshold.json",
+    "current": "results/summaries/experiment_010a_fire_threshold.json",
+    "sha256": "d9b183339aa166eb6af811e90c620eec655a17fd084ccac44a1f12a683d2061a",
+    "bytes": 465
+  },
+  {
+    "original": "results/experiment_010a_oof_predictions.npz",
+    "current": "results/models/experiment_010a_oof_predictions.npz",
+    "sha256": "8ae36fb9875ec41ad20c898624f96f6627a6bbcfed929aab68565a29d0767e71",
+    "bytes": 3881
+  },
+  {
+    "original": "results/experiment_010b_fire_controls.csv",
+    "current": "results/summaries/experiment_010b_fire_controls.csv",
+    "sha256": "6dea7b01e13266d02f922836c4099d9cbb56a23e7bf03ddd0738b304987a6289",
+    "bytes": 2720
+  },
+  {
+    "original": "results/flyswarm_01_batch.csv",
+    "current": "results/raw/flyswarm_01_batch.csv",
+    "sha256": "fd26d16adf491f41152de12c64a6a286261d6dc284d832cb8d32103508a1dfba",
+    "bytes": 1316347
+  },
+  {
+    "original": "results/flyswarm_02_battle.csv",
+    "current": "results/raw/flyswarm_02_battle.csv",
+    "sha256": "31908c806c4e71c26dcea08e1e6e202658da22e86913ce4ee15b0f3afa785299",
+    "bytes": 699731
+  },
+  {
+    "original": "results/flyswarm_03_fire_dataset.npz",
+    "current": "results/models/flyswarm_03_fire_dataset.npz",
+    "sha256": "38106cc7262d001744bdd03fbd37506a4ccdd2f08d3f7eed0b5e4676fbecdf65",
+    "bytes": 1550746
+  },
+  {
+    "original": "results/flyswarm_03_fire_readout.npz",
+    "current": "results/models/flyswarm_03_fire_readout.npz",
+    "sha256": "3e4e10d9eb6dd3c0dc2c29c6ba98025ea3d4a4fc7909934814fb70c1d5fdba75",
+    "bytes": 639654
+  },
+  {
+    "original": "results/flyswarm_04_audio_raw.csv",
+    "current": "results/summaries/flyswarm_04_audio_raw.csv",
+    "sha256": "7d9aaec69f11c9881f380b36694f7b947cdff04dde8b1bfc0a05838bd2ff1b13",
+    "bytes": 2987
+  },
+  {
+    "original": "results/flyswarm_04_audio_summary.csv",
+    "current": "results/summaries/flyswarm_04_audio_summary.csv",
+    "sha256": "975b3bcb7fa3d691229d8b7e911d9dbc34694be945d24a2d8e79f3909415165f",
+    "bytes": 437
+  },
+  {
+    "original": "results/flytank_02_turret.csv",
+    "current": "results/raw/flytank_02_turret.csv",
+    "sha256": "c192d77ba95ec2f4b2eaa2ead1b8be38722f9ddeefaccae87f6f8c106beedbba",
+    "bytes": 160008
+  },
+  {
+    "original": "results/flytank_03_pursuit.csv",
+    "current": "results/raw/flytank_03_pursuit.csv",
+    "sha256": "f23d77231d07196623390ac23cb49ffa1cd1d585751f98baf741c7814a1450bf",
+    "bytes": 301952
+  },
+  {
+    "original": "results/flytank_04_chase_escape.csv",
+    "current": "results/raw/flytank_04_chase_escape.csv",
+    "sha256": "1fdb034c7ed57cb4ab66e70d3e39522db7802ea0c1046c68e647817a4c55e00a",
+    "bytes": 556808
+  }
+]

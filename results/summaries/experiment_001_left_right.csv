@@ -1,0 +1,4 @@
+condition,stimulus_side,sim_time_s,wall_time_s,left_spikes,right_spikes,left_rate_hz,right_rate_hz,steering_signal
+baseline,none,1.0,0.17217216700373683,1,0,1.0,0.0,1.0
+target_left,L,1.0,0.17328358300437685,5,0,5.0,0.0,5.0
+target_right,R,1.0,0.1722883339971304,0,3,0.0,3.0,-3.0

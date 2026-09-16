@@ -1,0 +1,23 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+._*
+.idea/
+.vscode/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+# Local / large simulation output
+results/raw/
+results/tmp/
+# Default output of the unchanged new experiment (per-battle rows)
+results/flyswarm_05_two_brains_8v8_raw.csv
+# Local connectome data; canonical dataset is outside this repository
+fly-data/
+data/
+# Temporary files
+*.tmp
+*.bak

@@ -1,18 +1,18 @@
 {
   "asset": "jagdpanther.glb",
   "dimensions_xyz_m": [
-    3.3400001525878906,
-    10.49459981918335,
-    2.439999997615814
+    3.421999931335449,
+    9.925999879837036,
+    2.5927138291299343
   ],
-  "triangles_lod0": 17292,
+  "triangles_lod0": 218608,
   "lod1": null,
   "lod2": null,
   "texture_sizes": [],
   "status": "INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED",
   "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
   "axis": "Blender x width, y overall length, z height incl antenna",
-  "height_without_antenna_m": 2.4574999809265137,
+  "height_without_antenna_m": 2.569999933242798,
   "dimension_checks": {
     "hull_length": {
       "status": "FAIL",

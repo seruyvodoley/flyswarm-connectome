@@ -1,18 +1,18 @@
 {
   "asset": "su100.glb",
   "dimensions_xyz_m": [
-    3.200000047683716,
-    8.893999814987183,
-    2.4374999403953552
+    3.119999885559082,
+    9.1010000705719,
+    2.4822210799902678
   ],
-  "triangles_lod0": 13644,
+  "triangles_lod0": 166852,
   "lod1": null,
   "lod2": null,
   "texture_sizes": [],
   "status": "INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED",
   "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
   "axis": "Blender x width, y overall length, z height incl antenna",
-  "height_without_antenna_m": 2.4549999237060547,
+  "height_without_antenna_m": 2.4697210788726807,
   "dimension_checks": {
     "hull_length": {
       "status": "FAIL",

@@ -1,178 +1,132 @@
-# FlyTank / FlySwarm
+# FlySwarm — коннектом в танковой среде
 
-## Запуск приложения
+Исследовательская симуляция боя **8 × 8**: Godot моделирует мир и технику,
+а Python связывает наблюдения агентов с реконструированным коннектомом
+**Drosophila MaleCNS**. Можно наблюдать автономный бой, управлять танком
+на полигоне и сравнивать условия эксперимента.
+
+## Скринкаст интерфейса
+
+[![Посмотреть демонстрацию](docs/media/interface-poster.jpg)](docs/media/interface-demo.mp4)
+
+**[Смотреть / скачать MP4](docs/media/interface-demo.mp4)** · 35 секунд ·
+1280 × 800 · без звука. Запись реального интерфейса: главное меню, настройка
+боя, камеры, пауза, ручной полигон, исследовательская лаборатория, обучение,
+настройки и повторы. В записи используется Rule AI; она не изображает
+запуск нейробэкенда. Переходы автоматизированы для воспроизводимой записи.
+GitHub может предложить скачать MP4 вместо встроенного воспроизведения.
+
+## Что работает
+
+| Возможность | Описание |
+|---|---|
+| Исторический бой | 16 машин, две команды, точки A/B/C, билеты и итоговая статистика |
+| Контроллеры | Rule AI, MaleCNS, фиксированный обученный моторный адаптер для каждой команды |
+| Камеры | Обзор поля боя, от третьего лица, прицел и свободная камера |
+| Ручной полигон | Выбор машины и цели, дистанции 100–1500 м, углы цели, движение и стрельба |
+| Физика | Движение, конечная скорость снаряда, приближённая броня и повреждения модулей |
+| Гусеницы | Видимые следы с приближённым влиянием давления, поверхности и проскальзывания |
+| Нейронная связь | No Audio / Team Audio / All Audio; панель сигналов и линии между агентами |
+| Research Lab | Сравнение условий связи, физики, смены сторон и переноса политик; отмена задания |
+| Обучение | Сбор примеров, ridge-адаптер, сохранение и проверка на отдельном seed |
+| Повторы | Запись состояний мира и телеметрии, воспроизведение без MaleCNS |
+| Интерфейс | RU/EN, сохранение языка и настроек, пауза, возврат в меню, управление бэкендом |
+
+Техника: **Panther G, Tiger I, Jagdpanther, T-34-85, IS-2, SU-100**.
+Пять моделей пересобраны в проходе 03; принятый пользователем Tiger сохранён.
+[Состояние геометрии и ограничения](docs/model_validation/pass_03.md).
+
+## Быстрый старт
+
+Проверенная платформа: macOS Apple Silicon. Нужен Godot 4.7.2, установленный
+в `~/Applications/Godot.app` либо `/Applications/Godot.app`.
 
 ```sh
 ./run.sh
 ```
 
-Открывается главное меню Godot: бой, Research Lab, обучение, ручной полигон,
-повторы и настройки. Для MaleCNS используется локальная `.venv` и отдельно
-установленный dataset; Rule-based режим работает без нейробэкенда.
-[Потоки приложения](docs/application.md), [аудит](docs/application_audit.md),
-[состояние моделей](docs/model_validation/pass_02.md),
-[упаковка macOS](docs/macos_packaging.md).
+Откроется главное меню. Rule AI и полигон доступны без загрузки MaleCNS.
+Путь к другому Godot можно передать через `GODOT` — см. `run.sh`.
 
-Модели улучшены, но полная историческая валидация всех шести **не пройдена**.
+Для нейронного режима дополнительно подготовьте Python 3.11:
 
-
-Исследовательский Python-проект: реконструированный connectome центральной
-нервной системы Drosophila MaleCNS используется как контроллер embodied agents
-в танковой симуляционной среде. Это эксперимент с фиксированной сетью связей,
-а не утверждение о настоящем интеллекте мухи или эмуляции сознания.
-
-```text
-sensory encoder
-    ↓
-fixed MaleCNS connectome
-    ↓
-descending neurons
-    ↓
-motor decoder
-    ↓
-tank/world
-```
-
-Исследуемые каналы управления:
-
-```text
-LC10a → DNa02 → lateral steering / turret control
-LC9 → DNp09 → pursuit / forward locomotion
-LC4/LPLC2 → escape-related descending activity
-wing MN → JO-A/JO-B → inter-agent auditory signalling
-```
-
-Последний канал реализован через передачу сигнала в симуляционной среде.
-Наличие эффекта в модели не доказывает биологическую функцию коммуникации.
-
-Этапы: single-agent tracking, pursuit, chase/escape, causal ablation,
-8-agent FlySwarm, physical 4v4 battle, learned-fire (слабый/отрицательный
-результат по описанию проекта; превосходство не установлено), auditory
-communication и текущая архитектура two-brain 8v8.
-Состояние файлов и наблюдения записаны в [журнале](docs/experiment_log.md).
-
-Ограничения: MaleCNS wiring фиксирован. Большая часть learning experiments
-обучает readout, а не connectome. Visual encoder использует признаки,
-а не raw retina. Базовая стрельба rule-based. Friend/foe и выбор цели
-частично задаются environment layer. Эти допущения нужно учитывать при
-интерпретации нейронных и поведенческих результатов.
-
-Структура:
-
-```text
-src/flyswarm/              3D neural backend и исторический Python-проект
-experiments/single_agent/  нейронные экраны, tracking, pursuit/escape pathways
-experiments/flytank/       FlyTank 0.2–0.4
-experiments/swarm/         FlySwarm 0.1–0.5
-experiments/controls/      Experiments 003, 008, 010a/010b
-archive/prototypes/       три исторические версии *_WORKING.py
-results/raw/              локальные подробные записи, исключены из Git
-results/summaries/        компактные метрики и конфигурации
-results/models/           сохранённые NPZ datasets/readouts/predictions
-results/figures/           графики
-tests/                   быстрые тесты без загрузки MaleCNS
-tools/                   ограниченный smoke test
-docs/                    журнал, аудит, карта перемещений с SHA-256
-```
-
-Подготовка (проверенное окружение: macOS Apple Silicon, Python 3.11.16):
-
-```bash
+```sh
 python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-MaleCNS data настраиваются отдельно согласно установленному `flybrain`.
-В проверенном окружении `flybrain 0.1.0` использует `~/fly-data` или `FLY_DATA`;
-данные расположены вне репозитория. Проверьте их через `python -m flybrain info`.
-Connectome dataset не включён в Git.
+MaleCNS dataset устанавливается отдельно в расположение, ожидаемое FlyBrain
+(в проверенном окружении `/Users/serg/fly-data`). Dataset и `.venv` не входят
+в Git. При отсутствии зависимостей приложение предлагает повторить запуск
+или выбрать Rule AI. [Подробности запуска](docs/application.md).
 
-Запускайте скрипты **из корня репозитория**:
+## Управление
 
-```bash
-python experiments/swarm/flyswarm_05_two_brains_8v8.py
+| Клавиша | Действие |
+|---|---|
+| `C` / кнопка камеры | Переключить камеру |
+| Колесо, `WASD` в обзоре | Масштаб и перемещение по карте |
+| `Tab` | Следующий агент |
+| `T` / кнопка связи | Выкл. → красные → синие → все |
+| `Esc` | Пауза / меню |
+| `W/S`, `A/D` на полигоне | Движение и поворот |
+| `Q/E`, `R/F` | Башня и вертикальная наводка |
+| Пробел / ЛКМ, движение с ПКМ | Выстрел, наведение |
+| `F1` | Отладочный вид |
+
+## Как устроен эксперимент
+
+```text
+Godot: мир → признаки наблюдения
+                 ↓
+Python: сенсорный кодировщик → два отдельных FlyBrain(batch=8)
+                 ↓
+нисходящие нейроны → моторный readout → действия в Godot
 ```
 
-Это полный, потенциально длительный эксперимент. BLUE и RED имеют **два
-отдельных `FlyBrain(device="cpu", batch=8)`**, всего 16 агентов. Условия:
-`no_audio`, `team_audio`, `all_audio`; AUTO-FIRE одинаков во всех условиях.
-Исходные параметры: 45 секунд симуляции на бой, calibration seeds 200/201,
-test seeds 204–209. Скрипт сохранён без изменений, включая запуск при импорте.
-Не импортируйте его для получения вспомогательных функций.
+Каждая команда получает отдельный объект MaleCNS; это **2 × batch 8**,
+а не один batch 16. В проверенном dataset — 2 667 200 нейронных состояний.
+Коннектом фиксирован. Обучение меняет небольшой моторный readout, а не
+связи MaleCNS. Нейронный сигнал крыльев предыдущего шага поступает через
+среду к JO-A/JO-B; панель показывает численные вклады, не расшифрованную речь.
 
-0.5 пишет `results/flyswarm_05_two_brains_8v8_raw.csv` (одна строка на бой,
-не per-step trace) и `results/flyswarm_05_two_brains_8v8_summary.csv`.
-Обычный запуск перезаписывает одноимённые результаты; сохраняйте нужные
-снимки перед повторением. Исторические пути остальных результатов сохранены
-относительными symlink; правила описаны в [results/README.md](results/README.md).
+Это исследовательская модель, не доказательство биологического поведения.
+Сенсорный ввод использует признаки вместо изображения сетчатки; ряд функций,
+включая базовую стрельбу, задаётся правилами. Исторические размеры, броня и
+физика содержат приближения. Полная историческая валидация моделей не пройдена.
+Недоступные учебные задачи отключены; награда для ridge imitation не определена.
+Звуковое сопровождение и готовое подписанное macOS-приложение не реализованы.
 
-Проверки:
+## Проверки и воспроизводимость
 
-```bash
-python -m compileall -x '/\._' experiments src archive
-python -m unittest discover -s tests -v
-# Необязательно: pip install -r requirements-dev.txt
-# python -m pytest -q
-python tools/smoke_flyswarm05.py
-```
-
-На внешнем macOS-диске исключение `/\._` пропускает служебные AppleDouble
-файлы, не являющиеся Python-исходниками.
-
-Unit tests проверяют исходные pure functions через AST без исполнения тела
-эксперимента и без загрузки мозга. Smoke test отдельно импортирует временную
-копию с настоящими двумя мозгами: 0.2 секунды на бой, один calibration seed,
-два test seeds, все три режима, 180 секунд wall timeout. Результаты временные;
-они не являются научными результатами и не оценивают качество боя.
-
-Phase 2 refactor: extract common world/combat/audio/perception code into
-`src/flyswarm/`. Добавить безопасный `main()`/CLI, явные каталоги результатов,
-конфигурации и метаданные воспроизводимости. Отдельно проверить физический
-смысл `segment_circle_t`: сейчас возвращается проекция ближайшей точки,
-а не первое пересечение с окружностью. Сохранить исторические baseline и
-архитектуру двух независимых мозгов при дальнейших изменениях.
-
-
-## 3D research prototype (Godot + Python)
-
-Новая 3D-среда находится в `frontend/godot`; исторические 2D-эксперименты
-сохранены без изменений. Это рабочий прототип, **не завершённый исторический
-симулятор**: все шесть GLB пока являются blockout-моделями и не прошли
-проверку визуальной достоверности. Таблицы брони/боеприпасов приближённые.
-
-Проверено: Godot 4.7.2, Blender 5.0.1, macOS M2 8 GB, Python 3.11.
-`tools/run` использует `.venv/bin/python` и Godot из PATH или Applications.
-Другие пути можно задать переменными `PYTHON` и `GODOT`.
-
-```bash
-# Самостоятельный 3D-бой с явно обозначенным rule-based контроллером
-./tools/run run-demo
-# Ограниченный запуск и запись в новый локальный каталог
-./tools/run headless --seconds 30 --quit --record /tmp/flyswarm-demo-new
-# Python + Godot проверки без загрузки MaleCNS
+```sh
 ./tools/run run-tests
-# Настоящие два FlyBrain(batch=8): запустить в двух терминалах
-./tools/run run-brains
-./tools/run run-battle --seconds 5 --quit
-# Короткий train → save → reload → frozen eval с реальным connectome
-./tools/run run-training --seconds 1
-# Чтение записанного replay
-./tools/run run-demo --replay /tmp/flyswarm-demo-new/replay.jsonl
+./run.sh --headless --script res://scripts/app/validation.gd
+# Только при установленном реальном dataset:
+./run.sh --headless --script res://scripts/app/validation.gd -- --real-brains
 ```
 
-TAB выбирает агента, C переключает четыре камеры, F1 показывает сенсоры,
-SPACE ставит на паузу. В свободной камере WASD / Q / E / стрелки.
-Без Python HUD сообщает `BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL`.
-При `--connect` отказ backend останавливает интеграцию; скрытой подмены мозга нет.
+Seed, параметры сессии, метрики и повторы сохраняются в `results/raw/app/`
+при запуске из исходников. Raw-вывод исключён из Git. Старые исследовательские
+файлы сохранены; [журнал экспериментов](docs/experiment_log.md) и
+[исторический контекст](docs/research_background.md).
 
-Карты: Krasny Valley 1.5 км, отдельный `--training` стенд. Флаги
-`--normalized`, `--swap`, `--mirror`, `--audio no_audio|team_audio|all_audio`
-задают сравнительные условия. Пример readout в `results/models/3d/shared`
-обучен только на 800 smoke samples и не предназначен для оценки качества боя.
+## Структура проекта
 
-Документация: [архитектура](docs/simulator_architecture.md),
-[физика и следы](docs/vehicle_physics.md), [броня](docs/armour_and_ballistics.md),
-[нейронный интерфейс](docs/brain_vehicle_interface.md), [обучение](docs/training.md),
-[известные ограничения](docs/known_approximations.md),
-[проверка моделей](docs/vehicle_visual_references.md).
+```text
+frontend/godot/   приложение, сцены, интерфейс, 3D-модели
+src/flyswarm/     Python-бэкенд, сенсорика, readout, IPC
+assets/models/   исходные Blender-модели
+experiments/     исторические исследовательские эксперименты
+archive/         сохранённые прототипы
+data/            параметры техники, вооружения и сценариев
+tests/           быстрые проверки без загрузки dataset
+tools/           запуск, генерация моделей, проверки
+docs/media/      скринкаст и его обложка
+docs/            исследования, источники, валидация
+```
+
+[Архитектура приложения](docs/application.md) ·
+[Приближения](docs/known_approximations.md) ·
+[Источники моделей](docs/references/pass03_audit.md) ·
+[Подготовка macOS-сборки](docs/macos_packaging.md)

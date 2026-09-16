@@ -1,18 +1,12 @@
-# IS-2 Model 1944, straightened upper glacis
+# is2_1944 — pass 03
 
-Overall: TODO — historical visual acceptance FAILED / blockout only.
+Target: IS-2 Model 1944, straightened upper glacis
 
-- TODO: production period
-- TODO: running gear count/spacing/interleaving
-- TODO: hull dimensions/glacis
-- TODO: turret or casemate form
-- TODO: mantlet
-- TODO: cupola
-- TODO: gun proportions
-- TODO: muzzle brake
-- TODO: exhaust
-- TODO: orthographic alignment
-- TODO: human recognition without labels
-
-Runtime GLB import/articulation: PASS. This is not a historical fidelity PASS.
-No LOD1/LOD2 yet. Dimensions and triangle counts are measured in dimensions.json.
+- Original geometry and family-specific layout: PASS (implementation).
+- Source photographs inspected: see ../../references/pass03_audit.md.
+- Complete orthographic reference alignment: TODO.
+- Exact variant-specific mantlet, cupola, fittings: TODO independent verification.
+- Historical dimensional tolerance: TODO; not accepted.
+- LOD1/LOD2: Godot automatic import LODs, not manually validated.
+- Textures: none; materials only.
+- Seven neutral Blender views here; three engine views in ../godot/.

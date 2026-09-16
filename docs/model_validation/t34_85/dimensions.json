@@ -1,18 +1,18 @@
 {
   "asset": "t34_85.glb",
   "dimensions_xyz_m": [
-    3.200000047683716,
-    7.446000099182129,
-    2.939999997615814
+    3.119999885559082,
+    7.481000185012817,
+    2.9922210704535246
   ],
-  "triangles_lod0": 13208,
+  "triangles_lod0": 171680,
   "lod1": null,
   "lod2": null,
   "texture_sizes": [],
   "status": "INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED",
   "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
   "axis": "Blender x width, y overall length, z height incl antenna",
-  "height_without_antenna_m": 2.9574999809265137,
+  "height_without_antenna_m": 2.9797210693359375,
   "dimension_checks": {
     "hull_length": {
       "status": "FAIL",

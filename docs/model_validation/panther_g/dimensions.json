@@ -1,18 +1,18 @@
 {
   "asset": "panther_g.glb",
   "dimensions_xyz_m": [
-    3.3400001525878906,
-    8.980999946594238,
-    2.939999997615814
+    3.421999931335449,
+    9.175999879837036,
+    3.11243462190032
   ],
-  "triangles_lod0": 16776,
+  "triangles_lod0": 221512,
   "lod1": null,
   "lod2": null,
   "texture_sizes": [],
   "status": "INTERMEDIATE GEOMETRY / HISTORICAL VALIDATION NOT PASSED",
   "historical_tolerance_check": "FAIL / incomplete reference sheet or tolerance exceeded",
   "axis": "Blender x width, y overall length, z height incl antenna",
-  "height_without_antenna_m": 2.9574999809265137,
+  "height_without_antenna_m": 3.0897207260131836,
   "dimension_checks": {
     "hull_length": {
       "status": "FAIL",

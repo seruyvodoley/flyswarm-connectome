@@ -79,7 +79,7 @@ def main():
                                 action[5]=float(o['visible'] and abs(o['bearing'])<.015 and abs(o['elevation'])<.012)
                             if not o['alive']:action=np.zeros(6)
                             actions.append(action.tolist())
-                        result=dict(version=1,seq=last,actions=actions,traces=traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=.02,mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies else 'BIOLOGICAL_BASELINE'),metadata=metadata)
+                        result=dict(version=1,seq=last,actions=actions,traces=traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=.02,mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies or team_policies else 'BIOLOGICAL_BASELINE'),metadata=metadata,communication=brain.last_communication)
                         connection.sendall(encode(result))
             except (ConnectionError,ValueError) as e:print(type(e).__name__,str(e),flush=True)
             finally:

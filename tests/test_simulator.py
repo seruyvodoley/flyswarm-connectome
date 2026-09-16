@@ -4,11 +4,54 @@ import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from flyswarm.catalog import DATA,vehicle,ammunition
 from flyswarm.bridge import encode,read,MAX_LINE
-from flyswarm.sensory import audio_signal,visual
+from flyswarm.sensory import audio_signal,audio_frame,visual
 from flyswarm.policy import Readout,features
 from flyswarm.training import TRAIN_SEEDS,TEST_SEEDS
 
 class SimulatorTests(unittest.TestCase):
+    def test_audio_orientation_cap_and_topology(self):
+        positions=np.zeros((16,3));positions[1,0]=250
+        live=np.ones(16,dtype=bool);song=np.zeros(16);song[0]=2
+        h,c,d=audio_frame(song,positions,live,'all_audio')
+        self.assertAlmostEqual(c[1,0],.08)
+        self.assertEqual(c[0,1],0)
+        self.assertEqual(d[1,0],250)
+        for mode in ['no_audio','team_audio','all_audio']:
+            for signal in [song,np.full(16,100.)]:
+                h,c,d=audio_frame(signal,positions,live,mode)
+                np.testing.assert_allclose(c.sum(axis=1),h)
+                np.testing.assert_allclose(np.diag(c),0)
+                self.assertTrue(np.all(h<=.8+1e-12))
+                if mode=='no_audio':self.assertFalse(c.any())
+                if mode=='team_audio':self.assertFalse(c[:8,8:].any())
+        live[0]=False
+        h,c,d=audio_frame(np.ones(16),positions,live,'all_audio')
+        self.assertFalse(c[0,:].any());self.assertFalse(c[:,0].any())
+        h,c,d=audio_frame(np.full(16,100.),np.zeros((16,3)),np.ones(16,bool),'all_audio')
+        np.testing.assert_allclose(c[1:,0],.8/15)
+
+    def test_previous_song_telemetry_causality(self):
+        from flyswarm.brain import DualBrain
+        class SilentBrain:
+            dt=.02
+            def step(self, inject):return [np.array([],dtype=int) for _ in range(8)]
+        brain=DualBrain.__new__(DualBrain)
+        brain.brains=[SilentBrain(),SilentBrain()]
+        group={key:np.array([1]) for key in ['lc10_l','lc10_r','lc9_l','lc9_r','loom','ear']}
+        group['outputs']=[np.array([1]) for _ in range(6)]
+        brain.groups=[group,group];brain.song=np.ones(16);brain.trace=np.zeros((16,6));brain.ticks=9
+        obs=[dict(alive=True,position=[0,0,0],bearing=0,visible=False,looming=0) for _ in range(16)]
+        _,heard,_=brain.step(obs,'team_audio')
+        np.testing.assert_allclose(brain.last_communication['song_out'],1)
+        np.testing.assert_allclose(brain.last_communication['heard_total'],heard)
+        np.testing.assert_allclose(brain.song,0)
+        sample=brain.last_communication['sample']
+        brain.step(obs,'team_audio')
+        self.assertEqual(brain.last_communication['sample'],sample)
+        payload=encode(dict(version=1,seq=10,actions=[[0]*6]*16,communication=brain.last_communication))
+        self.assertLess(len(payload),MAX_LINE)
+        print('Communication result packet fixture bytes:',len(payload))
+
     def test_six_data_models(self):
         files=[p for p in (DATA/'vehicles').glob('*/*.json') if not p.name.startswith('._')]
         self.assertEqual(len(files),6)
@@ -35,6 +78,12 @@ class SimulatorTests(unittest.TestCase):
         positions=np.zeros((16,3));live=np.ones(16,dtype=bool)
         np.testing.assert_allclose(audio_signal(np.ones(16),positions,live,'team_audio'),.56)
         np.testing.assert_allclose(audio_signal(np.ones(16),positions,live,'all_audio'),.8)
+        heard,contribution,distance=audio_frame(np.ones(16),positions,live,'team_audio')
+        self.assertEqual(contribution.shape,(16,16))
+        self.assertEqual(distance.shape,(16,16))
+        np.testing.assert_allclose(contribution.sum(axis=1),heard)
+        np.testing.assert_allclose(np.diag(contribution),0)
+        self.assertAlmostEqual(contribution[0,1],.08)
         live[0]=False
         self.assertEqual(audio_signal(np.ones(16),positions,live,'all_audio')[0],0)
         with self.assertRaises(ValueError):audio_signal(np.ones(16),positions,live,'bad')

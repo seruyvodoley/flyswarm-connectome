@@ -64,8 +64,11 @@ func setup(config: Dictionary, index: int, battle):
 	label.font_size=36
 	label.pixel_size=.015
 	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	label.fixed_size=false
+	label.name="Identification"
+	label.outline_size=6
 	label.modulate=Color(.35,.65,1) if team==0 else Color(1,.4,.25)
-	label.visibility_range_end=300
+	label.visibility_range_end=4000
 	add_child(label)
 	var l=float(cfg.length_m)/2
 	var w=float(cfg.width_m)/2

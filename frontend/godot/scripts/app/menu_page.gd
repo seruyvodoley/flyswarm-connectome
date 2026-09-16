@@ -55,20 +55,20 @@ func _ready():
 	var buttons=find_children("*","Button",true,false)
 	if not buttons.is_empty():buttons[0].grab_focus()
 func label(parent: Node,text: String,size=19) -> Label:
-	var node=Label.new();node.text=text;node.add_theme_font_size_override("font_size",size);parent.add_child(node);return node
+	var node=Label.new();node.text=AppState.tr_text(text);node.add_theme_font_size_override("font_size",size);parent.add_child(node);return node
 func text_block(text: String):
 	var node=label(body,text,17);node.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;node.modulate=Color("b3c0b8");return node
 func title(kicker: String,text: String):
 	label(body,kicker,14).modulate=Color("c1a573")
 	label(body,text,40)
 func button(parent: Node,text: String,callback: Callable) -> Button:
-	var node=Button.new();node.text=text;node.name=text.to_pascal_case();node.custom_minimum_size.y=48;node.pressed.connect(callback);parent.add_child(node);return node
+	var node=Button.new();node.text=AppState.tr_text(text);node.name=text.to_pascal_case();node.custom_minimum_size.y=48;node.pressed.connect(callback);parent.add_child(node);return node
 func row(text: String) -> HBoxContainer:
 	var box=HBoxContainer.new();box.add_theme_constant_override("separation",20);body.add_child(box)
 	var caption=label(box,text);caption.custom_minimum_size.x=280;return box
 func dropdown(text: String,names: Array,values: Array,current,callback: Callable) -> OptionButton:
 	var box=row(text);var node=OptionButton.new();node.name=text.to_pascal_case();node.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(node)
-	for item in names:node.add_item(item)
+	for item in names:node.add_item(AppState.tr_text(str(item)))
 	node.select(maxi(0,values.find(current)))
 	node.item_selected.connect(func(i):callback.call(values[i]))
 	form_controls[text]=node
@@ -76,12 +76,12 @@ func dropdown(text: String,names: Array,values: Array,current,callback: Callable
 func number(text: String,value: float,minimum: float,maximum: float,callback: Callable) -> SpinBox:
 	var box=row(text);var node=SpinBox.new();node.name=text.to_pascal_case();node.min_value=minimum;node.max_value=maximum;node.value=value;node.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(node);node.value_changed.connect(callback);return node
 func toggle(text: String,value: bool,callback: Callable):
-	var node=CheckBox.new();node.text=text;node.button_pressed=value;node.toggled.connect(callback);body.add_child(node)
+	var node=CheckBox.new();node.text=AppState.tr_text(text);node.button_pressed=value;node.toggled.connect(callback);body.add_child(node)
 func policy_field(text: String,field: String):
-	var box=row(text);var node=LineEdit.new();node.text=AppState.session.get(field);node.placeholder_text="Select a frozen .npz readout";node.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(node)
+	var box=row(text);var node=LineEdit.new();node.text=AppState.session.get(field);node.placeholder_text=AppState.tr_text("Select a frozen .npz readout");node.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(node)
 	node.text_changed.connect(func(value):AppState.session.set(field,value))
 	button(box,"Browse",func():
-		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.npz ; Readout policy"]);add_child(dialog)
+		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.npz ; "+AppState.tr_text("Readout policy")]);add_child(dialog)
 		dialog.file_selected.connect(func(path):node.text=path;AppState.session.set(field,path);dialog.queue_free())
 		dialog.popup_centered_ratio(.75))
 func back():button(body,"Back",AppState.menu)
@@ -96,6 +96,7 @@ func main_menu():
 		button(left,item[0],AppState.configure.bind(item[1]))
 	button(left,"REPLAYS",AppState.show_page.bind("ReplayBrowser"))
 	button(left,"SETTINGS",AppState.show_page.bind("Settings"))
+	button(left,AppState.language_switch_label(),AppState.toggle_language)
 	button(left,"EXIT",AppState.quit_app)
 	var right=VBoxContainer.new();right.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_theme_constant_override("separation",20);split.add_child(right)
 	var map_view=TextureRect.new();map_view.custom_minimum_size=Vector2(450,330);map_view.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;map_view.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -176,12 +177,12 @@ func test_range():
 func replays():
 	title("RECORDED WORLD STATES","Replays")
 	text_block("Playback uses recorded transforms and projectiles; no MaleCNS is loaded.")
-	replay_list=ItemList.new();replay_list.custom_minimum_size.y=330;body.add_child(replay_list)
+	replay_list=ItemList.new();replay_list.max_text_lines=2;replay_list.custom_minimum_size.y=330;body.add_child(replay_list)
 	scan_replays(AppState.results_root(),0)
 	for path in replay_items:
 		var manifest=AppState.read_json(path.path_join("manifest.json"));var summary=AppState.read_json(path.path_join("summary.json"))
 		var cfg=manifest.get("session",{})
-		replay_list.add_item("%s  |  %s  |  seed %s  |  %s  |  %.1fs\n%s" % [manifest.get("date",path.get_file()),cfg.get("mode","battle"),manifest.get("map_seed","?"),manifest.get("map","?"),summary.get("time",0)," / ".join([cfg.get("vehicle_composition","mixed_1944"),cfg.get("blue_controller","unknown"),cfg.get("red_controller","unknown")])])
+		replay_list.add_item("%s  |  %s  |  seed %s  |  %s  |  %.1fs\n%s" % [manifest.get("date",path.get_file()),AppState.tr_text(str(cfg.get("mode","battle"))),manifest.get("map_seed","?"),AppState.tr_text(str(manifest.get("map","?"))),summary.get("time",0)," / ".join([AppState.tr_text(str(cfg.get("vehicle_composition","mixed_1944"))),AppState.tr_text(str(cfg.get("blue_controller","unknown"))),AppState.tr_text(str(cfg.get("red_controller","unknown")))])])
 	if replay_items.is_empty():text_block("No saved replays yet. Enable recording in a battle or use Save Replay in the pause menu.")
 	button(body,"PLAY",func():
 		var path=selected_replay()
@@ -189,7 +190,7 @@ func replays():
 	button(body,"DELETE",func():
 		var path=selected_replay()
 		if path=="":return
-		var dialog=ConfirmationDialog.new();dialog.dialog_text="Move this replay recording to Trash?\n"+path;add_child(dialog)
+		var dialog=ConfirmationDialog.new();dialog.dialog_text=AppState.tr_text("Move this replay recording to Trash?")+"\n"+path;add_child(dialog)
 		dialog.confirmed.connect(func():
 			var result=OS.move_to_trash(path.path_join("replay.jsonl"))
 			if result==OK:AppState.show_page("ReplayBrowser")
@@ -207,6 +208,7 @@ func selected_replay() -> String:
 func settings_menu():
 	title("LOCAL PREFERENCES","Settings")
 	var s=AppState.settings
+	dropdown("Language",["English","Русский"],["en","ru"],str(s.get("language","en")),func(v):AppState.set_language(str(v)))
 	dropdown("Graphics preset",["Low","Medium","High"],[0,1,2],s.preset,func(v):s.preset=v;s.shadows=v>0;s.vegetation=[.25,.6,1.0][v];s.effects=[.3,.6,1.0][v];AppState.show_page("Settings"))
 	dropdown("Window resolution",["1280 × 800","1440 × 900","1920 × 1080"],[0,1,2],s.resolution,func(v):s.resolution=v)
 	toggle("Fullscreen",s.fullscreen,func(v):s.fullscreen=v)
@@ -220,7 +222,7 @@ func settings_menu():
 	dropdown("Default communication",["No Audio","Team Audio","All Audio"],["no_audio","team_audio","all_audio"],s.audio,func(v):s.audio=v)
 	text_block("The launcher manages localhost only. Audio communication is a neural signal; application sound playback is not implemented. LOD bias uses imported mesh LODs where present.")
 	button(body,"SAVE SETTINGS",func():AppState.save_settings();AppState.menu())
-	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio"};AppState.save_settings();AppState.show_page("Settings"))
+	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en"))};AppState.save_settings();AppState.show_page("Settings"))
 	back()
 func pause_screen():
 	title("SESSION PAUSED","Pause")
@@ -240,9 +242,9 @@ func results():
 			for state in report.vehicles:
 				if int(state.id/8)!=team:continue
 				alive+=int(state.alive);shots+=int(state.metrics.shots);kills+=int(state.metrics.kills);pens+=int(state.metrics.penetrations);capture+=float(state.metrics.capture_s)
-			text_block("%s · tickets %.1f · survivors %d · shots %d · penetrations %d · kills %d · capture contribution %.1f vehicle·s" % ["BLUE" if team==0 else "RED",report.tickets[team],alive,shots,pens,kills,capture])
-		text_block("Duration: %.2f simulation seconds · %.2f wall seconds" % [report.time,report.get("wall_seconds",0)])
-	text_block("Results saved:\n"+AppState.last_output)
+			text_block(AppState.tr_format("results.team",[AppState.tr_text("BLUE" if team==0 else "RED"),report.tickets[team],alive,shots,pens,kills,capture]))
+		text_block(AppState.tr_format("results.duration",[report.time,report.get("wall_seconds",0)]))
+	text_block(AppState.tr_format("results.saved",[AppState.last_output]))
 	var play=button(body,"VIEW REPLAY",func():AppState.stop_session();AppState.session.mode="replay";AppState.session.replay_path=AppState.last_output.path_join("replay.jsonl");AppState.launch())
 	play.disabled=not FileAccess.file_exists(AppState.last_output.path_join("replay.jsonl"))
 	button(body,"RUN AGAIN",AppState.rerun)
@@ -258,23 +260,23 @@ func job_progress():
 	button(body,"RETURN",AppState.menu)
 func update_job(data: Dictionary):
 	if not is_instance_valid(job_text):return
-	job_text.text="%s\nCondition: %s · seed %s · run %s / %s\nSimulation: %.2fs · wall: %.1fs\n%s\nSaved: %s\nCheckpoint: %s" % [data.get("state","starting"),data.get("condition","—"),data.get("seed","—"),data.get("run",0),data.get("total",0),data.get("sim_time",0),data.get("wall_time",0),data.get("message",""),AppState.job_path,data.get("checkpoint","not saved yet")]
+	job_text.text=AppState.tr_format("job.progress",[AppState.tr_text(str(data.get("state","starting"))),data.get("condition","—"),data.get("seed","—"),data.get("run",0),data.get("total",0),data.get("sim_time",0),data.get("wall_time",0),AppState.tr_text(str(data.get("message",""))),AppState.job_path,data.get("checkpoint",AppState.tr_text("not saved yet"))])
 	var again=find_child("RunAgain",true,false)
 	if again:again.disabled=not data.get("state","") in ["complete","cancelled","error"]
 	progress.max_value=maxf(1,data.get("total",1));progress.value=data.get("completed",0)
 	results_button.disabled=not data.get("state","") in ["complete","cancelled","error"]
 func notice(message: String):
-	var dialog=AcceptDialog.new();dialog.dialog_text=message;add_child(dialog);dialog.popup_centered(Vector2i(650,220))
+	var dialog=AcceptDialog.new();dialog.dialog_text=AppState.tr_text(message);add_child(dialog);dialog.popup_centered(Vector2i(650,220))
 func backend_unavailable(reason: String):
-	headline.text="MaleCNS backend is unavailable."
+	headline.text=AppState.tr_text("MaleCNS backend is unavailable.")
 	text_block(reason)
 	button(body,"Retry",AppState.launch)
 	button(body,"Use Rule AI",func():AppState.session.blue_controller="rule";AppState.session.red_controller="rule";AppState.launch())
 func disconnect_dialog(reason: String):
-	headline.text="BRAIN BACKEND DISCONNECTED"
-	text_block(reason+"\nReconnect starts fresh neural state; the resumed episode is not scientifically continuous.")
+	headline.text=AppState.tr_text("BRAIN BACKEND DISCONNECTED")
+	text_block(reason+"\n"+AppState.tr_text("Reconnect starts fresh neural state; the resumed episode is not scientifically continuous."))
 	button(body,"RECONNECT",AppState.reconnect)
 	button(body,"RETURN TO MENU",AppState.menu)
 func _process(_dt):
-	status.text="BACKEND  ·  "+AppState.backend_state
-	if page=="LoadingScreen" and not AppState.backend_state in ["ERROR","DISCONNECTED"]:headline.text=AppState.loading_message
+	status.text=AppState.tr_text("BACKEND")+"  ·  "+AppState.tr_text(AppState.backend_state)
+	if page=="LoadingScreen" and not AppState.backend_state in ["ERROR","DISCONNECTED"]:headline.text=AppState.tr_text(AppState.loading_message)

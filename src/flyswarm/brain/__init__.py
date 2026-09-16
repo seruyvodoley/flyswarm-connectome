@@ -1,7 +1,7 @@
 """Two independent real MaleCNS objects. Importing this module loads no brain."""
 import time
 import numpy as np
-from flyswarm.sensory import visual,audio_signal
+from flyswarm.sensory import visual,audio_frame
 
 WING=['DLMn a, b','DLMn c-f','DVMn 1a-c','DVMn 2a, b','DVMn 3a, b','MNwm35','MNwm36','b1 MN','b2 MN','b3 MN','hg1 MN','hg2 MN','hg3 MN','hg4 MN','i1 MN','i2 MN','iii1 MN','iii3 MN','ps1 MN','tp1 MN','tp2 MN','tpn MN']
 
@@ -40,10 +40,23 @@ class DualBrain:
         self.song=np.zeros(16)
         self.trace=np.zeros((16,6))
         self.ticks=0
+        self.last_communication={
+            'sample':-1,
+            'song_out':[0.0]*16,
+            'heard_total':[0.0]*16,
+            'events':[],
+            'delay_steps':1,
+        }
     def step(self,observations,audio):
         start=time.perf_counter()
         alive=np.array([o['alive'] for o in observations])
-        heard=audio_signal(self.song,[o['position'] for o in observations],alive,audio)
+        previous_song=self.song.copy()
+        heard,contribution,distance=audio_frame(
+            previous_song,
+            [o['position'] for o in observations],
+            alive,
+            audio,
+        )
         stimulus=visual(observations)
         self.song[:]=0
         for team,(b,g) in enumerate(zip(self.brains,self.groups)):
@@ -57,6 +70,29 @@ class DualBrain:
                 self.trace[index]=.9*self.trace[index]+.1*counts/b.dt
                 self.song[index]=counts[-1] if alive[index] else 0
         self.ticks+=1
+
+        # UI/replay telemetry only.  Five samples/second keeps the socket and
+        # Godot UI light while preserving the actual 50 Hz neural simulation.
+        if self.ticks%10==0:
+            events=[]
+            receivers,senders=np.nonzero(contribution>=.01)
+            for receiver,sender in zip(receivers.tolist(),senders.tolist()):
+                events.append({
+                    'sender':int(sender),
+                    'receiver':int(receiver),
+                    'raw':float(previous_song[sender]),
+                    'received':float(contribution[receiver,sender]),
+                    'distance_m':float(distance[receiver,sender]),
+                })
+            events.sort(key=lambda event:event['received'],reverse=True)
+            self.last_communication={
+                'sample':int(self.ticks//10),
+                'song_out':previous_song.astype(float).tolist(),
+                'heard_total':heard.astype(float).tolist(),
+                'events':events[:12],
+                'delay_steps':1,
+            }
+
         return self.trace.copy(),heard,(time.perf_counter()-start)*1000
     def baseline(self,trace):
         # Natural lateral and pursuit decoders; no hidden role or ballistics teacher.

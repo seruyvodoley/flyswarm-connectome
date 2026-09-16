@@ -1,7 +1,8 @@
 extends Node
 const Config=preload("res://scripts/app/session_config.gd")
+const I18n=preload("res://scripts/app/i18n.gd")
 var session=Config.new()
-var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio"}
+var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en"}
 var root_path=""
 var python=""
 var view: Node
@@ -26,6 +27,7 @@ func _ready():
 	var file=ConfigFile.new()
 	if file.load("user://settings.cfg")==OK:
 		for key in settings:settings[key]=file.get_value("settings",key,settings[key])
+	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	get_tree().auto_accept_quit=false
 	apply_settings()
 func apply_settings():
@@ -37,6 +39,25 @@ func save_settings():
 	for key in settings:file.set_value("settings",key,settings[key])
 	file.save("user://settings.cfg")
 	apply_settings()
+func tr_text(text: String) -> String:
+	return I18n.t(text,str(settings.get("language","en")))
+
+func tr_format(key: String,args: Array) -> String:
+	return I18n.format(key,str(settings.get("language","en")),args)
+
+func language_switch_label() -> String:
+	return I18n.next_language_label(str(settings.get("language","en")))
+
+func set_language(language: String):
+	if not language in I18n.LANGUAGES:return
+	settings.language=language
+	save_settings()
+	if is_instance_valid(view):
+		call_deferred("show_page",current_page)
+
+func toggle_language():
+	set_language("en" if str(settings.get("language","en"))=="ru" else "ru")
+
 func results_root() -> String:
 	if not OS.has_feature("editor"):return ProjectSettings.globalize_path("user://sessions")
 	return root_path.path_join("results/raw/app")
@@ -136,7 +157,7 @@ func start_backend(token: int) -> bool:
 		loading_message="Only the local managed backend is supported. Choose localhost in Settings."
 		return false
 	if not FileAccess.file_exists(python):
-		loading_message="Python environment is missing: "+python+". Rule AI and Test Range remain available."
+		loading_message=tr_text("Python environment is missing: ")+python+tr_text(". Rule AI and Test Range remain available.")
 		return false
 	status_path=new_output("backend").path_join("status.json")
 	var args=PackedStringArray(["-m","flyswarm.bridge.server","--port",str(session.port),"--seed",str(session.battle_seed),"--once","--status-file",status_path,"--parent-pid",str(OS.get_process_id()),"--blue-controller",session.blue_controller,"--red-controller",session.red_controller])
@@ -149,7 +170,7 @@ func start_backend(token: int) -> bool:
 		var state=read_json(status_path)
 		loading_message=state.get("stage","Starting Python backend…")
 		if state.get("stage","")=="READY":backend_state="CONNECTING";loading_message="Connecting backend";return true
-		if state.get("error")!=null:loading_message=str(state.error);break
+		if state.get("error")!=null:loading_message=tr_text("Backend error: ")+str(state.error);break
 		if backend_pid<0 or not OS.is_process_running(backend_pid):loading_message="Backend exited. Check the Python environment and MaleCNS dataset.";break
 		await get_tree().create_timer(.2).timeout
 	if token!=generation:return false

@@ -26,7 +26,24 @@ var sim_time=0.0
 var frame=0
 var selected=0
 var camera_mode=1
+var last_camera_mode=-1
+var observer_environment: Environment
 var camera: Camera3D
+var camera_button: Button
+var battlefield_pan=Vector2.ZERO
+var battlefield_zoom=1600.0
+
+var comm_view=0 # 0 off, 1 red, 2 blue, 3 all
+var comm_toggle: Button
+var comm_panel: PanelContainer
+var comm_title: Label
+var comm_text: RichTextLabel
+var comm_links: MeshInstance3D
+var comm_line_material: StandardMaterial3D
+var comm_history=[]
+var comm_last_sample=-1
+var comm_last_link={}
+var replay_communication={}
 var hud: Label
 var detail: Label
 var debug=false
@@ -70,6 +87,10 @@ func _ready():
 	normalized=has("--normalized")
 	training=has("--training")
 	is_range=has("--range") or (session_config!=null and session_config.map=="test_range")
+	# Autonomous battles open in a true battlefield overview. Test range keeps
+	# the normal third-person follow camera.
+	if session_config!=null and not has("--camera"):
+		camera_mode=1 if is_range else 0
 	requires_brain=has("--connect")
 	audio_mode=option("--audio","no_audio")
 	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
@@ -79,6 +100,7 @@ func _ready():
 	if has("--replay"):
 		var manifest_path=option("--replay").get_base_dir().path_join("manifest.json")
 		if FileAccess.file_exists(manifest_path):replay_manifest=JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+		audio_mode=str(replay_manifest.get("audio",audio_mode))
 		if replay_manifest.get("map","").contains("Training"):
 			training=true
 			scenario=Catalog.read_json("scenarios/training_range.json")
@@ -115,6 +137,7 @@ func _ready():
 	env.fog_enabled=true
 	env.fog_density=.00018
 	env.fog_light_color=Color(.61,.68,.65)
+	observer_environment=env
 	sky.environment=env
 	add_child(sky)
 	var sun=DirectionalLight3D.new()
@@ -144,6 +167,10 @@ func _ready():
 		label.pixel_size=.08
 		label.position=pos+Vector3(0,18,0)
 		label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+		label.fixed_size=false
+		label.name="ObjectiveLabel"+str(i)
+		label.font_size=36
+		label.outline_size=4
 		add_child(label)
 		objectives[i].marker=marker
 	for i in range(16):
@@ -175,7 +202,8 @@ func _ready():
 	sensor_debug=MeshInstance3D.new()
 	add_child(sensor_debug)
 	camera=Camera3D.new()
-	camera.far=2300
+	camera.far=4000
+	camera.near=.1
 	camera.fov=62
 	add_child(camera)
 	camera.position=Vector3(170,140,-250)
@@ -184,21 +212,98 @@ func _ready():
 	add_child(canvas)
 	hud=Label.new()
 	hud.position=Vector2(24,18)
-	hud.add_theme_font_size_override("font_size",22)
+	hud.add_theme_font_size_override("font_size",14)
+	hud.size.x=430
+	hud.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	hud.add_theme_color_override("font_shadow_color",Color.BLACK)
 	hud.add_theme_constant_override("shadow_offset_x",2)
 	hud.add_theme_constant_override("shadow_offset_y",2)
 	var backdrop=ColorRect.new()
 	backdrop.color=Color(.025,.04,.05,.78)
 	backdrop.position=Vector2(12,10)
-	backdrop.size=Vector2(670,365)
+	backdrop.size=Vector2(455,290)
 	backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(backdrop)
 	canvas.add_child(hud)
 	detail=Label.new()
-	detail.position=Vector2(24,190)
-	detail.add_theme_font_size_override("font_size",16)
+	detail.position=Vector2(24,155)
+	detail.size.x=430
+	detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_font_size_override("font_size",12)
 	canvas.add_child(detail)
+
+	# Clickable observer controls.
+	camera_button=Button.new()
+	camera_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	camera_button.offset_left=-440
+	camera_button.offset_right=-225
+	camera_button.offset_top=18
+	camera_button.offset_bottom=62
+	camera_button.pressed.connect(cycle_camera)
+	canvas.add_child(camera_button)
+
+	comm_toggle=Button.new()
+	comm_toggle.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	comm_toggle.offset_left=-215
+	comm_toggle.offset_right=-18
+	comm_toggle.offset_top=18
+	comm_toggle.offset_bottom=62
+	comm_toggle.pressed.connect(cycle_comms)
+	comm_toggle.visible=not is_range
+	canvas.add_child(comm_toggle)
+
+	comm_panel=PanelContainer.new()
+	comm_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	comm_panel.offset_left=-460
+	comm_panel.offset_right=-18
+	comm_panel.offset_top=72
+	comm_panel.offset_bottom=570
+
+	var comm_style=StyleBoxFlat.new()
+	comm_style.bg_color=Color(.025,.04,.05,.93)
+	comm_style.border_color=Color(.35,.43,.40)
+	comm_style.set_border_width_all(1)
+	comm_style.set_corner_radius_all(4)
+	comm_style.content_margin_left=14
+	comm_style.content_margin_right=14
+	comm_style.content_margin_top=12
+	comm_style.content_margin_bottom=12
+	comm_panel.add_theme_stylebox_override("panel",comm_style)
+
+	var comm_box=VBoxContainer.new()
+	comm_box.add_theme_constant_override("separation",8)
+	comm_panel.add_child(comm_box)
+
+	comm_title=Label.new()
+	comm_title.add_theme_font_size_override("font_size",20)
+	comm_box.add_child(comm_title)
+
+	var disclaimer=Label.new()
+	disclaimer.text=AppState.tr_text("Interface shows physical/neural signal telemetry, not decoded language.")
+	disclaimer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	disclaimer.modulate=Color(.68,.74,.70)
+	comm_box.add_child(disclaimer)
+
+	comm_text=RichTextLabel.new()
+	comm_text.bbcode_enabled=false
+	comm_text.fit_content=false
+	comm_text.scroll_active=true
+	comm_text.scroll_following=true
+	comm_text.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	comm_text.custom_minimum_size=Vector2(390,390)
+	comm_box.add_child(comm_text)
+
+	canvas.add_child(comm_panel)
+
+	comm_links=MeshInstance3D.new()
+	add_child(comm_links)
+	comm_line_material=StandardMaterial3D.new()
+	comm_line_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	comm_line_material.vertex_color_use_as_albedo=true
+
+	update_camera_button()
+	refresh_comm_panel()
+
 	if requires_brain: bridge.connect_backend(int(option("--port","8765")))
 	record_path=option("--record","")
 	if record_path!="":
@@ -250,6 +355,8 @@ func _physics_process(delta):
 			var row=replay[replay_index]
 			sim_time=row.time
 			tickets=row.tickets
+			replay_communication=row.get("communication",{}) if row.get("communication",{}) is Dictionary else {}
+			ingest_communication(replay_communication)
 			for state in row.vehicles:
 				var v=vehicles[int(state.id)]
 				v.position=Vector3(state.position[0],state.position[1],state.position[2])
@@ -302,6 +409,7 @@ func _physics_process(delta):
 			vehicles[i].cmd=bridge.commands[i]
 			vehicles[i].dn=bridge.last_reply.get("traces",[])[i]
 			vehicles[i].audio_input=bridge.last_reply.get("heard",[])[i]
+		ingest_communication(bridge.last_reply.get("communication",{}))
 		bridge.commands=[]
 		delta=.02
 	for v in vehicles:
@@ -422,7 +530,7 @@ func snapshot() -> Dictionary:
 		states.append({"id":v.agent_id,"vehicle":v.cfg.id,"position":[v.position.x,v.position.y,v.position.z],"yaw":v.rotation.y,"turret":v.turret_angle,"gun":v.gun_angle,"alive":v.alive,"modules":v.modules.duplicate(),"metrics":v.metrics.duplicate(),"target":v.target,"impact":v.last_impact.duplicate(true)})
 	var zones=[]
 	for z in objectives:zones.append({"owner":z.owner,"progress":z.progress})
-	return {"time":sim_time,"vehicles":states,"tickets":tickets.duplicate(),"zones":zones,"brain":bridge.last_reply.get("mode","DISCONNECTED"),"projectiles":shell_snapshot()}
+	return {"time":sim_time,"vehicles":states,"tickets":tickets.duplicate(),"zones":zones,"brain":bridge.last_reply.get("mode","DISCONNECTED"),"projectiles":shell_snapshot(),"communication":current_communication().duplicate(true)}
 func shell_snapshot() -> Array:
 	var out=[]
 	for s in shells:out.append([s.position.x,s.position.y,s.position.z])
@@ -480,16 +588,34 @@ func _process(dt):
 		mesh.surface_end()
 		sensor_debug.mesh=mesh
 	if camera_mode==0:
-		camera.position=camera.position.lerp(v.position+Vector3(110,100,-150),dt*2)
-		camera.look_at(v.position+Vector3(0,2,0))
+		# True whole-battle observer view. It is deliberately independent of
+		# the selected vehicle.
+		camera.projection=Camera3D.PROJECTION_ORTHOGONAL
+		camera.size=battlefield_zoom
+		camera.keep_aspect=Camera3D.KEEP_HEIGHT
+		var pan=Vector2.ZERO
+		if Input.is_physical_key_pressed(KEY_W):pan.y-=1
+		if Input.is_physical_key_pressed(KEY_S):pan.y+=1
+		if Input.is_physical_key_pressed(KEY_A):pan.x-=1
+		if Input.is_physical_key_pressed(KEY_D):pan.x+=1
+		if pan.length()>0:
+			battlefield_pan+=pan.normalized()*dt*maxf(120,battlefield_zoom*.55)
+			battlefield_pan.x=clampf(battlefield_pan.x,-terrain.extent*.8,terrain.extent*.8)
+			battlefield_pan.y=clampf(battlefield_pan.y,-terrain.extent*.8,terrain.extent*.8)
+		camera.position=Vector3(battlefield_pan.x,1100,battlefield_pan.y)
+		camera.rotation=Vector3(-PI/2,0,0)
 	elif camera_mode==1:
-		camera.position=camera.position.lerp(v.position-v.global_basis.z*16+Vector3(0,8,0),dt*4)
+		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+		var follow=v.position-v.global_basis.z*16+Vector3(0,8,0)
+		camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,minf(1,dt*4))
 		camera.look_at(v.position+Vector3(0,2,0))
 	elif camera_mode==2:
+		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		camera.position=v.muzzle.global_position+Vector3(0,.4,0)
 		var a=v.rotation.y+v.turret_angle
 		camera.look_at(camera.position+Vector3(sin(a)*cos(v.gun_angle),sin(v.gun_angle),cos(a)*cos(v.gun_angle))*100)
 	else:
+		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		var movement=Vector3.ZERO
 		if Input.is_physical_key_pressed(KEY_W):movement-=camera.global_basis.z
 		if Input.is_physical_key_pressed(KEY_S):movement+=camera.global_basis.z
@@ -498,23 +624,68 @@ func _process(dt):
 		if Input.is_physical_key_pressed(KEY_Q):movement.y-=1
 		if Input.is_physical_key_pressed(KEY_E):movement.y+=1
 		camera.position+=movement*dt*100
-	var connection="BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL"
-	if requires_brain:connection="BRAIN WAITING" if not bridge.connected() else "2 × batch=8 · "+bridge.last_reply.get("mode","")
-	hud.text="KRASNY VALLEY   /   FLYSWARM RESEARCH\nGERMANY  %03d  (%d alive)     USSR  %03d  (%d alive)\nA %d   B %d   C %d   |   %.1fs   %s   %s\n%s\nBrain tick %d  %.1fms   IPC %.1fms   FPS %d" % [tickets[0],alive_count(0),tickets[1],alive_count(1),objectives[0].owner,objectives[1].owner,objectives[2].owner,sim_time,"NORMALIZED" if normalized else "HISTORICAL",audio_mode,connection,bridge.tick,bridge.last_reply.get("tick_ms",0),bridge.latency_ms,Engine.get_frames_per_second()]
-	detail.text="%s  ·  %s  ·  %s%d / local brain %d\nSpeed %.1f km/h    Gear %d    Ammo %d    Reload %.1fs\nTarget %d   Range %.0fm   LOS %s   Gun %.1f°\nDN %s   JO %.3f\nTAB agent  |  C camera  |  F1 debug  |  SPACE pause\nFree camera: WASD / Q E / arrows\n%s" % [v.cfg.display_name,v.cfg.role,"B" if v.team==0 else "R",v.agent_id%8+1,v.agent_id%8,v.speed*3.6,clampi(int(absf(v.speed)/3)+1,1,v.cfg.gears.size()),v.ammo_left,v.reload_left,v.target,v.target_range,str(v.seen),rad_to_deg(v.gun_angle),str(v.dn),v.audio_input,(str(v.modules)+"\n"+str(v.last_impact)) if debug else ""]
+	observer_environment.fog_enabled=camera_mode!=0
+	last_camera_mode=camera_mode
+	update_identification_labels()
+	var connection=AppState.tr_text("BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL")
+	if requires_brain:
+		connection=AppState.tr_text("BRAIN WAITING") if not bridge.connected() else "2 × batch=8 · "+bridge.last_reply.get("mode","")
+
+	var physics_name=AppState.tr_text("Normalized research control" if normalized else "Historical · provisional data")
+	var audio_name=AppState.tr_text({"no_audio":"No Audio","team_audio":"Team Audio","all_audio":"All Audio"}.get(audio_mode,audio_mode))
+
+	hud.text=AppState.tr_format("hud.header",[
+		tickets[0],alive_count(0),tickets[1],alive_count(1),
+		objectives[0].owner,objectives[1].owner,objectives[2].owner,
+		sim_time,physics_name,audio_name,connection,
+		bridge.tick,bridge.last_reply.get("tick_ms",0),bridge.latency_ms,
+		Engine.get_frames_per_second()
+	])
+
+	var communication=current_communication()
+	var songs=communication.get("song_out",[])
+	var own_song=float(songs[v.agent_id]) if songs.size()==16 else 0.0
+	var los_text=AppState.tr_text("yes" if v.seen else "no")
+
+	detail.text=AppState.tr_format("hud.detail",[
+		v.cfg.display_name,
+		AppState.tr_text(str(v.cfg.role)),
+		"B" if v.team==0 else "R",
+		v.agent_id%8+1,
+		v.agent_id%8,
+		v.speed*3.6,
+		clampi(int(absf(v.speed)/3)+1,1,v.cfg.gears.size()),
+		v.ammo_left,
+		v.reload_left,
+		v.target,
+		v.target_range,
+		los_text,
+		rad_to_deg(v.gun_angle),
+		own_song,
+		v.audio_input,
+		str(v.dn),
+		camera_name(),
+		(str(v.modules)+"\n"+str(v.last_impact)) if debug else ""
+	])
 	if is_range:
-		detail.text+="\nMANUAL · WASD drive · Q/E turret · R/F elevation · Space/LMB fire · ESC menu"
-		if debug:detail.text+="\nTARGET IMPACT: "+str(vehicles[8].last_impact)
-	if ended:detail.text+="\nBATTLE COMPLETE"
+		detail.text+="\n"+AppState.tr_text("MANUAL · WASD drive · Q/E turret · R/F elevation · Space/LMB fire · ESC menu")
+		if debug:detail.text+="\n"+AppState.tr_text("TARGET IMPACT: ")+str(vehicles[8].last_impact)
+	if ended:detail.text+="\n"+AppState.tr_text("BATTLE COMPLETE")
 	if screenshot_path!="" and sim_time>float(option("--capture-at","3.6")) and DisplayServer.get_name()!="headless":
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(screenshot_path)
 		screenshot_path=""
 func _unhandled_input(event):
+	if event is InputEventMouseButton and event.pressed and camera_mode==0:
+		if event.button_index==MOUSE_BUTTON_WHEEL_UP:
+			battlefield_zoom=clampf(battlefield_zoom*.86,280,1800)
+		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
+			battlefield_zoom=clampf(battlefield_zoom*1.16,280,1800)
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_TAB:selected=(selected+1)%16
-			KEY_C:camera_mode=(camera_mode+1)%4
+			KEY_C:cycle_camera()
+			KEY_T:cycle_comms()
 			KEY_F1:debug=not debug
 			KEY_SPACE:
 				if not is_range:paused=not paused
@@ -530,8 +701,204 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_UP):camera.rotate_object_local(Vector3.RIGHT,.035)
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
 
+
+func camera_name() -> String:
+	return AppState.tr_text([
+		"Battlefield",
+		"Third-person",
+		"Gunner",
+		"Free camera",
+	][camera_mode])
+
+func update_camera_button():
+	if is_instance_valid(camera_button):
+		camera_button.text=AppState.tr_format("camera.button",[camera_name()])
+
+func update_identification_labels():
+	# Convert a bounded screen font size to world units. Label3D fixed_size uses
+	# projection-dependent scaling and must not reuse a world-space pixel_size.
+	var height=maxf(1,get_viewport().get_visible_rect().size.y)
+	for tank in vehicles:
+		var label=tank.get_node("Identification") as Label3D
+		label.text=agent_label(tank.agent_id) if camera_mode==0 else agent_label(tank.agent_id)+" · "+tank.cfg.display_name
+		label.visible=tank.alive and (camera_mode==0 or camera.position.distance_to(tank.position)<300)
+		size_world_label(label,15,height)
+		label.global_position=tank.global_position+Vector3(0,5,0)
+		if camera_mode==0:
+			label.global_position+=camera.global_basis.y*((1 if tank.agent_id%2==0 else -1)*12*camera.size/height)
+	for i in range(objectives.size()):
+		size_world_label(get_node("ObjectiveLabel"+str(i)),24,height)
+
+func size_world_label(label: Label3D, pixels: float, viewport_height: float):
+	var units=camera.size/viewport_height
+	if camera.projection==Camera3D.PROJECTION_PERSPECTIVE:
+		var depth=-(camera.global_transform.affine_inverse()*label.global_position).z
+		units=2*maxf(.1,depth)*tan(deg_to_rad(camera.fov)*.5)/viewport_height
+	label.pixel_size=units*pixels/label.font_size
+
+func cycle_camera():
+	camera_mode=(camera_mode+1)%4
+	update_camera_button()
+
+func comm_mode_label() -> String:
+	return AppState.tr_text([
+		"Comms: Off",
+		"Comms: Red",
+		"Comms: Blue",
+		"Comms: All",
+	][comm_view])
+
+func cycle_comms():
+	comm_view=(comm_view+1)%4
+	refresh_comm_panel()
+
+func current_communication() -> Dictionary:
+	var value=replay_communication if replay_mode else bridge.last_reply.get("communication",{})
+	return value if value is Dictionary else {}
+
+func agent_label(id: int) -> String:
+	return ("B"+str(id+1)) if id<8 else ("R"+str(id-7))
+
+func comm_event_visible(event: Dictionary) -> bool:
+	if comm_view==3:return true
+	var sender=int(event.get("sender",-1))
+	if sender<0:return false
+	if comm_view==1:return sender>=8
+	if comm_view==2:return sender<8
+	return false
+
+func visible_comm_events(limit: int=12) -> Array:
+	var result=[]
+	for event in comm_history:
+		if sim_time-float(event.get("time",0))<=2.0 and comm_event_visible(event):
+			result.append(event)
+			if result.size()>=limit:break
+	return result
+
+func ingest_communication(communication):
+	if not communication is Dictionary or communication.is_empty():return
+	if not communication.get("sample",-1) is float and not communication.get("sample",-1) is int:return
+	var sample=int(communication.get("sample",-1))
+	if sample<0 or sample==comm_last_sample:return
+	comm_last_sample=sample
+
+	var sources=communication.get("events",[])
+	if not sources is Array:return
+	for source in sources:
+		if not source is Dictionary:continue
+		if not source.get("sender",null) is float and not source.get("sender",null) is int:continue
+		if not source.get("receiver",null) is float and not source.get("receiver",null) is int:continue
+		var event=source.duplicate(true)
+		var sender=int(event.get("sender",-1))
+		var receiver=int(event.get("receiver",-1))
+		if sender<0 or sender>=16 or receiver<0 or receiver>=16:continue
+
+		if sender==receiver:continue
+		if not event.get("received",null) is float and not event.get("received",null) is int:continue
+		if not event.get("raw",null) is float and not event.get("raw",null) is int:continue
+		if not event.get("distance_m",null) is float and not event.get("distance_m",null) is int:continue
+		if not is_finite(float(event.received)) or float(event.received)<0:continue
+		if not is_finite(float(event.distance_m)) or float(event.distance_m)<0:continue
+		var key=str(sender)+">"+str(receiver)
+		var last_time=float(comm_last_link.get(key,-999.0))
+
+		# UI-only deduplication. It does NOT modify neural communication.
+		if sim_time-last_time<.25:continue
+
+		comm_last_link[key]=sim_time
+		event.time=sim_time
+		comm_history.push_front(event)
+
+	while comm_history.size()>80:
+		comm_history.pop_back()
+
+	refresh_comm_panel()
+
+func update_comm_links(events: Array):
+	if not is_instance_valid(comm_links):return
+
+	if comm_view==0 or events.is_empty():
+		comm_links.mesh=null
+		return
+
+	var valid=[]
+	for event in events:
+		var sender=int(event.get("sender",-1));var receiver=int(event.get("receiver",-1))
+		if sender>=0 and sender<vehicles.size() and receiver>=0 and receiver<vehicles.size():
+			if vehicles[sender].alive and vehicles[receiver].alive:valid.append(event)
+	if valid.is_empty():comm_links.mesh=null;return
+	var mesh=ImmediateMesh.new()
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES,comm_line_material)
+
+	for event in valid:
+		var sender=int(event.sender)
+		var receiver=int(event.receiver)
+		if sender<0 or sender>=vehicles.size() or receiver<0 or receiver>=vehicles.size():
+			continue
+
+		if not vehicles[sender].alive or not vehicles[receiver].alive:continue
+		var strength=clampf(float(event.get("received",0))/.20,.25,1.0)
+		var base=Color(.34,.66,1.0) if sender<8 else Color(1.0,.42,.30)
+		var colour=base.darkened(1.0-strength)
+
+		mesh.surface_set_color(colour)
+		mesh.surface_add_vertex(vehicles[sender].global_position+Vector3(0,5,0))
+		mesh.surface_set_color(colour)
+		mesh.surface_add_vertex(vehicles[receiver].global_position+Vector3(0,5,0))
+
+	mesh.surface_end()
+	comm_links.mesh=mesh
+
+func refresh_comm_panel():
+	if is_instance_valid(comm_toggle):
+		comm_toggle.text=comm_mode_label()
+
+	if not is_instance_valid(comm_panel):return
+
+	comm_panel.visible=comm_view!=0
+	if comm_view==0:
+		update_comm_links([])
+		return
+
+	comm_title.text=AppState.tr_text([
+		"",
+		"Team Communication · Red",
+		"Team Communication · Blue",
+		"Team Communication · All",
+	][comm_view])
+
+	if audio_mode=="no_audio":
+		comm_text.text=AppState.tr_text("Communication channel disabled")
+		update_comm_links([])
+		return
+
+	if not requires_brain and not replay_mode:
+		comm_text.text=AppState.tr_text("No neural communication telemetry in Rule AI mode.")
+		update_comm_links([])
+		return
+
+	var events=visible_comm_events(14)
+	if events.is_empty():
+		comm_text.text=AppState.tr_text("No signal above threshold yet.")
+		update_comm_links([])
+		return
+
+	var lines=[]
+	for event in events:
+		lines.append(AppState.tr_format("comms.line",[
+			float(event.get("time",0)),
+			agent_label(int(event.sender)),
+			agent_label(int(event.receiver)),
+			float(event.get("raw",0)),
+			float(event.get("received",0)),
+			float(event.get("distance_m",0)),
+		]))
+
+	comm_text.text="\n".join(lines)
+	update_comm_links(events)
+
 func manual_commands() -> Array:
-	if camera_mode==3:return [0,0,0,0,0,0]
+	if camera_mode in [0,3]:return [0,0,0,0,0,0]
 	var drive=float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	var steer=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
 	var turn=float(Input.is_physical_key_pressed(KEY_E))-float(Input.is_physical_key_pressed(KEY_Q))

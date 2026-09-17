@@ -249,16 +249,163 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 		if (relative-direction*depth).length()<radius:
 			modules[key]=false
 			last_impact.damaged.append(key)
-	if not modules.ammo_rack or (not modules.gunner and not modules.commander and not modules.driver):
-		alive=false
-		speed=0
-		world.tickets[team]-=world.scenario.loss_cost
-		world.vehicles[shell.owner].metrics.kills+=1
-		world.vehicle_destroyed_effect(global_position+Vector3(0,1.0,0),not modules.ammo_rack)
-		var charred=StandardMaterial3D.new()
-		charred.albedo_color=Color(.12,.10,.08)
-		charred.roughness=1
-		for mesh in model.find_children("*","MeshInstance3D",true,false):mesh.material_override=charred
+	# Ground-vehicle knockout:
+	# ammo rack destruction OR only one modelled crew member remains.
+	#
+	# Do not require a particular trio such as driver+gunner+commander:
+	# that allowed a tank with only the driver alive to remain combat-alive.
+	var crew_keys = [
+		"driver",
+		"gunner",
+		"commander",
+		"loader",
+		"radio_operator"
+	]
+
+	var crew_total = 0
+	var crew_alive = 0
+
+	for crew_key in crew_keys:
+		if modules.has(crew_key):
+			crew_total += 1
+
+			if bool(modules[crew_key]):
+				crew_alive += 1
+
+	var ammo_destroyed = (
+		modules.has("ammo_rack")
+		and not bool(modules["ammo_rack"])
+	)
+
+	var crew_knockout = (
+		crew_total >= 2
+		and crew_alive <= 1
+	)
+
+	if ammo_destroyed or crew_knockout:
+		destroy_vehicle(int(shell.owner))
+
+
+func destroy_vehicle(killer_id: int):
+	if not alive:
+		return
+
+	alive=false
+	speed=0.0
+	velocity=Vector3.ZERO
+	yaw_rate=0.0
+	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
+
+	world.tickets[team]=maxf(
+		0.0,
+		float(world.tickets[team])-float(world.scenario.loss_cost)
+	)
+
+	if killer_id>=0 and killer_id<world.vehicles.size():
+		world.vehicles[killer_id].metrics.kills+=1
+
+	var catastrophic=not bool(
+		modules.get("ammo_rack",true)
+	)
+
+	# One destruction visual path for normal battle and Test Range.
+	if world.has_method("vehicle_destroyed_effect"):
+		world.vehicle_destroyed_effect(
+			global_position+Vector3(0,1.0,0),
+			catastrophic
+		)
+	else:
+		# Compatibility with an older battle.gd.
+		world.effect(
+			global_position+Vector3(0,1.5,0),
+			Color(.16,.13,.10),
+			1.5,
+			2.2
+		)
+
+	# Persistent wreck appearance.
+	var charred=StandardMaterial3D.new()
+	charred.albedo_color=Color(.075,.065,.055)
+	charred.roughness=1.0
+	charred.metallic=.18
+
+	for mesh in model.find_children(
+		"*",
+		"MeshInstance3D",
+		true,
+		false
+	):
+		mesh.material_override=charred
+
+	# Gun/turret remain physically attached, but become a clearly dead wreck.
+	# A little gun droop reads much better than an apparently combat-ready tank.
+	if gun:
+		gun.rotation.x=deg_to_rad(8.0)
+
+	var identification=find_child(
+		"Identification",
+		true,
+		false
+	)
+
+	if identification is Label3D:
+		identification.text=(
+			"× "
+			+("B" if team==0 else "R")
+			+str(agent_id%8+1)
+			+" · "
+			+str(cfg.display_name)
+		)
+
+		identification.modulate=Color(.48,.48,.46)
+
+
+func reset_destroyed_state():
+	# Used by Test Range target reset.
+	alive=true
+	speed=0.0
+	velocity=Vector3.ZERO
+	yaw_rate=0.0
+	reload_left=0.0
+	last_impact={}
+
+	cmd=[
+		0.0,0.0,0.0,
+		0.0,0.0,0.0
+	]
+
+	for key in modules:
+		modules[key]=true
+
+	for mesh in model.find_children(
+		"*",
+		"MeshInstance3D",
+		true,
+		false
+	):
+		mesh.material_override=null
+
+	var identification=find_child(
+		"Identification",
+		true,
+		false
+	)
+
+	if identification is Label3D:
+		identification.text=(
+			("B" if team==0 else "R")
+			+str(agent_id%8+1)
+			+" · "
+			+str(cfg.display_name)
+		)
+
+		identification.modulate=(
+			Color(.35,.65,1.0)
+			if team==0
+			else Color(1.0,.4,.25)
+		)
+
+
 
 func observation() -> Dictionary:
 	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"teacher":teacher(),"target":target}

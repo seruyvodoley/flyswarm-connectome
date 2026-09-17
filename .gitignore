@@ -29,3 +29,9 @@ results/replays/
 
 # Local application builds
 build/
+
+# macOS metadata
+.DS_Store
+._*
+.AppleDouble
+.LSOverride

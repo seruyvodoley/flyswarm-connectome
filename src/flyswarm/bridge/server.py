@@ -74,6 +74,21 @@ def main():
                             elif policy:action=policy.predict(x)
                             else:
                                 action=brain.baseline(t)
+
+                                # Explicit locomotion/search auxiliary.
+                                #
+                                # When no enemy is visible the visual encoder
+                                # injects no LC9 pursuit stimulus. Without a
+                                # floor the tank can remain indefinitely at
+                                # spawn. This auxiliary knows no waypoint,
+                                # objective coordinate, enemy coordinate or
+                                # vehicle role.
+                                if not o['visible']:
+                                    action[0]=max(
+                                        float(action[0]),
+                                        .18
+                                    )
+
                                 # Explicit rule-based fire/elevation auxiliary baseline.
                                 action[4]=np.clip(o['elevation']*6,-1,1)
                                 action[5]=float(o['visible'] and abs(o['bearing'])<.015 and abs(o['elevation'])<.012)

@@ -95,6 +95,57 @@ class DualBrain:
 
         return self.trace.copy(),heard,(time.perf_counter()-start)*1000
     def baseline(self,trace):
-        # Natural lateral and pursuit decoders; no hidden role or ballistics teacher.
+        """Map measured DN rates into normalized vehicle controls.
+
+        The previous 3D decoder divided pursuit/turn signals by very large
+        constants and could leave vehicles effectively stationary.
+
+        Scaling is based on the earlier successful FlyTank 0.3 pursuit
+        decoder, adapted from direct speed/deg-s commands to [-1, 1] vehicle
+        controls.  The connectome itself remains frozen.
+        """
         p9l,p9r,a02l,a02r,escape,wing=trace
-        return np.clip([(p9l+p9r-escape*.2)/80,0,(p9r-p9l)/40,(a02r-a02l)/40,0,0],-1,1)
+
+        pursuit_drive=max(0.0,float(p9l+p9r)-2.0)
+
+        # Full drive at roughly 12 Hz combined DNp09 activity.
+        throttle=np.clip(
+            pursuit_drive/10.0,
+            0.0,
+            1.0
+        )
+
+        # FlyTank 0.3 used 5 deg/s per Hz DNp09 difference.
+        # Here we map that response into a normalized steering control.
+        steer=np.clip(
+            float(p9r-p9l)/6.0,
+            -1.0,
+            1.0
+        )
+
+        # DNa02 was also much more strongly coupled in the validated
+        # tracking experiment than in the old /40 3D mapping.
+        turret=np.clip(
+            float(a02r-a02l)/8.0,
+            -1.0,
+            1.0
+        )
+
+        # Escape-related activity suppresses pursuit but cannot reverse the
+        # vehicle by itself.
+        escape_suppression=np.clip(
+            float(escape)/80.0,
+            0.0,
+            .70
+        )
+
+        throttle*=1.0-escape_suppression
+
+        return np.array([
+            throttle,
+            0.0,
+            steer,
+            turret,
+            0.0,
+            0.0
+        ],dtype=float)

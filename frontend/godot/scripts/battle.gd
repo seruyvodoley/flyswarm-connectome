@@ -30,6 +30,8 @@ var last_camera_mode=-1
 var observer_environment: Environment
 var camera: Camera3D
 var camera_button: Button
+var previous_vehicle_button: Button
+var next_vehicle_button: Button
 var battlefield_pan=Vector2.ZERO
 var battlefield_zoom=1600.0
 
@@ -99,6 +101,98 @@ func option(name: String, fallback: String="") -> String:
 		if args[i]==name:return args[i+1]
 	return fallback
 func has(name: String) -> bool:return name in (launch_args if session_config!=null else OS.get_cmdline_user_args())
+func objective_horizontal_distance(
+	a: Vector3,
+	b: Vector3
+) -> float:
+	return Vector2(
+		a.x-b.x,
+		a.z-b.z
+	).length()
+
+
+func create_objective_ring(
+	center: Vector3,
+	radius: float
+) -> MeshInstance3D:
+	# Exact circle in X/Z, but every vertex samples terrain height.
+	#
+	# Unlike the old flat CylinderMesh this cannot disappear into a slope.
+	var ring=MeshInstance3D.new()
+	var surface=SurfaceTool.new()
+
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var segments=128
+	var width=maxf(1.8,radius*.055)
+	var outer=radius
+	var inner=maxf(1.0,radius-width)
+
+	for i in range(segments):
+		var a0=TAU*float(i)/float(segments)
+		var a1=TAU*float(i+1)/float(segments)
+
+		var ox0=center.x+cos(a0)*outer
+		var oz0=center.z+sin(a0)*outer
+
+		var ix0=center.x+cos(a0)*inner
+		var iz0=center.z+sin(a0)*inner
+
+		var ox1=center.x+cos(a1)*outer
+		var oz1=center.z+sin(a1)*outer
+
+		var ix1=center.x+cos(a1)*inner
+		var iz1=center.z+sin(a1)*inner
+
+		var outer0=Vector3(
+			ox0,
+			terrain.height_at(ox0,oz0)+.28,
+			oz0
+		)
+
+		var inner0=Vector3(
+			ix0,
+			terrain.height_at(ix0,iz0)+.28,
+			iz0
+		)
+
+		var outer1=Vector3(
+			ox1,
+			terrain.height_at(ox1,oz1)+.28,
+			oz1
+		)
+
+		var inner1=Vector3(
+			ix1,
+			terrain.height_at(ix1,iz1)+.28,
+			iz1
+		)
+
+		for vertex in [
+			outer0,
+			inner0,
+			outer1,
+			outer1,
+			inner0,
+			inner1
+		]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(vertex)
+
+	ring.mesh=surface.commit()
+
+	var material=StandardMaterial3D.new()
+	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color=Color(.38,.41,.35,.88)
+	material.cull_mode=BaseMaterial3D.CULL_DISABLED
+
+	ring.material_override=material
+	ring.name="ObjectiveRing"
+
+	return ring
+
+
 func _ready():
 	if session_config!=null:
 		launch_args=session_config.cli_args()
@@ -172,15 +266,10 @@ func _ready():
 		var v=scenario.objectives[i]
 		var pos=Vector3(v[0],terrain.height_at(v[0],v[1]),v[1])
 		objectives.append({"position":pos,"owner":-1,"progress":0.0,"contested":false,"inside":[0,0]})
-		var marker=MeshInstance3D.new()
-		var mesh=CylinderMesh.new()
-		mesh.top_radius=scenario.zone_radius
-		mesh.bottom_radius=scenario.zone_radius
-		mesh.height=.14
-		mesh.radial_segments=48
-		marker.mesh=mesh
-		marker.position=pos+Vector3(0,.3,0)
-		marker.material_override=terrain.material(Color(.33,.37,.31))
+		var marker=create_objective_ring(
+			pos,
+			float(scenario.zone_radius)
+		)
 		add_child(marker)
 		var label=Label3D.new()
 		label.text=["A","B","C"][i]
@@ -195,6 +284,13 @@ func _ready():
 		add_child(label)
 		objectives[i].marker=marker
 		objectives[i].label=label
+
+		# A/B/C belong to the Domination battle mode.
+		# Test Range is a gunnery/mobility sandbox and does not process capture,
+		# so showing these markers there is misleading.
+		marker.visible = not is_range
+		label.visible = not is_range
+
 		update_objective_visual(i)
 	for i in range(16):
 		var team=int(i/8)
@@ -276,11 +372,12 @@ func _ready():
 
 	range_killcam_panel=PanelContainer.new()
 	range_killcam_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	range_killcam_panel.offset_left=-330
-	range_killcam_panel.offset_right=330
-	range_killcam_panel.offset_top=-225
-	range_killcam_panel.offset_bottom=-28
+	range_killcam_panel.offset_left=-360
+	range_killcam_panel.offset_right=360
+	range_killcam_panel.offset_top=-430
+	range_killcam_panel.offset_bottom=-24
 	range_killcam_panel.visible=false
+	range_killcam_panel.clip_contents=true
 
 	var killcam_style=StyleBoxFlat.new()
 	killcam_style.bg_color=Color(.025,.035,.04,.92)
@@ -299,13 +396,13 @@ func _ready():
 
 	range_killcam_title=Label.new()
 	range_killcam_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	range_killcam_title.add_theme_font_size_override("font_size",28)
+	range_killcam_title.add_theme_font_size_override("font_size",25)
 	killcam_box.add_child(range_killcam_title)
 
 	range_killcam_body=Label.new()
 	range_killcam_body.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	range_killcam_body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	range_killcam_body.add_theme_font_size_override("font_size",16)
+	range_killcam_body.add_theme_font_size_override("font_size",15)
 	killcam_box.add_child(range_killcam_body)
 
 	var reset_target_button=Button.new()
@@ -329,6 +426,32 @@ func _ready():
 	camera_button.offset_bottom=62
 	camera_button.pressed.connect(cycle_camera)
 	canvas.add_child(camera_button)
+
+	# Observer vehicle selection.
+	# Visible in normal battles; Test Range only has one controlled vehicle.
+	previous_vehicle_button=Button.new()
+	previous_vehicle_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	previous_vehicle_button.offset_left=-228
+	previous_vehicle_button.offset_right=-124
+	previous_vehicle_button.offset_top=-66
+	previous_vehicle_button.offset_bottom=-22
+	previous_vehicle_button.text="◀"
+	previous_vehicle_button.tooltip_text="Previous vehicle · Shift+Tab"
+	previous_vehicle_button.visible=not is_range
+	previous_vehicle_button.pressed.connect(select_previous_vehicle)
+	canvas.add_child(previous_vehicle_button)
+
+	next_vehicle_button=Button.new()
+	next_vehicle_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	next_vehicle_button.offset_left=-114
+	next_vehicle_button.offset_right=-10
+	next_vehicle_button.offset_top=-66
+	next_vehicle_button.offset_bottom=-22
+	next_vehicle_button.text="▶"
+	next_vehicle_button.tooltip_text="Next vehicle · Tab"
+	next_vehicle_button.visible=not is_range
+	next_vehicle_button.pressed.connect(select_next_vehicle)
+	canvas.add_child(next_vehicle_button)
 
 	comm_toggle=Button.new()
 	comm_toggle.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -390,6 +513,7 @@ func _ready():
 	comm_line_material.vertex_color_use_as_albedo=true
 
 	update_camera_button()
+	update_selection_buttons()
 	refresh_comm_panel()
 
 	if requires_brain: bridge.connect_backend(int(option("--port","8765")))
@@ -504,9 +628,23 @@ func _physics_process(delta):
 				else:get_tree().quit(2)
 			return
 		for i in range(16):
-			vehicles[i].cmd=bridge.commands[i]
-			vehicles[i].dn=bridge.last_reply.get("traces",[])[i]
-			vehicles[i].audio_input=bridge.last_reply.get("heard",[])[i]
+			var command=bridge.commands[i].duplicate()
+
+			if is_malecns_controller(vehicles[i]):
+				command=apply_malecns_objective_aux(
+					vehicles[i],
+					command
+				)
+
+			vehicles[i].cmd=command
+
+			var traces=bridge.last_reply.get("traces",[])
+			if traces.size()==16:
+				vehicles[i].dn=traces[i]
+
+			var heard=bridge.last_reply.get("heard",[])
+			if heard.size()==16:
+				vehicles[i].audio_input=heard[i]
 		ingest_communication(bridge.last_reply.get("communication",{}))
 		bridge.commands=[]
 		delta=.02
@@ -607,6 +745,191 @@ func step_shells(dt: float):
 		else:
 			s.position=to
 			s.visual.position=to
+
+func is_malecns_controller(vehicle) -> bool:
+	if not requires_brain:
+		return false
+
+	if session_config==null:
+		return str(
+			bridge.last_reply.get("mode","")
+		)=="BIOLOGICAL_BASELINE"
+
+	var controller = (
+		session_config.blue_controller
+		if vehicle.team==0
+		else session_config.red_controller
+	)
+
+	return str(controller)=="brain"
+
+
+func apply_malecns_objective_aux(
+	vehicle,
+	source: Array
+) -> Array:
+	# ========================================================
+	# ENGINEERED TACTICAL AUXILIARY
+	# ========================================================
+	#
+	# MaleCNS still controls pursuit/combat/turret behaviour.
+	#
+	# A fly connectome has no concept of:
+	#     map A/B/C objectives
+	#     War Thunder capture rules
+	#     strategic waypoints
+	#
+	# Therefore objective navigation is intentionally implemented OUTSIDE
+	# MaleCNS at the vehicle/world motor layer.
+	#
+	# Objective XYZ is NEVER injected into the neural sensory encoder.
+
+	var command=source.duplicate()
+
+	while command.size()<6:
+		command.append(0.0)
+
+	if not vehicle.alive:
+		return [
+			0.0,0.0,0.0,
+			0.0,0.0,0.0
+		]
+
+	if objectives.is_empty():
+		return command
+
+	var destination=objective_destination(vehicle)
+
+	var delta=destination-vehicle.global_position
+	delta.y=0.0
+
+	var distance=delta.length()
+
+	if distance<.001:
+		return command
+
+	var desired_heading=atan2(
+		delta.x,
+		delta.z
+	)
+
+	var heading_error=wrapf(
+		desired_heading-vehicle.rotation.y,
+		-PI,
+		PI
+	)
+
+	var radius=float(scenario.zone_radius)
+
+	var inside_capture_zone=(
+		distance<radius*.62
+	)
+
+	# --------------------------------------------------------
+	# TRAVEL TO OBJECTIVE
+	# --------------------------------------------------------
+
+	if not inside_capture_zone:
+		var navigation_steer=clampf(
+			heading_error*1.55,
+			-1.0,
+			1.0
+		)
+
+		# The vehicle should actually travel at useful battlefield speed.
+		#
+		# This is still normalized throttle: historical acceleration and
+		# cross-country speed limits remain Vehicle.step()'s responsibility.
+		var navigation_throttle=.82
+
+		if absf(heading_error)>.60:
+			navigation_throttle=.46
+
+		if absf(heading_error)>1.15:
+			navigation_throttle=.22
+
+		if distance<radius*1.45:
+			navigation_throttle=minf(
+				navigation_throttle,
+				.34
+			)
+
+		# When MaleCNS sees an enemy, neural combat behaviour receives more
+		# authority while the objective vector remains a weak tactical bias.
+		var navigation_weight=.78
+
+		if vehicle.seen:
+			navigation_weight=.30
+			navigation_throttle*=.72
+
+		command[2]=lerpf(
+			float(command[2]),
+			navigation_steer,
+			navigation_weight
+		)
+
+		command[0]=maxf(
+			float(command[0]),
+			navigation_throttle
+		)
+
+	# --------------------------------------------------------
+	# HOLD / CAPTURE OBJECTIVE
+	# --------------------------------------------------------
+
+	else:
+		# Like a normal capture-mode player, stop inside the circle instead
+		# of driving straight through it.
+		#
+		# If combat is occurring, allow a small amount of neural movement.
+		if vehicle.seen:
+			command[0]=clampf(
+				float(command[0]),
+				0.0,
+				.28
+			)
+		else:
+			command[0]=0.0
+			command[2]=0.0
+
+	# --------------------------------------------------------
+	# SIMPLE WORLD-LEVEL OBSTACLE AVOIDANCE
+	# --------------------------------------------------------
+
+	if not inside_capture_zone:
+		var probe_start=(
+			vehicle.global_position
+			+Vector3(0,1.2,0)
+		)
+
+		var probe_end=(
+			probe_start
+			+vehicle.global_basis.z*13.0
+		)
+
+		var query=PhysicsRayQueryParameters3D.create(
+			probe_start,
+			probe_end,
+			3,
+			vehicle.excluded()
+		)
+
+		var obstacle=(
+			get_world_3d()
+			.direct_space_state
+			.intersect_ray(query)
+		)
+
+		if not obstacle.is_empty():
+			command[0]=-.15
+			command[2]=(
+				1.0
+				if vehicle.agent_id%2==0
+				else -1.0
+			)
+
+	return command
+
 
 func objective_capture_multiplier(count: int) -> float:
 	if count <= 0:
@@ -771,9 +1094,7 @@ func step_objectives(dt: float):
 			if not vehicle.alive:
 				continue
 
-			if vehicle.position.distance_to(
-				zone["position"]
-			) >= float(scenario.zone_radius):
+			if objective_horizontal_distance(vehicle.position,zone["position"]) >= float(scenario.zone_radius):
 				continue
 
 			counts[vehicle.team] += 1
@@ -1228,14 +1549,17 @@ func _process(dt):
 	if requires_brain:
 		connection=AppState.tr_text("BRAIN WAITING") if not bridge.connected() else "2 × batch=8 · "+bridge.last_reply.get("mode","")
 
+		if bridge.connected() and is_malecns_controller(v):
+			connection+=" · OBJECTIVE_AUX"
+
 	var physics_name=AppState.tr_text("Normalized research control" if normalized else "Historical · provisional data")
 	var audio_name=AppState.tr_text({"no_audio":"No Audio","team_audio":"Team Audio","all_audio":"All Audio"}.get(audio_mode,audio_mode))
 
 	hud.text=AppState.tr_format("hud.header",[
 		tickets[0],alive_count(0),tickets[1],alive_count(1),
-		objective_hud_status(objectives[0]),
-		objective_hud_status(objectives[1]),
-		objective_hud_status(objectives[2]),
+		("-" if is_range else objective_hud_status(objectives[0])),
+		("-" if is_range else objective_hud_status(objectives[1])),
+		("-" if is_range else objective_hud_status(objectives[2])),
 		sim_time,physics_name,audio_name,connection,
 		bridge.tick,bridge.last_reply.get("tick_ms",0),bridge.latency_ms,
 		Engine.get_frames_per_second()
@@ -1276,13 +1600,22 @@ func _process(dt):
 		screenshot_path=""
 func _unhandled_input(event):
 	if event is InputEventMouseButton and event.pressed and camera_mode==0:
-		if event.button_index==MOUSE_BUTTON_WHEEL_UP:
+		if event.button_index==MOUSE_BUTTON_LEFT:
+			select_vehicle_from_screen(
+				event.position
+			)
+
+		elif event.button_index==MOUSE_BUTTON_WHEEL_UP:
 			battlefield_zoom=clampf(battlefield_zoom*.86,280,1800)
 		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
 			battlefield_zoom=clampf(battlefield_zoom*1.16,280,1800)
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
-			KEY_TAB:selected=(selected+1)%16
+			KEY_TAB:
+				if event.shift_pressed:
+					select_previous_vehicle()
+				else:
+					select_next_vehicle()
 			KEY_C:
 				if is_range and range_killcam_active:
 					end_range_killcam()
@@ -1311,6 +1644,120 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
 
 
+
+func select_vehicle(index: int):
+	if index<0 or index>=vehicles.size():
+		return
+
+	if not vehicles[index].alive:
+		return
+
+	selected=index
+
+	# Snap follow/gunner camera to the newly selected agent instead of
+	# interpolating from the old vehicle across the whole battlefield.
+	last_camera_mode=-1
+
+	update_selection_buttons()
+
+
+func select_vehicle_direction(direction: int):
+	if vehicles.is_empty():
+		return
+
+	for offset in range(1,vehicles.size()+1):
+		var index=(
+			selected
+			+direction*offset
+		+vehicles.size()*2
+		)%vehicles.size()
+
+		if vehicles[index].alive:
+			select_vehicle(index)
+			return
+
+
+func select_next_vehicle():
+	select_vehicle_direction(1)
+
+
+func select_previous_vehicle():
+	select_vehicle_direction(-1)
+
+
+func update_selection_buttons():
+	if vehicles.is_empty():
+		return
+
+	var current=agent_label(selected)
+
+	if is_instance_valid(previous_vehicle_button):
+		previous_vehicle_button.text="◀ "+current
+
+	if is_instance_valid(next_vehicle_button):
+		next_vehicle_button.text=current+" ▶"
+
+
+func select_vehicle_from_screen(screen_position: Vector2):
+	if camera_mode!=0:
+		return
+
+	if not is_instance_valid(camera):
+		return
+
+	var origin=camera.project_ray_origin(
+		screen_position
+	)
+
+	var direction=camera.project_ray_normal(
+		screen_position
+	)
+
+	var query=PhysicsRayQueryParameters3D.create(
+		origin,
+		origin+direction*5000.0,
+		6
+	)
+
+	var hit=(
+		get_world_3d()
+		.direct_space_state
+		.intersect_ray(query)
+	)
+
+	if hit.is_empty():
+		return
+
+	var collider=hit.get(
+		"collider",
+		null
+	)
+
+	if collider==null:
+		return
+
+	var candidate=null
+
+	if collider.has_meta("vehicle"):
+		candidate=collider.get_meta(
+			"vehicle"
+		)
+
+	elif collider in vehicles:
+		candidate=collider
+
+	if candidate==null:
+		return
+
+	if not candidate.alive:
+		return
+
+	select_vehicle(
+		int(candidate.agent_id)
+	)
+
+
+
 func camera_name() -> String:
 	return AppState.tr_text([
 		"Battlefield",
@@ -1329,8 +1776,43 @@ func update_identification_labels():
 	var height=maxf(1,get_viewport().get_visible_rect().size.y)
 	for tank in vehicles:
 		var label=tank.get_node("Identification") as Label3D
-		label.text=agent_label(tank.agent_id) if camera_mode==0 else agent_label(tank.agent_id)+" · "+tank.cfg.display_name
-		label.visible=tank.alive and (camera_mode==0 or camera.position.distance_to(tank.position)<300)
+
+		var identification=agent_label(
+			tank.agent_id
+		)
+
+		if tank.agent_id==selected:
+			identification="▶ "+identification
+
+		label.text=(
+			identification
+			if camera_mode==0
+			else identification+" · "+tank.cfg.display_name
+		)
+
+		label.outline_size=(
+			10
+			if tank.agent_id==selected
+			else 6
+		)
+
+		if tank.agent_id==selected:
+			label.modulate=Color(
+				1.0,
+				.92,
+				.28
+			)
+		else:
+			label.modulate=(
+				Color(.35,.65,1.0)
+				if tank.team==0
+				else Color(1.0,.4,.25)
+			)
+
+		label.visible=tank.alive and (
+			camera_mode==0
+			or camera.position.distance_to(tank.position)<300
+		)
 		size_world_label(label,15,height)
 		label.global_position=tank.global_position+Vector3(0,5,0)
 		if camera_mode==0:
@@ -1794,7 +2276,7 @@ func reset_range_target():
 	if is_instance_valid(range_killcam_panel):
 		range_killcam_panel.visible=false
 
-	target.alive=true
+	target.reset_destroyed_state()
 	target.show()
 
 	target.speed=0.0

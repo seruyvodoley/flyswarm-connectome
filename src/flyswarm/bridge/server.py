@@ -6,12 +6,28 @@ from flyswarm.brain import DualBrain
 from flyswarm.bridge import read,encode
 from flyswarm.policy import Readout,features
 from flyswarm.marl.policy import SharedPPOPolicy
+from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features
 
 def load_policy(path):
-    """Load either the ridge readout or shared PPO adapter from one selector."""
+    """Load either the ridge readout or any supported shared PPO adapter."""
     with np.load(path,allow_pickle=False) as data:
-        if "value" in data and data["weights"].shape[0]==21:return SharedPPOPolicy.load(path)
+        if "value" in data and data["weights"].ndim==2 and data["weights"].shape[1]==6:
+            return SharedPPOPolicy.load(path)
     return Readout.load(path)
+
+def ppo_features(policy,trace,observation):
+    """Build live PPO input while retaining old 20-D checkpoint compatibility."""
+    base=np.concatenate([
+        np.log1p(np.maximum(0,np.asarray(trace,dtype=float)))/5,
+        np.asarray(observation.get('rl_task',[0.]*14),dtype=float),
+    ])
+    expected=int(policy.weights.shape[0]-1)
+    if expected==base.size:
+        return base
+    conditioned=np.concatenate([base,role_features(str(observation['vehicle']))])
+    if expected==conditioned.size:
+        return conditioned
+    raise ValueError(f"PPO observation size mismatch: checkpoint expects {expected}, runtime provides {base.size} legacy or {conditioned.size} role-conditioned features")
 
 def main():
     p=argparse.ArgumentParser()
@@ -74,7 +90,7 @@ def main():
                             if policies and policy is None:raise ValueError(f"No policy for {o['vehicle']}")
                             is_ppo=isinstance(policy,SharedPPOPolicy)
                             mode=policy.mode if policy and not is_ppo else a.feature_mode
-                            x=np.concatenate([np.log1p(np.maximum(0,np.asarray(t,dtype=float)))/5,np.asarray(o.get('rl_task',[0.]*14),dtype=float)]) if is_ppo else features(t,o['proprio'],mode)
+                            x=ppo_features(policy,t,o) if is_ppo else features(t,o['proprio'],mode)
                             decoded=brain.baseline(t)
                             raw_neural=np.asarray(t,dtype=float)
                             objective_aux=np.zeros(6);gunnery_aux=np.zeros(6)
@@ -90,7 +106,6 @@ def main():
                                 action=decoded.copy()
 
                                 # Explicit locomotion/search auxiliary.
-                                #
                                 # When no enemy is visible the visual encoder
                                 # injects no LC9 pursuit stimulus. Without a
                                 # floor the tank can remain indefinitely at

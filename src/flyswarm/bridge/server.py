@@ -5,6 +5,13 @@ import numpy as np
 from flyswarm.brain import DualBrain
 from flyswarm.bridge import read,encode
 from flyswarm.policy import Readout,features
+from flyswarm.marl.policy import SharedPPOPolicy
+
+def load_policy(path):
+    """Load either the ridge readout or shared PPO adapter from one selector."""
+    with np.load(path,allow_pickle=False) as data:
+        if "value" in data and data["weights"].shape[0]==21:return SharedPPOPolicy.load(path)
+    return Readout.load(path)
 
 def main():
     p=argparse.ArgumentParser()
@@ -33,8 +40,8 @@ def main():
     policy_hashes={}
     if a.policy:
         path=Path(a.policy)
-        if path.is_dir():policies={f.parent.name:Readout.load(f) for f in path.glob('*/policy.npz')}
-        else:policies={'shared':Readout.load(path)}
+        if path.is_dir():policies={f.parent.name:load_policy(f) for f in path.glob('*/policy.npz')}
+        else:policies={'shared':load_policy(path)}
         files=path.glob('*/policy.npz') if path.is_dir() else [path]
         policy_hashes={f.parent.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in files}
     if a.collect and a.policy:raise ValueError('Do not collect training data during policy evaluation')
@@ -42,10 +49,10 @@ def main():
     for team in ['blue','red']:
         file=getattr(a,team+'_policy')
         if file:
-            try:team_policies[team]=Readout.load(file)
+            try:team_policies[team]=load_policy(file)
             except Exception as exc:status('ERROR',str(exc));return
     xs=[];ys=[];vehicles=[];seeds=[]
-    metadata={'brain_seeds':[a.seed,a.seed+1000],'neuron_count':sum(b.n*b.batch for b in brain.brains),'feature_mode':a.feature_mode,'mode':'imitation' if a.collect else 'evaluation','policy_ids':{key:value.metadata for key,value in policies.items()},'policy_sha256':policy_hashes}
+    metadata={'brain_seeds':[a.seed,a.seed+1000],'neuron_count':sum(b.n*b.batch for b in brain.brains),'feature_mode':a.feature_mode,'mode':'imitation' if a.collect else 'evaluation','controllers':{'blue':a.blue_controller,'red':a.red_controller},'policy_ids':{key:value.metadata for key,value in policies.items()},'policy_sha256':policy_hashes,'team_policy_ids':{key:value.metadata for key,value in team_policies.items()},'team_policy_sha256':{team:hashlib.sha256(Path(getattr(a,team+'_policy')).read_bytes()).hexdigest() for team in team_policies}}
     with socket.socket() as server:
         server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         server.bind(('127.0.0.1',a.port));server.listen(1)
@@ -60,20 +67,27 @@ def main():
                         if packet['seq']<=last:raise ValueError('Non-monotonic sequence')
                         last=packet['seq'];obs=packet['observations']
                         traces,heard,ms=brain.step(obs,packet['audio'])
-                        actions=[]
+                        actions=[];control_layers=[]
                         for o,t in zip(obs,traces):
                             team='blue' if o['id']<8 else 'red'
                             policy=team_policies.get(team,policies.get(o['vehicle'],policies.get('shared')))
                             if policies and policy is None:raise ValueError(f"No policy for {o['vehicle']}")
-                            mode=policy.mode if policy else a.feature_mode
-                            x=features(t,o['proprio'],mode)
+                            is_ppo=isinstance(policy,SharedPPOPolicy)
+                            mode=policy.mode if policy and not is_ppo else a.feature_mode
+                            x=np.concatenate([np.log1p(np.maximum(0,np.asarray(t,dtype=float)))/5,np.asarray(o.get('rl_task',[0.]*14),dtype=float)]) if is_ppo else features(t,o['proprio'],mode)
+                            decoded=brain.baseline(t)
+                            raw_neural=np.asarray(t,dtype=float)
+                            objective_aux=np.zeros(6);gunnery_aux=np.zeros(6)
+                            adapter_action=None
                             if a.collect:
                                 xs.append(x);ys.append(o['teacher']);vehicles.append(o['vehicle']);seeds.append(a.seed)
                                 action=np.array(o['teacher'])
-                            elif getattr(a,team+'_controller')=='rule':action=np.array(o['teacher'])
-                            elif policy:action=policy.predict(x)
+                            elif getattr(a,team+'_controller')=='rule':
+                                action=np.array(o['teacher']);decoded=None
+                            elif policy:
+                                action=policy.act(x,deterministic=True)[0] if is_ppo else policy.predict(x);adapter_action=action.copy()
                             else:
-                                action=brain.baseline(t)
+                                action=decoded.copy()
 
                                 # Explicit locomotion/search auxiliary.
                                 #
@@ -84,17 +98,25 @@ def main():
                                 # objective coordinate, enemy coordinate or
                                 # vehicle role.
                                 if not o['visible']:
-                                    action[0]=max(
-                                        float(action[0]),
-                                        .18
-                                    )
+                                    previous=float(action[0]);action[0]=max(previous,.18)
+                                    objective_aux[0]=float(action[0])-previous
 
                                 # Explicit rule-based fire/elevation auxiliary baseline.
+                                previous=action.copy()
                                 action[4]=np.clip(o['elevation']*6,-1,1)
                                 action[5]=float(o['visible'] and abs(o['bearing'])<.015 and abs(o['elevation'])<.012)
+                                gunnery_aux=action-previous
                             if not o['alive']:action=np.zeros(6)
                             actions.append(action.tolist())
-                        result=dict(version=1,seq=last,actions=actions,traces=traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=.02,mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies or team_policies else 'BIOLOGICAL_BASELINE'),metadata=metadata,communication=brain.last_communication)
+                            control_layers.append({
+                                'raw_neural_action':raw_neural.tolist(),
+                                'decoder_action':None if decoded is None else decoded.tolist(),
+                                'objective_aux_action':objective_aux.tolist(),
+                                'gunnery_aux_action':gunnery_aux.tolist(),
+                                'adapter_action':None if adapter_action is None else adapter_action.tolist(),
+                                'final_action':action.tolist(),
+                            })
+                        result=dict(version=1,seq=last,actions=actions,control_layers=control_layers,traces=traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=.02,mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies or team_policies else 'BIOLOGICAL_BASELINE'),metadata=metadata,communication=brain.last_communication)
                         connection.sendall(encode(result))
             except (ConnectionError,ValueError) as e:print(type(e).__name__,str(e),flush=True)
             finally:

@@ -22,8 +22,8 @@ func run():
 	app.settings.language="ru"
 	app.show_page("MainMenu")
 	await process_frame
-	var historical_button=app.view.find_child("HistoricalBattle",true,false)
-	check(historical_button!=null and historical_button.text=="ИСТОРИЧЕСКИЙ БОЙ","Russian localization")
+	var battle_button=app.view.find_child("AutonomousBattle",true,false)
+	check(battle_button!=null and battle_button.text=="АВТОНОМНЫЙ БОЙ","Russian localization")
 	var expression=RegEx.new();expression.compile("%[-+0-9.]*[sdf]")
 	for key in app.I18n.EN:
 		var en=[];var ru=[]
@@ -124,6 +124,19 @@ func run():
 		for frame in range(80):await physics_frame
 		check(app.backend_pid<0 and app.current_page=="ResultsScreen","Neural replay completes without backend")
 		app.menu()
+		for controllers in [["rule","brain"],["brain","rule"]]:
+			app.configure("battle")
+			app.session.blue_controller=controllers[0]
+			app.session.red_controller=controllers[1]
+			app.session.seconds=.4
+			app.launch()
+			check(await wait_battle(),"Mixed controller battle starts: "+str(controllers))
+			for attempt in range(300):
+				if app.current_page=="ResultsScreen":break
+				await create_timer(.1).timeout
+			check(app.current_page=="ResultsScreen","Mixed controller battle completes: "+str(controllers))
+			check(app.last_report.vehicles.size()==16,"Mixed controller battle retains 8v8")
+			app.menu()
 	print("APPLICATION VALIDATION failures=",failed)
 	app.stop_session();app.clear_view()
 	await process_frame

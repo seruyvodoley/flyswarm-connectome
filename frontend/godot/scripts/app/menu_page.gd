@@ -86,15 +86,29 @@ func policy_field(text: String,field: String):
 		dialog.popup_centered_ratio(.75))
 func back():button(body,"Back",AppState.menu)
 func main_menu():
-	var split=HBoxContainer.new();split.add_theme_constant_override("separation",70);body.add_child(split)
-	var left=VBoxContainer.new();left.custom_minimum_size.x=400;left.add_theme_constant_override("separation",10);split.add_child(left)
+	var split=HBoxContainer.new();split.add_theme_constant_override("separation",40);body.add_child(split)
+	var left=VBoxContainer.new();left.custom_minimum_size.x=520;left.add_theme_constant_override("separation",8);split.add_child(left)
 	label(left,"CONNECTOME / EMBODIMENT",14).modulate=Color("c1a573")
 	label(left,"FLYSWARM",58)
 	label(left,"A world to observe. A network to study.",16)
 	var spacer=Control.new();spacer.custom_minimum_size.y=20;left.add_child(spacer)
-	for item in [["HISTORICAL BATTLE","battle"],["RESEARCH LABORATORY","research"],["TRAINING","training"],["TEST RANGE","range"]]:
-		button(left,item[0],AppState.configure.bind(item[1]))
-	button(left,"REPLAYS",AppState.show_page.bind("ReplayBrowser"))
+	var entries=[
+		["AUTONOMOUS BATTLE","Run or observe an 8×8 battle using Rule AI, MaleCNS or a trained adapter.","battle"],
+		["RESEARCH LABORATORY","Run reproducible experiment series across seeds and compare conditions.","research"],
+		["READOUT TRAINING","Fit and evaluate an external motor readout from MaleCNS features. Teacher imitation; no reward.","training"],
+		["TEST RANGE","Manually drive and fire to inspect mobility, armour, ballistics and damage.","range"]
+	]
+	for item in entries:
+		var entry_row=HBoxContainer.new();entry_row.add_theme_constant_override("separation",12);left.add_child(entry_row)
+		var entry_button=button(entry_row,item[0],AppState.configure.bind(item[2]));entry_button.custom_minimum_size.x=235
+		var description=label(entry_row,item[1],14);description.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+		description.modulate=Color("9aaba2")
+	var replay_row=HBoxContainer.new();replay_row.add_theme_constant_override("separation",12);left.add_child(replay_row)
+	var replay_button=button(replay_row,"REPLAYS",AppState.show_page.bind("ReplayBrowser"));replay_button.custom_minimum_size.x=235
+	var replay_description=label(replay_row,"Open recorded simulations without running MaleCNS again.",14);replay_description.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	replay_description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	replay_description.modulate=Color("9aaba2")
 	button(left,"SETTINGS",AppState.show_page.bind("Settings"))
 	button(left,AppState.language_switch_label(),AppState.toggle_language)
 	button(left,"EXIT",AppState.quit_app)
@@ -144,13 +158,12 @@ func research():
 	common_battle()
 	button(body,"RUN EXPERIMENT",AppState.start_job);back()
 func training():
-	title("READOUT ADAPTATION","Training")
+	title("FIXED MALECNS · RIDGE IMITATION","Readout Training")
 	var s=AppState.session
-	text_block("MaleCNS: FIXED / FROZEN · only the small motor readout is fitted. The available task uses teacher imitation; reward is not defined.")
+	text_block("MaleCNS: FIXED / FROZEN · Method: teacher imitation / ridge readout · Reward: not used. Only the implemented turret-tracking task is shown.")
 	dropdown("Vehicle",VEHICLES,IDS,s.training_vehicle,func(v):s.training_vehicle=v)
-	var tasks=dropdown("Task",["Turret tracking · available","Mobility familiarisation · unavailable","Waypoint navigation · unavailable","Slope traversal · unavailable","Stationary gunnery · unavailable","Moving-target gunnery · unavailable","1v1 combat · unavailable","Capture objective · unavailable"],["turret_tracking","mobility","waypoint","slope","stationary","moving","combat","capture"],s.training_task,func(v):s.training_task=v)
-	for i in range(1,8):tasks.set_item_disabled(i,true)
-	text_block("Other curriculum tasks have no training implementation yet and are disabled.")
+	s.training_task="turret_tracking"
+	dropdown("Task",["Turret tracking · available"],["turret_tracking"],s.training_task,func(v):s.training_task=v)
 	dropdown("Adapter",["Vehicle-specific","Shared policy"],["vehicle","shared"],s.adapter,func(v):s.adapter=v)
 	number("Episodes",s.episodes,1,20,func(v):s.episodes=int(v))
 	number("Training seed",s.battle_seed,0,999999,func(v):s.battle_seed=int(v))

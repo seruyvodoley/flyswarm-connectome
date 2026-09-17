@@ -13,6 +13,7 @@ const Catalog=preload("res://scripts/catalog.gd")
 const Terrain=preload("res://scripts/terrain.gd")
 const Vehicle=preload("res://scripts/vehicle.gd")
 const Bridge=preload("res://scripts/bridge.gd")
+const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
 var terrain
 var tracks
 var vehicles=[]
@@ -48,6 +49,9 @@ var comm_last_link={}
 var replay_communication={}
 var hud: Label
 var detail: Label
+var gunner_reticle: Control
+var control_layers=[]
+var telemetry_samples=[]
 var debug=false
 var sensor_debug: MeshInstance3D
 var replay_shell_nodes=[]
@@ -350,6 +354,9 @@ func _ready():
 	detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	detail.add_theme_font_size_override("font_size",12)
 	canvas.add_child(detail)
+	gunner_reticle=GunnerReticle.new()
+	gunner_reticle.visible=false
+	canvas.add_child(gunner_reticle)
 
 	# --------------------------------------------------------
 	# Test Range hit feedback / killcam UI
@@ -629,12 +636,22 @@ func _physics_process(delta):
 			return
 		for i in range(16):
 			var command=bridge.commands[i].duplicate()
+			var layer={}
+			var reply_layers=bridge.last_reply.get("control_layers",[])
+			if reply_layers.size()==16:
+				layer=reply_layers[i].duplicate(true)
 
 			if is_malecns_controller(vehicles[i]):
+				var before_objective=command.duplicate()
 				command=apply_malecns_objective_aux(
 					vehicles[i],
 					command
 				)
+				layer["objective_aux_action"]=[]
+				for j in range(6):layer["objective_aux_action"].append(command[j]-before_objective[j])
+			layer["final_action"]=command.duplicate()
+			while control_layers.size()<16:control_layers.append({})
+			control_layers[i]=layer
 
 			vehicles[i].cmd=command
 
@@ -674,6 +691,9 @@ func _physics_process(delta):
 			if replay_buffer.size()>6000:replay_buffer.pop_front()
 	if record_path!="" and sim_time-progress_clock>=.5:
 		progress_clock=sim_time
+		var telemetry_sample=snapshot()
+		telemetry_samples.append(telemetry_sample)
+		if telemetry_samples.size()>7200:telemetry_samples.pop_front()
 		FileAccess.open(record_path.path_join("live.json"),FileAccess.WRITE).store_string(JSON.stringify({"sim_time":sim_time,"wall_time":(Time.get_ticks_usec()-start_wall)/1000000.0}))
 
 	var elimination_end = (
@@ -982,6 +1002,33 @@ func objective_destination(vehicle) -> Vector3:
 	# Все точки уже наши: возвращаемся к исходной назначенной точке
 	# и фактически обороняем её.
 	return preferred_zone["position"]
+
+func rl_task_features(vehicle) -> Array:
+	# ENGINEERED policy input. This array goes to the external adapter only;
+	# it is never injected into MaleCNS sensory cells.
+	var destination=objective_destination(vehicle)
+	var assigned=0
+	var nearest=INF
+	for i in range(objectives.size()):
+		var distance=objectives[i].position.distance_squared_to(destination)
+		if distance<nearest:
+			nearest=distance
+			assigned=i
+	var delta=destination-vehicle.global_position
+	var bearing=wrapf(atan2(delta.x,delta.z)-vehicle.rotation.y,-PI,PI)
+	var zone=objectives[assigned]
+	var intact=0
+	for working in vehicle.modules.values():intact+=1 if working else 0
+	var health=float(intact)/maxf(1.0,float(vehicle.modules.size()))
+	return [
+		vehicle.speed/maxf(1.0,float(vehicle.cfg.max_speed_kph)/3.6),
+		vehicle.reload_left/maxf(1.0,float(vehicle.cfg.reload_s)),
+		health,1.0 if vehicle.alive else 0.0,
+		sin(bearing),cos(bearing),delta.length()/1500.0,
+		float(zone.owner),float(zone.progress),
+		tickets[vehicle.team]/300.0,tickets[1-vehicle.team]/300.0,
+		float(assigned)/2.0,1.0 if vehicle.seen else 0.0,1.0
+	]
 
 
 func objective_hud_status(zone: Dictionary) -> String:
@@ -1388,7 +1435,8 @@ func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
 func snapshot() -> Dictionary:
 	var states=[]
 	for v in vehicles:
-		states.append({"id":v.agent_id,"vehicle":v.cfg.id,"position":[v.position.x,v.position.y,v.position.z],"yaw":v.rotation.y,"turret":v.turret_angle,"gun":v.gun_angle,"alive":v.alive,"modules":v.modules.duplicate(),"metrics":v.metrics.duplicate(),"target":v.target,"impact":v.last_impact.duplicate(true)})
+		var controls=control_layers[v.agent_id].duplicate(true) if control_layers.size()==16 else {"final_action":v.cmd.duplicate()}
+		states.append({"id":v.agent_id,"team":"blue" if v.team==0 else "red","vehicle":v.cfg.id,"position":[v.position.x,v.position.y,v.position.z],"speed_m_s":v.speed,"yaw":v.rotation.y,"turret":v.turret_angle,"gun":v.gun_angle,"alive":v.alive,"modules":v.modules.duplicate(),"metrics":v.metrics.duplicate(),"target":v.target,"impact":v.last_impact.duplicate(true),"neural_trace":v.dn.duplicate(),"heard_input":v.audio_input,"control":controls})
 	var zones=[]
 	for z in objectives:zones.append({"owner":z.owner,"progress":z.progress,"contested":z.contested,"inside":z.inside.duplicate()})
 	return {"time":sim_time,"vehicles":states,"tickets":tickets.duplicate(),"zones":zones,"brain":bridge.last_reply.get("mode","DISCONNECTED"),"projectiles":shell_snapshot(),"communication":current_communication().duplicate(true)}
@@ -1420,11 +1468,37 @@ func finish(notify_result=true):
 	report.mode="NORMALIZED" if normalized else "HISTORICAL"
 	if record_path!="":
 		FileAccess.open(record_path.path_join("summary.json"),FileAccess.WRITE).store_string(JSON.stringify(report,"  "))
+		write_research_exports(report)
 		if recorder:recorder.flush()
 	print("SUMMARY ",JSON.stringify({"sim_s":sim_time,"wall_s":wall,"xRT":report.realtime_factor,"physics_ms":report.mean_physics_ms,"brain_tick_ms":report.brain_tick_ms,"alive":[alive_count(0),alive_count(1)]}))
 	report_cache=report
 	if session_config!=null and notify_result:completed.emit(report)
 	if has("--quit"):get_tree().quit()
+
+func csv_value(value) -> String:
+	var text=JSON.stringify(value) if value is Array or value is Dictionary else str(value)
+	return '"'+text.replace('"','""')+'"'
+
+func write_csv(path: String,header: Array,rows: Array):
+	var file=FileAccess.open(path,FileAccess.WRITE)
+	file.store_line(",".join(header))
+	for row in rows:
+		var cells=PackedStringArray()
+		for value in row:cells.append(csv_value(value))
+		file.store_line(",".join(cells))
+
+func write_research_exports(report: Dictionary):
+	# Bounded 2 Hz samples: enough for analysis without creating unbounded raw files.
+	write_csv(record_path.path_join("results.csv"),["sim_time","wall_seconds","blue_tickets","red_tickets","blue_alive","red_alive","realtime_factor","brain_tick_ms"],[[report.time,report.wall_seconds,report.tickets[0],report.tickets[1],alive_count(0),alive_count(1),report.realtime_factor,report.brain_tick_ms]])
+	var agents=[]
+	var actions=[]
+	for sample in telemetry_samples:
+		for state in sample.vehicles:
+			agents.append([sample.time,state.id,state.team,state.vehicle,state.position,state.speed_m_s,state.alive,state.target,state.modules,state.metrics])
+			var c=state.control
+			actions.append([sample.time,state.id,c.get("raw_neural_action",null),c.get("decoder_action",null),c.get("objective_aux_action",null),c.get("gunnery_aux_action",null),c.get("adapter_action",null),c.get("final_action",null)])
+	write_csv(record_path.path_join("per_agent.csv"),["sim_time","agent_id","team","vehicle","position","speed_m_s","alive","target","modules","metrics"],agents)
+	write_csv(record_path.path_join("actions.csv"),["sim_time","agent_id","raw_neural_action","decoder_action","objective_aux_action","gunnery_aux_action","adapter_action","final_action"],actions)
 func _process(dt):
 	for i in range(effects.size()-1,-1,-1):
 		var fx=effects[i]
@@ -1488,6 +1562,8 @@ func _process(dt):
 
 	var v=vehicles[selected] if not vehicles.is_empty() else null
 	if v==null:return
+	gunner_reticle.visible=camera_mode==2
+	if camera_mode==2:gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left)
 	sensor_debug.visible=debug
 	if debug:
 		var mesh=ImmediateMesh.new()

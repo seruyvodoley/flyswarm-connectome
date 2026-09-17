@@ -30,6 +30,7 @@ GitHub может предложить скачать MP4 вместо встр�
 | Research Lab | Сравнение условий связи, физики, смены сторон и переноса политик; отмена задания |
 | Обучение | Сбор примеров, ridge-адаптер, сохранение и проверка на отдельном seed |
 | Повторы | Запись состояний мира и телеметрии, воспроизведение без MaleCNS |
+| MARL API | PettingZoo ParallelEnv для 16 агентов, random baseline и общий PPO/IPPO readout |
 | Интерфейс | RU/EN, сохранение языка и настроек, пауза, возврат в меню, управление бэкендом |
 
 Техника: **Panther G, Tiger I, Jagdpanther, T-34-85, IS-2, SU-100, Tiger**.
@@ -106,7 +107,10 @@ Python: сенсорный кодировщик → два отдельных Fl
 ```
 
 Seed, параметры сессии, метрики и повторы сохраняются в `results/raw/app/`
-при запуске из исходников. Raw-вывод исключён из Git. Старые исследовательские
+при запуске из исходников. Каждая записанная сессия создаёт ограниченные
+`results.csv`, `per_agent.csv`, `actions.csv` и `summary.json`; action export
+разделяет нейронный trace, decoder, objective/gunnery auxiliary, adapter и
+финальное действие. Raw-вывод исключён из Git. Старые исследовательские
 файлы сохранены; [журнал экспериментов](docs/experiment_log.md) и
 [исторический контекст](docs/research_background.md).
 
@@ -126,6 +130,7 @@ docs/            исследования, источники, валидаци�
 ```
 
 [Архитектура приложения](docs/application.md) ·
+[PettingZoo и MARL](docs/marl.md) ·
 [Приближения](docs/known_approximations.md) ·
 [Источники моделей](docs/references/pass03_audit.md) ·
 [Подготовка macOS-сборки](docs/macos_packaging.md)

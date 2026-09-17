@@ -408,4 +408,4 @@ func reset_destroyed_state():
 
 
 func observation() -> Dictionary:
-	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"teacher":teacher(),"target":target}
+	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"rl_task":world.rl_task_features(self),"teacher":teacher(),"target":target}

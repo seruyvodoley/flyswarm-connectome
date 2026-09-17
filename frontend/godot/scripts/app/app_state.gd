@@ -34,10 +34,12 @@ func apply_settings():
 	if DisplayServer.get_name()=="headless":return
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if settings.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 	if not settings.fullscreen:DisplayServer.window_set_size([Vector2i(1280,800),Vector2i(1440,900),Vector2i(1920,1080)][int(settings.resolution)])
-func save_settings():
+func persist_settings():
 	var file=ConfigFile.new()
 	for key in settings:file.set_value("settings",key,settings[key])
 	file.save("user://settings.cfg")
+func save_settings():
+	persist_settings()
 	apply_settings()
 func tr_text(text: String) -> String:
 	return I18n.t(text,str(settings.get("language","en")))
@@ -51,7 +53,10 @@ func language_switch_label() -> String:
 func set_language(language: String):
 	if not language in I18n.LANGUAGES:return
 	settings.language=language
-	save_settings()
+	# Language changes are UI-only. Persist them without re-applying display
+	# settings: apply_settings() forces WINDOWED + the configured resolution and
+	# therefore collapses a maximized/full-screen-sized window on language swap.
+	persist_settings()
 	if is_instance_valid(view):
 		call_deferred("show_page",current_page)
 

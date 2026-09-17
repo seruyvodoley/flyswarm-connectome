@@ -5,7 +5,7 @@
   "time_limit_s": 600,
   "tickets": 300,
   "loss_cost": 25,
-  "ticket_bleed_per_s": 0.7,
+  "ticket_bleed_per_s": 2.0,
   "capture_seconds": 12,
   "zone_radius": 45,
   "objectives": [

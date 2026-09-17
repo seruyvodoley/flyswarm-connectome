@@ -93,6 +93,11 @@ func configure(mode: String):
 	session.audio_mode=settings.audio
 	session.host=settings.host
 	session.port=int(settings.port)
+	# Interactive autonomous battles are outcome-driven. battle.gd still has a
+	# generic safety time limit for jobs/replays, so give the visual battle a
+	# deliberately remote 1-hour simulation cap: under normal play it ends on
+	# tickets or elimination, not on the old 60-second default.
+	if mode=="battle":session.seconds=3600
 	if mode=="range":session.map="test_range";session.seconds=3600
 	if mode=="training":session.battle_seed=100;session.seconds=2;session.blue_controller="brain";session.red_controller="brain"
 	if mode=="research":session.seconds=5;session.blue_controller="brain";session.red_controller="brain"

@@ -74,8 +74,16 @@ func clear_view():
 		view.get_parent().remove_child(view)
 		view.queue_free()
 	view=null
+func set_battle_overlay_visible(value: bool):
+	if not is_instance_valid(battle):return
+	# Battle HUD, observer controls, communication panel, gunner reticle and
+	# Test Range hit/killcam UI live on CanvasLayer children. They belong only
+	# to the active simulation view and must never bleed through menus/results.
+	for layer in battle.find_children("*","CanvasLayer",true,false):
+		layer.visible=value
 func show_page(page: String):
 	current_page=page
+	set_battle_overlay_visible(false)
 	clear_view()
 	view=load("res://scenes/app/"+page+".tscn").instantiate()
 	get_tree().root.add_child(view)
@@ -150,6 +158,7 @@ func launch():
 	battle.backend_failed.connect(on_backend_failed)
 	get_tree().root.add_child(battle)
 	clear_view()
+	set_battle_overlay_visible(true)
 	backend_state="READY" if session.needs_brain() else "NOT REQUIRED"
 func start_backend(token: int) -> bool:
 	stop_backend()
@@ -196,6 +205,7 @@ func reconnect():
 		battle.paused=false
 		backend_dialog_open=false
 		clear_view()
+		set_battle_overlay_visible(true)
 	else:view.disconnect_dialog(loading_message)
 func pause_menu():
 	if not is_instance_valid(battle):return
@@ -204,6 +214,7 @@ func pause_menu():
 func resume():
 	if is_instance_valid(battle):battle.paused=false
 	clear_view()
+	set_battle_overlay_visible(true)
 func on_completed(report: Dictionary):
 	last_report=report
 	stop_backend()

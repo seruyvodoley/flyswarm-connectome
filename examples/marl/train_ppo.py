@@ -6,7 +6,11 @@ from flyswarm.marl import FlySwarmParallelEnv
 from flyswarm.marl.policy import SharedPPOPolicy
 
 def train(steps,seed,checkpoint,curve,max_episode_steps=300):
-    rng=np.random.default_rng(seed);env=FlySwarmParallelEnv(max_steps=max_episode_steps);policy=SharedPPOPolicy(seed=seed);seen=0;updates=[]
+    rng=np.random.default_rng(seed)
+    env=FlySwarmParallelEnv(max_steps=max_episode_steps,role_conditioning=True)
+    obs_dim=env.observation_space(env.possible_agents[0]).shape[0]
+    policy=SharedPPOPolicy(obs_dim=obs_dim,seed=seed)
+    seen=0;updates=[]
     while seen<steps:
         obs,_=env.reset(seed=seed+len(updates));trajectories={a:[] for a in env.possible_agents}
         while env.agents and seen<steps:
@@ -22,7 +26,7 @@ def train(steps,seed,checkpoint,curve,max_episode_steps=300):
             for o,raw,logp,value,reward,done in reversed(trajectory):
                 future=reward+.99*future*(not done);batch['obs'].append(o);batch['raw'].append(raw);batch['logp'].append(logp);batch['returns'].append(future);batch['adv'].append(future-value);episode_reward+=reward
         loss=policy.update(batch);updates.append({'steps':seen,'mean_agent_return':episode_reward/16,'value_mse':loss})
-    policy.save(checkpoint,{"algorithm":"shared PPO/IPPO reference","seed":seed,"backend":"analytical_training"})
+    policy.save(checkpoint,{"algorithm":"shared PPO/IPPO reference","seed":seed,"backend":"analytical_training","role_conditioned":True,"observation_dim":obs_dim})
     dest=Path(curve);dest.parent.mkdir(parents=True,exist_ok=True)
     with dest.open('w',newline='') as f:w=csv.DictWriter(f,fieldnames=updates[0]);w.writeheader();w.writerows(updates)
     return updates

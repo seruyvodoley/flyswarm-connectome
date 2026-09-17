@@ -85,6 +85,20 @@ func policy_field(text: String,field: String):
 		dialog.file_selected.connect(func(path):node.text=path;AppState.session.set(field,path);dialog.queue_free())
 		dialog.popup_centered_ratio(.75))
 func back():button(body,"Back",AppState.menu)
+func menu_entry(parent: VBoxContainer,title_text: String,description_text: String,callback: Callable):
+	var card=VBoxContainer.new()
+	card.custom_minimum_size=Vector2(520,94)
+	card.add_theme_constant_override("separation",5)
+	parent.add_child(card)
+	var entry_button=button(card,title_text,callback)
+	entry_button.custom_minimum_size=Vector2(520,52)
+	entry_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	entry_button.alignment=HORIZONTAL_ALIGNMENT_LEFT
+	var description=label(card,description_text,14)
+	description.custom_minimum_size=Vector2(520,34)
+	description.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	description.modulate=Color("9aaba2")
 func main_menu():
 	var split=HBoxContainer.new();split.add_theme_constant_override("separation",40);body.add_child(split)
 	var left=VBoxContainer.new();left.custom_minimum_size.x=520;left.add_theme_constant_override("separation",8);split.add_child(left)
@@ -92,26 +106,15 @@ func main_menu():
 	label(left,"FLYSWARM",58)
 	label(left,"A world to observe. A network to study.",16)
 	var spacer=Control.new();spacer.custom_minimum_size.y=20;left.add_child(spacer)
-	var entries=[
-		["AUTONOMOUS BATTLE","Run or observe an 8×8 battle using Rule AI, MaleCNS or a trained adapter.","battle"],
-		["RESEARCH LABORATORY","Run reproducible experiment series across seeds and compare conditions.","research"],
-		["READOUT TRAINING","Fit and evaluate an external motor readout from MaleCNS features. Teacher imitation; no reward.","training"],
-		["TEST RANGE","Manually drive and fire to inspect mobility, armour, ballistics and damage.","range"]
-	]
-	for item in entries:
-		var entry_row=HBoxContainer.new();entry_row.add_theme_constant_override("separation",12);left.add_child(entry_row)
-		var entry_button=button(entry_row,item[0],AppState.configure.bind(item[2]));entry_button.custom_minimum_size.x=235
-		var description=label(entry_row,item[1],14);description.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-		description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-		description.modulate=Color("9aaba2")
-	var replay_row=HBoxContainer.new();replay_row.add_theme_constant_override("separation",12);left.add_child(replay_row)
-	var replay_button=button(replay_row,"REPLAYS",AppState.show_page.bind("ReplayBrowser"));replay_button.custom_minimum_size.x=235
-	var replay_description=label(replay_row,"Open recorded simulations without running MaleCNS again.",14);replay_description.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	replay_description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	replay_description.modulate=Color("9aaba2")
-	button(left,"SETTINGS",AppState.show_page.bind("Settings"))
-	button(left,AppState.language_switch_label(),AppState.toggle_language)
-	button(left,"EXIT",AppState.quit_app)
+	menu_entry(left,"AUTONOMOUS BATTLE","Run or observe an 8×8 battle using Rule AI, MaleCNS or a trained adapter.",AppState.configure.bind("battle"))
+	menu_entry(left,"RESEARCH LABORATORY","Run reproducible experiment series across seeds and compare conditions.",AppState.configure.bind("research"))
+	menu_entry(left,"READOUT TRAINING","Fit and evaluate an external motor readout from MaleCNS features. Teacher imitation; no reward.",AppState.configure.bind("training"))
+	menu_entry(left,"TEST RANGE","Manually drive and fire to inspect mobility, armour, ballistics and damage.",AppState.configure.bind("range"))
+	menu_entry(left,"REPLAYS","Open recorded simulations without running MaleCNS again.",AppState.show_page.bind("ReplayBrowser"))
+	var secondary=HBoxContainer.new();secondary.add_theme_constant_override("separation",8);left.add_child(secondary)
+	var settings_button=button(secondary,"SETTINGS",AppState.show_page.bind("Settings"));settings_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	var language_button=button(secondary,AppState.language_switch_label(),AppState.toggle_language);language_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	var exit_button=button(secondary,"EXIT",AppState.quit_app);exit_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var right=VBoxContainer.new();right.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_theme_constant_override("separation",20);split.add_child(right)
 	var map_view=TextureRect.new();map_view.custom_minimum_size=Vector2(450,330);map_view.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;map_view.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var image=Image.create(600,360,false,Image.FORMAT_RGB8)

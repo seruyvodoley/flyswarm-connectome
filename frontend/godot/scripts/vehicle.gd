@@ -22,7 +22,7 @@ var cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
 var modules={}
 var volumes={}
 var armour_bodies=[]
-var metrics={"distance_travelled":0.0,"stationary_s":0.0,"reverse_s":0.0,"shots":0,"penetrations":0,"kills":0,"capture_s":0.0,"objective_presence_s":0.0,"contest_s":0.0,"target_switches":0,"target_visible_s":0.0,"chassis_aim_s":0.0}
+var metrics={"distance_travelled":0.0,"stationary_s":0.0,"reverse_s":0.0,"shots":0,"penetrations":0,"kills":0,"capture_s":0.0,"objective_presence_s":0.0,"contest_s":0.0,"target_switches":0,"target_visible_s":0.0,"chassis_aim_s":0.0,"stuck_recoveries":0}
 var last_impact={}
 var dn=[0,0,0,0,0]
 var audio_input=0.0
@@ -34,6 +34,9 @@ var muzzle: Node3D
 var wheels=[]
 var visual_hull: Node3D
 var contact_state={"resistance":.055,"grip":.65,"slip":0.0,"depth":0.0,"pressure_pa":0.0}
+var stuck_intent_s=0.0
+var recovery_left_s=0.0
+var recovery_turn=1.0
 
 func setup(config: Dictionary, index: int, battle):
 	cfg=config
@@ -50,8 +53,6 @@ func setup(config: Dictionary, index: int, battle):
 	box.size=Vector3(cfg.width_m-.3,1.4,cfg.length_m-.5)
 	shape.shape=box
 	# Keep the lower face of the CharacterBody collider at the vehicle root.
-	# The old y=1.0 offset placed it 0.3 m above the root, allowing the visual
-	# model to sink into the terrain before collision contact stopped the body.
 	shape.position.y=.7
 	add_child(shape)
 	model=load("res://assets/vehicles/"+cfg.id+".glb").instantiate()
@@ -156,7 +157,6 @@ func teacher() -> Array:
 	var steer=clampf(heading*2,-1,1)
 	var throttle=.8 if absf(heading)<1.2 else .15
 	if delta.length()<world.scenario.zone_radius*.6: throttle=0
-	# Short forward obstacle probe. Does not assign roles by vehicle class.
 	var front=global_position+Vector3(0,1.3,0)
 	var query=PhysicsRayQueryParameters3D.create(front,front+global_basis.z*12,3,excluded())
 	if not get_world_3d().direct_space_state.intersect_ray(query).is_empty():
@@ -183,10 +183,28 @@ func step(dt: float):
 	reload_left=maxf(0,reload_left-dt)
 	gun.position=gun.position.lerp(gun_rest,minf(1,dt*8))
 	var old=global_position
-	var throttle=float(cmd[0])
+	var requested_throttle=float(cmd[0])
+	var throttle=requested_throttle
 	var steer=float(cmd[2])
-	if not modules.engine or not modules.track_left or not modules.track_right: throttle=0;steer=0;speed=0
+	var mechanically_mobile=bool(modules.engine and modules.track_left and modules.track_right)
+	if not mechanically_mobile:
+		throttle=0;steer=0;speed=0
+		stuck_intent_s=0.0
+		recovery_left_s=0.0
 	if not modules.driver: throttle*=.2;steer*=.2
+
+	# Deterministic anti-deadlock manoeuvre. It does not choose objectives or
+	# targets; it only frees a mechanically mobile tank that has been ordered
+	# to move but has made virtually no progress for several seconds.
+	if mechanically_mobile and recovery_left_s>0.0:
+		if recovery_left_s>1.35:
+			throttle=-.60
+			steer=recovery_turn
+		else:
+			throttle=.72
+			steer=-recovery_turn*.72
+		recovery_left_s=maxf(0.0,recovery_left_s-dt)
+
 	var slope=(world.terrain.height_at(position.x+sin(rotation.y)*3,position.z+cos(rotation.y)*3)-world.terrain.height_at(position.x,position.z))/3
 	contact_state=world.tracks.contact(self,dt)
 	var power_acc=minf(minf(float(cfg.traction),contact_state.grip)*9.81,float(cfg.engine_kw)*1000*.7/(float(cfg.mass_kg)*maxf(2,absf(speed))))
@@ -206,13 +224,23 @@ func step(dt: float):
 	move_and_slide()
 	position.x=clampf(position.x,-world.terrain.extent+8,world.terrain.extent-8)
 	position.z=clampf(position.z,-world.terrain.extent+8,world.terrain.extent-8)
-	# Hard terrain guard: the vehicle root is the track-contact reference and
-	# may never be allowed below the rendered ground. Buildings/rocks are not
-	# affected because this only raises a body that is below the terrain floor.
 	var terrain_floor=world.terrain.height_at(position.x,position.z)+.08
 	if position.y<terrain_floor:
 		position.y=terrain_floor
 		if velocity.y<0.0:velocity.y=0.0
+
+	var moved=Vector2(global_position.x-old.x,global_position.z-old.z).length()
+	if mechanically_mobile and recovery_left_s<=0.0 and absf(requested_throttle)>.25 and moved<.025 and absf(speed)<.45 and not world.training:
+		stuck_intent_s+=dt
+		if stuck_intent_s>=2.8:
+			stuck_intent_s=0.0
+			recovery_left_s=2.7
+			recovery_turn=1.0 if (agent_id+int(world.sim_time/3.0))%2==0 else -1.0
+			metrics.stuck_recoveries+=1
+	else:
+		if moved>.06 or absf(requested_throttle)<=.25 or recovery_left_s>0.0:
+			stuck_intent_s=0.0
+
 	var traverse_factor=1.0 if modules.turret_drive else .1
 	if modules.gunner:
 		turret_angle+=float(cmd[3])*deg_to_rad(cfg.turret_rate_deg_s)*dt*traverse_factor
@@ -231,7 +259,7 @@ func step(dt: float):
 		reload_left=float(cfg.reload_s)*(1 if modules.loader else 2.5)
 		ammo_left-=1
 		metrics.shots+=1
-	metrics.distance_travelled+=Vector2(global_position.x-old.x,global_position.z-old.z).length()
+	metrics.distance_travelled+=moved
 	if absf(speed)<.2:metrics.stationary_s+=dt
 	if speed<-.1:metrics.reverse_s+=dt
 	if seen:metrics.target_visible_s+=dt
@@ -258,163 +286,61 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 		if (relative-direction*depth).length()<radius:
 			modules[key]=false
 			last_impact.damaged.append(key)
-	# Ground-vehicle knockout:
-	# ammo rack destruction OR only one modelled crew member remains.
-	#
-	# Do not require a particular trio such as driver+gunner+commander:
-	# that allowed a tank with only the driver alive to remain combat-alive.
-	var crew_keys = [
-		"driver",
-		"gunner",
-		"commander",
-		"loader",
-		"radio_operator"
-	]
-
-	var crew_total = 0
-	var crew_alive = 0
-
+	var crew_keys=["driver","gunner","commander","loader","radio_operator"]
+	var crew_total=0
+	var crew_alive=0
 	for crew_key in crew_keys:
 		if modules.has(crew_key):
-			crew_total += 1
-
-			if bool(modules[crew_key]):
-				crew_alive += 1
-
-	var ammo_destroyed = (
-		modules.has("ammo_rack")
-		and not bool(modules["ammo_rack"])
-	)
-
-	var crew_knockout = (
-		crew_total >= 2
-		and crew_alive <= 1
-	)
-
+			crew_total+=1
+			if bool(modules[crew_key]):crew_alive+=1
+	var ammo_destroyed=(modules.has("ammo_rack") and not bool(modules["ammo_rack"]))
+	var crew_knockout=(crew_total>=2 and crew_alive<=1)
 	if ammo_destroyed or crew_knockout:
 		destroy_vehicle(int(shell.owner))
 
-
 func destroy_vehicle(killer_id: int):
-	if not alive:
-		return
-
+	if not alive:return
 	alive=false
 	speed=0.0
 	velocity=Vector3.ZERO
 	yaw_rate=0.0
 	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
-
-	world.tickets[team]=maxf(
-		0.0,
-		float(world.tickets[team])-float(world.scenario.loss_cost)
-	)
-
-	if killer_id>=0 and killer_id<world.vehicles.size():
-		world.vehicles[killer_id].metrics.kills+=1
-
-	var catastrophic=not bool(
-		modules.get("ammo_rack",true)
-	)
-
-	# One destruction visual path for normal battle and Test Range.
+	stuck_intent_s=0.0
+	recovery_left_s=0.0
+	world.tickets[team]=maxf(0.0,float(world.tickets[team])-float(world.scenario.loss_cost))
+	if killer_id>=0 and killer_id<world.vehicles.size():world.vehicles[killer_id].metrics.kills+=1
+	var catastrophic=not bool(modules.get("ammo_rack",true))
 	if world.has_method("vehicle_destroyed_effect"):
-		world.vehicle_destroyed_effect(
-			global_position+Vector3(0,1.0,0),
-			catastrophic
-		)
+		world.vehicle_destroyed_effect(global_position+Vector3(0,1.0,0),catastrophic)
 	else:
-		# Compatibility with an older battle.gd.
-		world.effect(
-			global_position+Vector3(0,1.5,0),
-			Color(.16,.13,.10),
-			1.5,
-			2.2
-		)
-
-	# Persistent wreck appearance.
+		world.effect(global_position+Vector3(0,1.5,0),Color(.16,.13,.10),1.5,2.2)
 	var charred=StandardMaterial3D.new()
 	charred.albedo_color=Color(.075,.065,.055)
 	charred.roughness=1.0
 	charred.metallic=.18
-
-	for mesh in model.find_children(
-		"*",
-		"MeshInstance3D",
-		true,
-		false
-	):
-		mesh.material_override=charred
-
-	# Gun/turret remain physically attached, but become a clearly dead wreck.
-	# A little gun droop reads much better than an apparently combat-ready tank.
-	if gun:
-		gun.rotation.x=deg_to_rad(8.0)
-
-	var identification=find_child(
-		"Identification",
-		true,
-		false
-	)
-
+	for mesh in model.find_children("*","MeshInstance3D",true,false):mesh.material_override=charred
+	if gun:gun.rotation.x=deg_to_rad(8.0)
+	var identification=find_child("Identification",true,false)
 	if identification is Label3D:
-		identification.text=(
-			"× "
-			+("B" if team==0 else "R")
-			+str(agent_id%8+1)
-			+" · "
-			+str(cfg.display_name)
-		)
-
+		identification.text="× "+("B" if team==0 else "R")+str(agent_id%8+1)+" · "+str(cfg.display_name)
 		identification.modulate=Color(.48,.48,.46)
 
-
 func reset_destroyed_state():
-	# Used by Test Range target reset.
 	alive=true
 	speed=0.0
 	velocity=Vector3.ZERO
 	yaw_rate=0.0
 	reload_left=0.0
 	last_impact={}
-
-	cmd=[
-		0.0,0.0,0.0,
-		0.0,0.0,0.0
-	]
-
-	for key in modules:
-		modules[key]=true
-
-	for mesh in model.find_children(
-		"*",
-		"MeshInstance3D",
-		true,
-		false
-	):
-		mesh.material_override=null
-
-	var identification=find_child(
-		"Identification",
-		true,
-		false
-	)
-
+	stuck_intent_s=0.0
+	recovery_left_s=0.0
+	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
+	for key in modules:modules[key]=true
+	for mesh in model.find_children("*","MeshInstance3D",true,false):mesh.material_override=null
+	var identification=find_child("Identification",true,false)
 	if identification is Label3D:
-		identification.text=(
-			("B" if team==0 else "R")
-			+str(agent_id%8+1)
-			+" · "
-			+str(cfg.display_name)
-		)
-
-		identification.modulate=(
-			Color(.35,.65,1.0)
-			if team==0
-			else Color(1.0,.4,.25)
-		)
-
-
+		identification.text=("B" if team==0 else "R")+str(agent_id%8+1)+" · "+str(cfg.display_name)
+		identification.modulate=Color(.35,.65,1.0) if team==0 else Color(1.0,.4,.25)
 
 func observation() -> Dictionary:
 	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"rl_task":world.rl_task_features(self),"teacher":teacher(),"target":target}

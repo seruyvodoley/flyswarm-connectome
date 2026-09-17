@@ -49,7 +49,10 @@ func setup(config: Dictionary, index: int, battle):
 	var box=BoxShape3D.new()
 	box.size=Vector3(cfg.width_m-.3,1.4,cfg.length_m-.5)
 	shape.shape=box
-	shape.position.y=1.0
+	# Keep the lower face of the CharacterBody collider at the vehicle root.
+	# The old y=1.0 offset placed it 0.3 m above the root, allowing the visual
+	# model to sink into the terrain before collision contact stopped the body.
+	shape.position.y=.7
 	add_child(shape)
 	model=load("res://assets/vehicles/"+cfg.id+".glb").instantiate()
 	add_child(model)
@@ -203,7 +206,13 @@ func step(dt: float):
 	move_and_slide()
 	position.x=clampf(position.x,-world.terrain.extent+8,world.terrain.extent-8)
 	position.z=clampf(position.z,-world.terrain.extent+8,world.terrain.extent-8)
-	if position.y<world.terrain.height_at(position.x,position.z)-2: position.y=world.terrain.height_at(position.x,position.z)+.05
+	# Hard terrain guard: the vehicle root is the track-contact reference and
+	# may never be allowed below the rendered ground. Buildings/rocks are not
+	# affected because this only raises a body that is below the terrain floor.
+	var terrain_floor=world.terrain.height_at(position.x,position.z)+.08
+	if position.y<terrain_floor:
+		position.y=terrain_floor
+		if velocity.y<0.0:velocity.y=0.0
 	var traverse_factor=1.0 if modules.turret_drive else .1
 	if modules.gunner:
 		turret_angle+=float(cmd[3])*deg_to_rad(cfg.turret_rate_deg_s)*dt*traverse_factor

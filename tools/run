@@ -14,13 +14,14 @@ TASK_ACTION=${1:-run-demo}
 if [ "$#" -gt 0 ]; then shift; fi
 # A fresh checkout has GLBs but no local Godot import cache.
 case "$TASK_ACTION" in
- run-demo|run-battle|run-training|run-tests|run-ballistics-test|headless)
+ run-demo|run-open-day|run-battle|run-training|run-tests|run-ballistics-test|headless)
   if [ ! -d frontend/godot/.godot/imported ]; then
    "$TASK_GODOT" --headless --editor --path frontend/godot --import
   fi ;;
 esac
 case "$TASK_ACTION" in
  run-demo) exec "$TASK_GODOT" --path frontend/godot -- --legacy-battle "$@" ;;
+ run-open-day) exec "$TASK_GODOT" --path frontend/godot -- --open-day "$@" ;;
  run-battle) exec "$TASK_GODOT" --path frontend/godot -- --connect "$@" ;;
  run-brains) exec "$TASK_PYTHON" -m flyswarm.bridge.server "$@" ;;
  run-training) exec "$TASK_PYTHON" tools/training_smoke.py --godot "$TASK_GODOT" "$@" ;;

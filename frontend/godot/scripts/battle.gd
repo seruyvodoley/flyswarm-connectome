@@ -5,6 +5,7 @@ signal backend_failed(message)
 var session_config
 var launch_args=PackedStringArray()
 var is_range=false
+var is_demo=false
 var replay_buffer=[]
 var report_cache={}
 var progress_clock=0.0
@@ -14,6 +15,7 @@ const Terrain=preload("res://scripts/terrain.gd")
 const Vehicle=preload("res://scripts/vehicle.gd")
 const Bridge=preload("res://scripts/bridge.gd")
 const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
+const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
 var terrain
 var tracks
 var vehicles=[]
@@ -79,6 +81,13 @@ var capture_changes=0
 var objective_captures=[0,0]
 var objective_neutralizations=[0,0]
 var screenshot_path=""
+var demo_intro_left=0.0
+var demo_intro: Label
+var demo_status: Label
+var demo_brain_panel: PanelContainer
+var demo_brain_text: Label
+var demo_brain_visible=true
+var demo_hud_clock=0.0
 
 # ============================================================
 # TEST RANGE KILLCAM / HIT FEEDBACK
@@ -206,6 +215,7 @@ func _ready():
 	normalized=has("--normalized")
 	training=has("--training")
 	is_range=has("--range") or (session_config!=null and session_config.map=="test_range")
+	is_demo=has("--demo") or (session_config!=null and session_config.mode=="demo")
 	# Autonomous battles open in a true battlefield overview. Test range keeps
 	# the normal third-person follow camera.
 	if session_config!=null and not has("--camera"):
@@ -213,6 +223,11 @@ func _ready():
 	requires_brain=has("--connect")
 	audio_mode=option("--audio","no_audio")
 	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
+	if is_demo:
+		scenario.size_m=700
+		scenario.spawn_z=90
+		scenario.spawn_spacing=0
+		scenario.time_limit_s=90
 	scenario.seed=int(option("--seed",str(scenario.seed)))
 	if is_range:scenario.size_m=2200
 	var replay_manifest={}
@@ -292,8 +307,8 @@ func _ready():
 		# A/B/C belong to the Domination battle mode.
 		# Test Range is a gunnery/mobility sandbox and does not process capture,
 		# so showing these markers there is misleading.
-		marker.visible = not is_range
-		label.visible = not is_range
+		marker.visible = not is_range and not is_demo
+		label.visible = not is_range and not is_demo
 
 		update_objective_visual(i)
 	for i in range(16):
@@ -318,6 +333,15 @@ func _ready():
 			else:
 				tank.alive=false; tank.hide();tank.position=Vector3(1500+i*20,-100,1500)
 				tank.collision_layer=0; tank.collision_mask=0
+				for plate in tank.armour_bodies:plate.collision_layer=0
+		if is_demo:
+			if i in [0,8]:
+				var demo_z=-90 if i==0 else 90
+				tank.position=Vector3(0,terrain.height_at(0,demo_z)+.1,demo_z)
+				tank.rotation.y=0 if i==0 else PI
+			else:
+				tank.alive=false;tank.hide();tank.position=Vector3(1200+i*10,-100,1200)
+				tank.collision_layer=0;tank.collision_mask=0
 				for plate in tank.armour_bodies:plate.collision_layer=0
 		if session_config!=null:
 			for mesh in tank.model.find_children("*","GeometryInstance3D",true,false):mesh.lod_bias=AppState.settings.lod
@@ -522,6 +546,7 @@ func _ready():
 	update_camera_button()
 	update_selection_buttons()
 	refresh_comm_panel()
+	if is_demo:setup_demo_ui(canvas)
 
 	if requires_brain: bridge.connect_backend(int(option("--port","8765")))
 	record_path=option("--record","")
@@ -558,6 +583,83 @@ func _ready():
 	print("READY ",scenario.name," 16 vehicles; ","NORMALIZED" if normalized else "HISTORICAL", " backend=",requires_brain)
 	screenshot_path=option("--screenshot","")
 
+func setup_demo_ui(canvas: CanvasLayer):
+	selected=0;camera_mode=1;last_camera_mode=-1;demo_intro_left=4.0
+	hud.visible=false;detail.visible=false;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=false
+	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
+	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
+	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
+	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
+	var brain_box=VBoxContainer.new();brain_box.add_theme_constant_override("separation",10);demo_brain_panel.add_child(brain_box)
+	var fly_preview=DemoFlyPreview.new();fly_preview.custom_minimum_size=Vector2(340,145);fly_preview.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;brain_box.add_child(fly_preview)
+	demo_brain_text=Label.new();demo_brain_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_brain_text.add_theme_font_size_override("font_size",16);brain_box.add_child(demo_brain_text);canvas.add_child(demo_brain_panel)
+	demo_intro=Label.new();demo_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);demo_intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_intro.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_intro.add_theme_font_size_override("font_size",42);demo_intro.add_theme_color_override("font_color",Color("ead58f"));demo_intro.add_theme_color_override("font_shadow_color",Color.BLACK);demo_intro.add_theme_constant_override("shadow_offset_x",3);demo_intro.add_theme_constant_override("shadow_offset_y",3);demo_intro.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_intro)
+	vehicles[8].get_node("Identification").text="🪰 FLY-01"
+
+func demo_health(vehicle) -> float:
+	if not vehicle.alive:return 0.0
+	var total=maxi(1,vehicle.modules.size());var working=0
+	for value in vehicle.modules.values():working+=1 if value else 0
+	return float(working)/float(total)
+
+func demo_bar(value: float) -> String:
+	var filled=clampi(roundi(clampf(value,0,1)*10),0,10)
+	return "["+"■".repeat(filled)+"·".repeat(10-filled)+"]"
+
+func update_demo_hud():
+	if not is_instance_valid(demo_status) or vehicles.size()<9:return
+	var player=vehicles[0];var fly=vehicles[8];var remaining=maxf(0,time_limit-sim_time)
+	demo_status.text=AppState.tr_format("demo.hud",[demo_bar(demo_health(player)),demo_bar(demo_health(fly)),int(remaining)/60,int(remaining)%60])
+	var trace=fly.dn.duplicate() if fly.dn is Array else []
+	while trace.size()<6:trace.append(0.0)
+	var control=control_layers[8] if control_layers.size()==16 else {}
+	demo_brain_text.text=AppState.tr_format("demo.brain",[fly.cfg.display_name,trace[0],trace[1],trace[2],trace[3],trace[4],trace[5],str(control.get("objective_aux_action",[0,0,0,0,0,0])),str(control.get("gunnery_aux_action",[0,0,0,0,0,0])),bridge.last_reply.get("tick_ms",0)])
+
+func demo_command_for_point(point: Vector3,brake: bool=false,fire_pressed: bool=false) -> Array:
+	var vehicle=vehicles[0];var delta=point-vehicle.global_position;delta.y=0
+	if delta.length()<.1:delta=vehicle.global_basis.z
+	var desired=atan2(delta.x,delta.z)
+	var body_error=wrapf(desired-vehicle.rotation.y,-PI,PI)
+	var turret_world=vehicle.rotation.y+vehicle.turret_angle
+	var turret_error=wrapf(desired-turret_world,-PI,PI)
+	var allowed=deg_to_rad(23.0 if vehicle.cfg.turreted else float(vehicle.cfg.traverse_limit_deg)*.75)
+	var steer=clampf(body_error*1.8,-1,1) if absf(body_error)>allowed else 0.0
+	var throttle=.62;var braking=0.0
+	if brake:
+		if absf(vehicle.speed)<.35:throttle=-.45
+		else:throttle=0;braking=1
+	var turret_command=clampf(turret_error*3.2,-1,1)
+	var target_height=point.y-vehicle.muzzle.global_position.y
+	var horizontal=maxf(1,Vector2(point.x-vehicle.muzzle.global_position.x,point.z-vehicle.muzzle.global_position.z).length())
+	var elevation_target=atan2(target_height,horizontal)
+	var elevation=clampf((elevation_target-vehicle.gun_angle)*5,-1,1)
+	return [throttle,braking,steer,turret_command,elevation,1.0 if fire_pressed else 0.0]
+
+func demo_mouse_commands() -> Array:
+	var point=vehicles[8].global_position+Vector3(0,1.4,0)
+	if is_instance_valid(camera) and DisplayServer.get_name()!="headless":
+		var mouse=get_viewport().get_mouse_position();var origin=camera.project_ray_origin(mouse);var direction=camera.project_ray_normal(mouse)
+		var query=PhysicsRayQueryParameters3D.create(origin,origin+direction*2500,5,vehicles[0].excluded())
+		var hit=get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty():point=hit.position
+		elif absf(direction.y)>.001:
+			var distance=(terrain.height_at(origin.x,origin.z)+1.0-origin.y)/direction.y
+			if distance>0:point=origin+direction*distance
+	return demo_command_for_point(point,Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+
+func apply_demo_tactical_aux(vehicle,source: Array) -> Array:
+	# ENGINEERED and explicitly displayed in the demo panel. MaleCNS receives
+	# normal visual inputs; arena geometry and tank controls stay outside it.
+	var command=source.duplicate()
+	while command.size()<6:command.append(0.0)
+	if not vehicle.alive or not vehicles[0].alive:return [0,0,0,0,0,0]
+	var delta=vehicles[0].global_position-vehicle.global_position;delta.y=0
+	var desired=atan2(delta.x,delta.z);var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
+	if delta.length()>65:
+		command[0]=maxf(float(command[0]),.72);command[2]=lerpf(float(command[2]),clampf(error*1.7,-1,1),.72)
+	else:command[0]=clampf(float(command[0]),0,.25)
+	return command
+
 func has_los(a,b) -> bool:
 	var start=a.global_position+Vector3(0,2.5,0)
 	var end=b.global_position+Vector3(0,1.7,0)
@@ -568,6 +670,7 @@ func has_los(a,b) -> bool:
 
 func _physics_process(delta):
 	if paused:return
+	if is_demo and demo_intro_left>0:return
 
 	# Killcam is presentation-only. Freeze the manual range simulation while
 	# the observer camera inspects the destroyed target.
@@ -641,7 +744,12 @@ func _physics_process(delta):
 			if reply_layers.size()==16:
 				layer=reply_layers[i].duplicate(true)
 
-			if is_malecns_controller(vehicles[i]):
+			if is_demo and i==8 and is_malecns_controller(vehicles[i]):
+				var before_tactical=command.duplicate()
+				command=apply_demo_tactical_aux(vehicles[i],command)
+				layer["objective_aux_action"]=[]
+				for j in range(6):layer["objective_aux_action"].append(command[j]-before_tactical[j])
+			elif is_malecns_controller(vehicles[i]):
 				var before_objective=command.duplicate()
 				command=apply_malecns_objective_aux(
 					vehicles[i],
@@ -671,6 +779,9 @@ func _physics_process(delta):
 			v.cmd=v.teacher()
 		if is_range:
 			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
+		if is_demo:
+			if v.agent_id==0:v.cmd=demo_mouse_commands()
+			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
 			v.cmd[2]=0
@@ -679,7 +790,7 @@ func _physics_process(delta):
 		vehicles[0].target=8
 		vehicles[0].target_range=vehicles[0].position.distance_to(vehicles[8].position)
 	step_shells(delta)
-	if not is_range:step_objectives(delta)
+	if not is_range and not is_demo:step_objectives(delta)
 	sim_time+=delta
 	frame+=1
 	physics_usec+=Time.get_ticks_usec()-started
@@ -1500,6 +1611,13 @@ func write_research_exports(report: Dictionary):
 	write_csv(record_path.path_join("per_agent.csv"),["sim_time","agent_id","team","vehicle","position","speed_m_s","alive","target","modules","metrics"],agents)
 	write_csv(record_path.path_join("actions.csv"),["sim_time","agent_id","raw_neural_action","decoder_action","objective_aux_action","gunnery_aux_action","adapter_action","final_action"],actions)
 func _process(dt):
+	if is_demo and demo_intro_left>0:
+		demo_intro_left=maxf(0,demo_intro_left-dt)
+		if demo_intro_left>3.0:demo_intro.text=AppState.tr_text("NERVOUS SYSTEM MODEL CONNECTED")
+		elif demo_intro_left>2.0:demo_intro.text=AppState.tr_format("demo.intro.vehicle",[vehicles[8].cfg.display_name])
+		elif demo_intro_left>1.0:demo_intro.text=AppState.tr_text("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
+		else:demo_intro.text=AppState.tr_text("FIGHT")
+		if demo_intro_left<=0:demo_intro.visible=false
 	for i in range(effects.size()-1,-1,-1):
 		var fx=effects[i]
 
@@ -1562,6 +1680,9 @@ func _process(dt):
 
 	var v=vehicles[selected] if not vehicles.is_empty() else null
 	if v==null:return
+	if is_demo:
+		demo_hud_clock+=dt
+		if demo_hud_clock>=.1:demo_hud_clock=0;update_demo_hud()
 	gunner_reticle.visible=camera_mode==2
 	if camera_mode==2:gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left)
 	sensor_debug.visible=debug
@@ -1600,9 +1721,11 @@ func _process(dt):
 		camera.rotation=Vector3(-PI/2,0,0)
 	elif camera_mode==1:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
-		var follow=v.position-v.global_basis.z*16+Vector3(0,8,0)
+		var follow=v.position-v.global_basis.z*(13 if is_demo else 16)+Vector3(0,7 if is_demo else 8,0)
 		camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,minf(1,dt*4))
-		camera.look_at(v.position+Vector3(0,2,0))
+		var look_target=v.position+Vector3(0,2,0)
+		if is_demo and vehicles.size()>8:look_target=look_target.lerp(vehicles[8].position+Vector3(0,2,0),.16)
+		camera.look_at(look_target)
 	elif camera_mode==2:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		camera.position=v.muzzle.global_position+Vector3(0,.4,0)
@@ -1685,6 +1808,8 @@ func _unhandled_input(event):
 			battlefield_zoom=clampf(battlefield_zoom*.86,280,1800)
 		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
 			battlefield_zoom=clampf(battlefield_zoom*1.16,280,1800)
+	if is_demo and event is InputEventMouseButton and event.pressed and demo_intro_left>0:
+		demo_intro_left=0;demo_intro.visible=false
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_TAB:
@@ -1856,6 +1981,8 @@ func update_identification_labels():
 		var identification=agent_label(
 			tank.agent_id
 		)
+		if is_demo and tank.agent_id==8:identification="🪰 FLY-01"
+		if is_demo and tank.agent_id==0:identification=AppState.tr_text("YOU")
 
 		if tank.agent_id==selected:
 			identification="▶ "+identification

@@ -18,6 +18,7 @@ var generation=0
 var current_page="MainMenu"
 var loading_message="Preparing simulation…"
 var backend_dialog_open=false
+var open_day_mode=false
 func _ready():
 	root_path=OS.get_environment("FLYSWARM_ROOT")
 	if root_path=="":root_path=ProjectSettings.globalize_path("res://../..").simplify_path()
@@ -93,6 +94,7 @@ func show_page(page: String):
 	view=load("res://scenes/app/"+page+".tscn").instantiate()
 	get_tree().root.add_child(view)
 func configure(mode: String):
+	open_day_mode=false
 	session=Config.new()
 	session.mode=mode
 	session.audio_mode=settings.audio
@@ -107,6 +109,32 @@ func configure(mode: String):
 	if mode=="training":session.battle_seed=100;session.seconds=2;session.blue_controller="brain";session.red_controller="brain"
 	if mode=="research":session.seconds=5;session.blue_controller="brain";session.red_controller="brain"
 	show_page({"battle":"HistoricalBattleSetup","range":"TestRangeSetup","training":"TrainingMenu","research":"ResearchLab"}[mode])
+func open_day_menu():
+	open_day_mode=true
+	stop_session()
+	show_page("OpenDayMain")
+func research_menu():
+	open_day_mode=false
+	stop_session()
+	show_page("MainMenu")
+func configure_demo(vehicle: String="t34_85"):
+	open_day_mode=true
+	session=Config.new()
+	session.mode="demo"
+	session.map="demo_arena"
+	session.seconds=90
+	session.blue_controller="rule"
+	session.red_controller="brain"
+	session.audio_mode="no_audio"
+	session.vehicle_composition=vehicle
+	session.demo_vehicle=vehicle
+	session.demo_opponent=vehicle
+	session.record=true
+	session.host=settings.host
+	session.port=int(settings.port)
+func start_demo(vehicle: String="t34_85"):
+	configure_demo(vehicle)
+	launch()
 func stop_backend():
 	if backend_pid>0 and OS.is_process_running(backend_pid):OS.kill(backend_pid)
 	backend_pid=-1
@@ -128,7 +156,7 @@ func stop_session():
 	backend_dialog_open=false
 func menu():
 	stop_session()
-	show_page("MainMenu")
+	show_page("OpenDayMain" if open_day_mode else "MainMenu")
 func launch():
 	var problem=session.validate()
 	if problem!="":view.notice(problem);return
@@ -228,7 +256,7 @@ func resume():
 func on_completed(report: Dictionary):
 	last_report=report
 	stop_backend()
-	show_page("ResultsScreen")
+	show_page("DemoResult" if session.mode=="demo" else "ResultsScreen")
 func rerun():
 	stop_session()
 	launch()

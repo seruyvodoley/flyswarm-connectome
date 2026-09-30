@@ -5,4 +5,7 @@ func _ready():
 	if "--seconds" in args or "--legacy-battle" in args or "--connect" in args or "--replay" in args:
 		var scene=load("res://scenes/Battle.tscn").instantiate()
 		add_child(scene)
+	elif "--open-day" in args:
+		AppState.settings.language="ru"
+		AppState.open_day_menu.call_deferred()
 	else:AppState.show_page.call_deferred("MainMenu")

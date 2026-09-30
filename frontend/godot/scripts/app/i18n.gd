@@ -36,6 +36,16 @@ const EN = {
 
 	"comms.line":
 		"%.2f  %s → %s   out %.2f · recv %.3f · %.0f m",
+
+	"demo.hud":
+		"YOU  %s\nVS\n🪰 FLY  %s\nTime: %02d:%02d",
+
+	"demo.brain":
+		"LIVE MALECNS TELEMETRY\nVehicle: %s\n\n"
+		+ "DESCENDING NEURONS\nDNp09 %.2f   DNa02 %.2f\nDNp01 %.2f   DNp11 %.2f\nwing %.2f   song %.2f\n\n"
+		+ "ENGINEERED CONTROL LAYERS\nMovement / tactics: %s\nAiming / firing: %s\n\nBrain tick: %.1f ms",
+
+	"demo.intro.vehicle": "Your vehicle: %s\nMove the pointer to steer · LMB fire · RMB brake / reverse",
 }
 
 const RU = {
@@ -83,6 +93,50 @@ const RU = {
 	"BATTLE COMPLETE": "БОЙ ЗАВЕРШЁН",
 	"TARGET IMPACT: ": "ПОПАДАНИЕ В ЦЕЛЬ: ",
 	"MANUAL · WASD drive · Q/E turret · R/F elevation · Space/LMB fire · ESC menu": "РУЧНОЙ · WASD ход · Q/E башня · R/F орудие · Пробел/ЛКМ огонь · ESC меню",
+
+	# Open Day presentation
+	"OPEN DAY · MALECNS": "ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ · MALECNS",
+	"OPEN DAY": "ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ",
+	"A fly controls a tank.": "Муха управляет танком.",
+	"Fight a reconstructed model of the Drosophila nervous system.": "Сразитесь с реконструированной моделью нервной системы дрозофилы.",
+	"QUICK BATTLE: VISITOR VS FLY": "БЫСТРЫЙ БОЙ: ПОСЕТИТЕЛЬ ПРОТИВ МУХИ",
+	"HOW IT WORKS": "КАК ЭТО РАБОТАЕТ",
+	"This is Drosophila.": "Это дрозофила.",
+	"We use a reconstructed model of its nervous system to control an agent in a virtual environment.": "Мы используем реконструированную модель её нервной системы для управления агентом в виртуальной среде.",
+	"CHOOSE YOUR VEHICLE": "ВЫБЕРИТЕ ТАНК",
+	"WHY A FLY?": "ПОЧЕМУ МУХА?",
+	"EYES": "ЗРЕНИЕ",
+	"Visual signals enter the reconstructed sensory pathways.": "Зрительные сигналы поступают в реконструированные сенсорные пути.",
+	"NERVOUS SYSTEM": "НЕРВНАЯ СИСТЕМА",
+	"The fixed MaleCNS model processes those signals.": "Фиксированная модель MaleCNS обрабатывает эти сигналы.",
+	"MOVEMENT": "ДВИЖЕНИЕ",
+	"Descending-neuron signals pass through an external engineered motor adapter.": "Сигналы нисходящих нейронов проходят через внешний инженерный моторный адаптер.",
+	"START DEMO": "НАЧАТЬ ДЕМО",
+	"RESEARCH INTERFACE": "ИССЛЕДОВАТЕЛЬСКИЙ ИНТЕРФЕЙС",
+	"HOW DOES THE FLY CONTROL A TANK?": "КАК МУХА УПРАВЛЯЕТ ТАНКОМ?",
+	"1. FLY": "1. МУХА",
+	"Sensory signals from the virtual world": "Сенсорные сигналы из виртуального мира",
+	"2. BIOLOGICAL MODEL": "2. БИОЛОГИЧЕСКАЯ МОДЕЛЬ",
+	"Reconstructed connectome\nDNp09 · DNa02 · DNp01 · wing/song": "Реконструированный коннектом\nDNp09 · DNa02 · DNp01 · wing/song",
+	"The connectome is frozen and does not understand tanks, objectives or tactics.": "Коннектом зафиксирован и не понимает танки, цели или тактику.",
+	"3. ENGINEERED ADAPTER": "3. ИНЖЕНЕРНЫЙ АДАПТЕР",
+	"SIGNALS → CONTROLS": "СИГНАЛЫ → УПРАВЛЕНИЕ",
+	"motor decoder\nmovement auxiliary\naiming and firing helper": "моторный декодер\nпомощник движения\nпомощник наведения и огня",
+	"This external layer converts neural activity into safe vehicle controls.": "Этот внешний слой преобразует нейронную активность в безопасные команды машине.",
+	"4. VIRTUAL VEHICLE": "4. ВИРТУАЛЬНАЯ МАШИНА",
+	"movement\nturning\naiming\nfiring": "движение\nповорот\nнаведение\nстрельба",
+	"The existing FlySwarm physics, armour and ballistics remain active.": "Продолжают работать физика, броня и баллистика FlySwarm.",
+	"BACK": "НАЗАД",
+	"YOU DEFEATED THE FLY": "ВЫ ПОБЕДИЛИ МУХУ",
+	"THE FLY WON": "МУХА ПОБЕДИЛА",
+	"Yes. A reconstructed model of the Drosophila nervous system just won this round.": "Да. Реконструированная модель нервной системы дрозофилы выиграла этот раунд.",
+	"MaleCNS + external engineered motor/tactical layer": "MaleCNS + внешний инженерный моторно-тактический слой",
+	"PLAY AGAIN": "СЫГРАТЬ ЕЩЁ РАЗ",
+	"OPEN DAY MENU": "МЕНЮ ДЕМО",
+	"SHOW / HIDE FLY BRAIN": "ПОКАЗАТЬ / СКРЫТЬ МОЗГ МУХИ",
+	"A FLY CONTROLS A TANK": "МУХА УПРАВЛЯЕТ ТАНКОМ",
+	"REAL MALECNS ACTIVITY": "РЕАЛЬНАЯ АКТИВНОСТЬ MALECNS",
+	"CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT": "СМОЖЕТЕ ПОБЕДИТЬ МУХУ?\nНАЖМИТЕ, ЧТОБЫ СРАЗИТЬСЯ",
 	# General application
 	"F / S     FLYSWARM": "F / S     FLYSWARM",
 	"CONNECTOME / EMBODIMENT": "КОННЕКТОМ / ВОПЛОЩЕНИЕ",
@@ -433,6 +487,16 @@ const RU = {
 
 	"comms.line":
 		"%.2f  %s → %s   исх. %.2f · принято %.3f · %.0f м",
+
+	"demo.hud":
+		"ВЫ  %s\nПРОТИВ\n🪰 МУХА  %s\nВремя: %02d:%02d",
+
+	"demo.brain":
+		"ТЕЛЕМЕТРИЯ MALECNS В РЕАЛЬНОМ ВРЕМЕНИ\nМашина: %s\n\n"
+		+ "НИСХОДЯЩИЕ НЕЙРОНЫ\nDNp09 %.2f   DNa02 %.2f\nDNp01 %.2f   DNp11 %.2f\nкрылья %.2f   песня %.2f\n\n"
+		+ "ИНЖЕНЕРНЫЕ СЛОИ УПРАВЛЕНИЯ\nДвижение / тактика: %s\nНаведение / огонь: %s\n\nBrain tick: %.1f мс",
+
+	"demo.intro.vehicle": "Ваша машина: %s\nВедите указателем · ЛКМ огонь · ПКМ тормоз / задний ход",
 }
 
 static func t(key: String, language: String) -> String:

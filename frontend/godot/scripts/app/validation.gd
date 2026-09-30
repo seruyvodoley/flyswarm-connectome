@@ -12,7 +12,7 @@ func wait_battle():
 	return false
 func run():
 	app=root.get_node("AppState")
-	for page in ["MainMenu","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress"]:
+	for page in ["MainMenu","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","OpenDayMain","HowItWorks","DemoResult"]:
 		check(ResourceLoader.exists("res://scenes/app/"+page+".tscn"),"Missing "+page)
 		app.show_page(page)
 		await process_frame

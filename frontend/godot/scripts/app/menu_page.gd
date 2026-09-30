@@ -106,6 +106,7 @@ func main_menu():
 	label(left,"FLYSWARM",58)
 	label(left,"A world to observe. A network to study.",16)
 	var spacer=Control.new();spacer.custom_minimum_size.y=20;left.add_child(spacer)
+	menu_entry(left,"OPEN DAY DEMO","A fast 1v1: a visitor against a tank controlled by the reconstructed MaleCNS model.",AppState.open_day_menu)
 	menu_entry(left,"AUTONOMOUS BATTLE","Run or observe an 8×8 battle using Rule AI, MaleCNS or a trained adapter.",AppState.configure.bind("battle"))
 	menu_entry(left,"RESEARCH LABORATORY","Run reproducible experiment series across seeds and compare conditions.",AppState.configure.bind("research"))
 	menu_entry(left,"READOUT TRAINING","Fit and evaluate an external motor readout from MaleCNS features. Teacher imitation; no reward.",AppState.configure.bind("training"))
@@ -288,7 +289,11 @@ func backend_unavailable(reason: String):
 	headline.text=AppState.tr_text("MaleCNS backend is unavailable.")
 	text_block(reason)
 	button(body,"Retry",AppState.launch)
-	button(body,"Use Rule AI",func():AppState.session.blue_controller="rule";AppState.session.red_controller="rule";AppState.launch())
+	if AppState.session.mode=="demo":
+		text_block("The interactive Fly battle requires the real MaleCNS backend. Rule AI is never presented as the fly.")
+		button(body,"RETURN TO OPEN DAY",AppState.open_day_menu)
+	else:
+		button(body,"Use Rule AI",func():AppState.session.blue_controller="rule";AppState.session.red_controller="rule";AppState.launch())
 func disconnect_dialog(reason: String):
 	headline.text=AppState.tr_text("BRAIN BACKEND DISCONNECTED")
 	text_block(reason+"\n"+AppState.tr_text("Reconnect starts fresh neural state; the resumed episode is not scientifically continuous."))

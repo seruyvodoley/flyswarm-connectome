@@ -27,6 +27,8 @@ var record=true
 var range_distance=500
 var target_angle=0
 var range_mode="gunnery"
+var demo_vehicle="t34_85"
+var demo_opponent="t34_85"
 var output=""
 var host="127.0.0.1"
 var port=8765
@@ -52,6 +54,7 @@ func cli_args() -> PackedStringArray:
 	if swap:args.append("--swap")
 	if vehicle_composition!="mixed_1944":args.append_array(["--mirror",vehicle_composition])
 	if mode=="range":args.append("--range")
+	if mode=="demo":args.append("--demo")
 	if map=="training_range":args.append("--training")
 	if mode=="replay":args.append_array(["--replay",replay_path])
 	if output!="":args.append_array(["--record",output])

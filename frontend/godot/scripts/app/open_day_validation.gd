@@ -55,14 +55,19 @@ func run():
 	var idle_command=battle.demo_command(false);var firing_command=battle.demo_command(true)
 	check(idle_command[0]>.5 and idle_command.slice(1,5)==[0.0,0.0,0.0,0.0],"Open Day drives forward without autonomous hull or turret steering")
 	check(firing_command[5]==1.0,"Right mouse button maps to fire action")
+	var result_page=load("res://scripts/app/open_day_page.gd").new()
+	check(result_page.result_outcome(true,1.0,true,1.0)=="draw","Equal surviving vehicles are reported as a draw")
+	check(result_page.result_outcome(true,1.0,false,0.0)=="human" and result_page.result_outcome(false,0.0,true,1.0)=="fly" and result_page.result_outcome(false,0.0,false,0.0)=="draw","Elimination awards the survivor and mutual elimination is a draw")
+	check(result_page.result_outcome(true,.5,true,1.0)=="fly","Survivors are compared by remaining vehicle condition")
+	result_page.free()
 	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
 	battle.paused=false;battle.camera_mode=2
 	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
-	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle>original_turret and vehicle.gun_angle>original_gun,"Mouse movement aims the turret and raises the gun independently")
+	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle<original_turret and vehicle.gun_angle>original_gun,"Mouse right turns the turret right and mouse up raises the gun")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(30,0),true)
-	check(vehicle.rotation.y!=original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Middle-button drag rotates the hull without changing gun aim")
+	check(vehicle.rotation.y<original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Mouse right with middle button turns the hull right without changing gun aim")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_camera_button();battle.demo_set_sniper_mode(true);await process_frame
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")

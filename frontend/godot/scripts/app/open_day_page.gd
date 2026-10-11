@@ -132,15 +132,24 @@ func build_result(root: VBoxContainer):
 		var health=float(working)/maxf(1.0,float(state.modules.size())) if state.alive else 0.0
 		if int(state.id)==0:human_alive=state.alive;human_health=health;shots=int(state.metrics.shots);hits=int(state.metrics.penetrations)
 		if int(state.id)==8:fly_alive=state.alive;fly_health=health
-	var human_won=(human_alive and not fly_alive) or (human_alive==fly_alive and human_health>fly_health)
+	var outcome=result_outcome(human_alive,human_health,fly_alive,fly_health)
 	var box=panel(root);box.alignment=BoxContainer.ALIGNMENT_CENTER
-	preview(box,Vector2(520,280));label(box,"YOU DEFEATED THE FLY" if human_won else "THE FLY WON",40)
-	if not human_won:label(box,"Yes. A reconstructed model of the Drosophila nervous system just won this round.",20)
+	var outcome_text="YOU DEFEATED THE FLY" if outcome=="human" else ("THE FLY WON" if outcome=="fly" else "DRAW")
+	if str(AppState.settings.language)=="ru":outcome_text="ТЫ ПОБЕДИЛ МУХУ" if outcome=="human" else ("МУХА ПОБЕДИЛА" if outcome=="fly" else "НИЧЬЯ")
+	preview(box,Vector2(520,280));label(box,outcome_text,40)
+	if outcome=="fly":label(box,"Yes. A reconstructed model of the Drosophila nervous system just won this round.",20)
 	var result_stats=("Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d" % [report.get("time",0),shots,hits])
 	if str(AppState.settings.language)=="ru":result_stats=("Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d" % [report.get("time",0),shots,hits])
 	label(box,result_stats,18)
 	label(box,"MaleCNS + external engineered motor/tactical layer",14).modulate=Color("aebcb4")
 	var buttons=HBoxContainer.new();box.add_child(buttons);button(buttons,"PLAY AGAIN",AppState.rerun);button(buttons,"HOW IT WORKS",AppState.show_page.bind("HowItWorks"));button(buttons,"OPEN DAY MENU",AppState.open_day_menu)
+
+func result_outcome(human_alive: bool,human_health: float,fly_alive: bool,fly_health: float) -> String:
+	if human_alive and not fly_alive:return "human"
+	if fly_alive and not human_alive:return "fly"
+	if not human_alive and not fly_alive:return "draw"
+	if is_equal_approx(human_health,fly_health):return "draw"
+	return "human" if human_health>fly_health else "fly"
 
 func _process(delta):
 	if page!="OpenDayMain":return

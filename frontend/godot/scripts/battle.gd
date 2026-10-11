@@ -671,14 +671,17 @@ func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
 	var vehicle=vehicles[0]
 	if hull_turning:
 		# Middle-button drag is the only mouse gesture that rotates the hull.
-		vehicle.rotation.y=wrapf(vehicle.rotation.y+relative.x*.004,-PI,PI)
+		# With the vehicle facing +Z, positive Godot yaw turns its nose left on
+		# screen. Negate horizontal mouse delta so dragging right turns right.
+		vehicle.rotation.y=wrapf(vehicle.rotation.y-relative.x*.004,-PI,PI)
 		return
 	# In the gunner view the camera follows the gun, so the center reticle stays
 	# on the bore. Mouse delta changes the gun directly instead of ray-casting
 	# from that same moving camera (which caused an aim feedback loop). The same
 	# direct mouse aim works in follow view, with no cursor-target auto tracking.
 	var sensitivity=.00085 if camera_mode==2 and demo_sniper_mode else .0032
-	vehicle.turret_angle=wrapf(vehicle.turret_angle+relative.x*sensitivity,-PI,PI) if vehicle.cfg.turreted else clampf(vehicle.turret_angle+relative.x*sensitivity,-deg_to_rad(vehicle.cfg.traverse_limit_deg),deg_to_rad(vehicle.cfg.traverse_limit_deg))
+	var yaw_delta=-relative.x*sensitivity
+	vehicle.turret_angle=wrapf(vehicle.turret_angle+yaw_delta,-PI,PI) if vehicle.cfg.turreted else clampf(vehicle.turret_angle+yaw_delta,-deg_to_rad(vehicle.cfg.traverse_limit_deg),deg_to_rad(vehicle.cfg.traverse_limit_deg))
 	vehicle.gun_angle=clampf(vehicle.gun_angle-relative.y*sensitivity,deg_to_rad(vehicle.cfg.elevation_deg[0]),deg_to_rad(vehicle.cfg.elevation_deg[1]))
 
 func demo_set_sniper_mode(enabled: bool):

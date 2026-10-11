@@ -95,6 +95,7 @@ var demo_brain_text: Label
 var demo_brain_visible=true
 var demo_hud_clock=0.0
 var demo_sniper_mode=false
+var demo_camera_before_scope=1
 var impact_killcam: Control
 
 # ============================================================
@@ -608,7 +609,7 @@ func setup_demo_ui(canvas: CanvasLayer):
 	selected=0;camera_mode=1;last_camera_mode=-1;demo_intro_left=4.0;demo_sniper_mode=false
 	hud.visible=false;detail.visible=true;camera_button.visible=true;camera_button.offset_left=-630;camera_button.offset_right=-430;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=false;update_camera_button()
 	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
-	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.text="MOUSE: TURRET + ELEVATION · MIDDLE DRAG: HULL\nLMB: SNIPER SCOPE · RMB: FIRE · AUTO-FORWARD" if str(AppState.settings.language)!="ru" else "МЫШЬ: БАШНЯ + УВН · СРЕДНЯЯ КНОПКА: КОРПУС\nЛКМ: ОПТИКА · ПКМ: ОГОНЬ · ТАНК ЕДЕТ ВПЕРЁД";demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls)
+	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.text="MOUSE: TURRET + ELEVATION · MIDDLE DRAG: HULL\nLMB: FIRE · RMB: SNIPER SCOPE · AUTO-FORWARD" if str(AppState.settings.language)!="ru" else "МЫШЬ: БАШНЯ + УВН · СРЕДНЯЯ КНОПКА: КОРПУС\nЛКМ: ОГОНЬ · ПКМ: ОПТИКА · ТАНК ЕДЕТ ВПЕРЁД";demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls)
 	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
 	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
 	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
@@ -690,14 +691,25 @@ func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
 	vehicle.gun_angle=clampf(vehicle.gun_angle-relative.y*sensitivity,deg_to_rad(vehicle.cfg.elevation_deg[0]),deg_to_rad(vehicle.cfg.elevation_deg[1]))
 
 func demo_set_sniper_mode(enabled: bool):
+	if enabled and not demo_sniper_mode:
+		demo_camera_before_scope=camera_mode if camera_mode!=2 else 1
+		camera_mode=2
+	elif not enabled and demo_sniper_mode:
+		camera_mode=demo_camera_before_scope if demo_camera_before_scope!=2 else 1
 	demo_sniper_mode=enabled
+	last_camera_mode=-1
+	update_camera_button()
+	if is_instance_valid(gunner_reticle):gunner_reticle.visible=enabled or camera_mode==2
 	if is_instance_valid(gunner_reticle):gunner_reticle.queue_redraw()
+
+func demo_toggle_sniper_scope():
+	demo_set_sniper_mode(not demo_sniper_mode)
 
 func demo_command(fire_pressed: bool=false) -> Array:
 	return [0.62,0.0,0.0,0.0,0.0,1.0 if fire_pressed else 0.0]
 
-func demo_mouse_commands() -> Array:
-	return demo_command(Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
+func demo_mouse_commands(fire_pressed: bool) -> Array:
+	return demo_command(fire_pressed)
 
 func apply_demo_tactical_aux(vehicle,source: Array) -> Array:
 	# ENGINEERED and explicitly displayed in the demo panel. MaleCNS receives
@@ -857,7 +869,7 @@ func _physics_process(delta):
 		if is_range:
 			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
 		if is_demo:
-			if v.agent_id==0:v.cmd=demo_mouse_commands()
+			if v.agent_id==0:v.cmd=demo_mouse_commands(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
@@ -1734,10 +1746,10 @@ func _process(dt):
 		if demo_intro_left>3.0:demo_intro.text=demo_intro_copy("NERVOUS SYSTEM MODEL CONNECTED")
 		elif demo_intro_left>2.0:
 			if str(AppState.settings.language)=="ru":
-				demo_intro.text="ТВОЙ ТАНК: %s\nМЫШЬ — БАШНЯ И УВН · СРЕДНЯЯ КНОПКА — ПОВОРОТ КОРПУСА\nЛКМ — ОПТИКА · ПКМ — ОГОНЬ · ТАНК ВСЕГДА ДВИЖЕТСЯ ВПЕРЁД" % vehicles[0].cfg.display_name
+				demo_intro.text="ТВОЙ ТАНК: %s\nМЫШЬ — БАШНЯ И УВН · СРЕДНЯЯ КНОПКА — ПОВОРОТ КОРПУСА\nЛКМ — ОГОНЬ · ПКМ — ОПТИКА · ТАНК ВСЕГДА ДВИЖЕТСЯ ВПЕРЁД" % vehicles[0].cfg.display_name
 			else:
 				var intro_format=AppState.tr_text("demo.intro.vehicle")
-				if intro_format=="demo.intro.vehicle":intro_format="Your tank: %s\nMouse: turret and elevation · Middle drag: hull turn\nLMB scope · RMB fire · tank keeps moving forward"
+				if intro_format=="demo.intro.vehicle":intro_format="Your tank: %s\nMouse: turret and elevation · Middle drag: hull turn\nLMB fire · RMB scope · tank keeps moving forward"
 				demo_intro.text=intro_format % [vehicles[0].cfg.display_name]
 		elif demo_intro_left>1.0:demo_intro.text=demo_intro_copy("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
 		else:demo_intro.text=demo_intro_copy("FIGHT")
@@ -1930,8 +1942,8 @@ func _process(dt):
 		screenshot_path=""
 func _unhandled_input(event):
 	if is_demo and event is InputEventMouseButton and event.pressed:
-		if event.button_index==MOUSE_BUTTON_LEFT and camera_mode==2:
-			demo_set_sniper_mode(not demo_sniper_mode)
+		if event.button_index==MOUSE_BUTTON_RIGHT:
+			demo_toggle_sniper_scope()
 		elif event.button_index==MOUSE_BUTTON_WHEEL_UP:
 			camera_mode=2 if camera_mode!=2 else 1;last_camera_mode=-1;update_camera_button()
 		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:

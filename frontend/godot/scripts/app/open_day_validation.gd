@@ -54,7 +54,7 @@ func run():
 	check(not battle.objectives[0].marker.visible,"Domination UI hidden")
 	var idle_command=battle.demo_command(false);var firing_command=battle.demo_command(true)
 	check(idle_command[0]>.5 and idle_command.slice(1,5)==[0.0,0.0,0.0,0.0],"Open Day drives forward without autonomous hull or turret steering")
-	check(firing_command[5]==1.0,"Right mouse button maps to fire action")
+	check(firing_command[5]==1.0 and battle.demo_mouse_commands(true)[5]==1.0,"Left mouse button maps to fire action")
 	var result_page=load("res://scripts/app/open_day_page.gd").new()
 	check(result_page.result_outcome(true,true)=="draw","Surviving vehicles are never scored as a win")
 	check(result_page.result_outcome(true,false)=="human" and result_page.result_outcome(false,true)=="fly" and result_page.result_outcome(false,false)=="draw","A winner requires destruction of the opposing vehicle")
@@ -62,9 +62,15 @@ func run():
 	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
 	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
-	battle.paused=false;battle.camera_mode=2
+	battle.paused=false;battle.camera_mode=1
+	var right_click=InputEventMouseButton.new();right_click.button_index=MOUSE_BUTTON_RIGHT;right_click.pressed=true
+	battle._unhandled_input(right_click)
+	check(battle.demo_sniper_mode and battle.camera_mode==2,"RMB enters gunner scope directly from third-person view")
+	battle._unhandled_input(right_click)
+	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Second RMB returns to the previous camera")
+	battle.camera_mode=2
 	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
-	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle<original_turret and vehicle.gun_angle>original_gun,"Mouse right turns the turret right and mouse up raises the gun")
+	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle<original_turret and vehicle.gun_angle>original_gun,"Mouse right turns the turret right, mouse up raises the gun, and free aim leaves hull heading unchanged")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(30,0),true)
 	check(vehicle.rotation.y<original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Mouse right with middle button turns the hull right without changing gun aim")

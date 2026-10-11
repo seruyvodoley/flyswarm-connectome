@@ -1,10 +1,14 @@
 extends Control
 @export var page="OpenDayMain"
 const FlyPreview=preload("res://scripts/app/fly_preview.gd")
+const VehiclePreview=preload("res://scripts/app/vehicle_preview.gd")
 var selected_vehicle="t34_85"
 var attract_elapsed=0.0
 var attract_active=false
 var attract_label: Label
+var vehicle_preview: SubViewportContainer
+var vehicle_buttons: Dictionary={}
+var selected_vehicle_label: Label
 var attract_phase=0
 var attract_clock=0.0
 const RU_COPY={
@@ -13,6 +17,7 @@ const RU_COPY={
 	"QUICK BATTLE: VISITOR VS FLY":"БЫСТРЫЙ БОЙ: ТЫ ПРОТИВ МУХИ","AUTONOMOUS BATTLE":"АВТОНОМНЫЙ БОЙ",
 	"HOW IT WORKS":"КАК ЭТО РАБОТАЕТ","TEST RANGE":"ПОЛИГОН","REPLAYS":"ПОВТОРЫ","SETTINGS":"НАСТРОЙКИ",
 	"This is Drosophila.":"Это дрозофила.","We use a reconstructed model of its nervous system to control an agent in a virtual environment.":"Реконструированная модель её нервной системы управляет агентом в виртуальном мире.",
+	"We use a reconstructed nervous system model to control an agent in a virtual world.":"Реконструированная модель нервной системы управляет агентом в виртуальном мире.",
 	"CHOOSE YOUR VEHICLE":"ВЫБЕРИ ТАНК","WHY A FLY?":"ПОЧЕМУ МУХА?","EYES":"ЗРИТЕЛЬНЫЕ СИГНАЛЫ",
 	"Visual signals enter the reconstructed sensory pathways.":"Зрительные сигналы поступают в реконструированные сенсорные пути.","NERVOUS SYSTEM":"НЕРВНАЯ СИСТЕМА",
 	"The fixed MaleCNS model processes those signals.":"Зафиксированная модель MaleCNS обрабатывает сигналы.","MOVEMENT":"УПРАВЛЕНИЕ",
@@ -65,7 +70,8 @@ func preview(parent: Node,min_size=Vector2(480,340)):
 
 func build_main(root: VBoxContainer):
 	var columns=HBoxContainer.new();columns.size_flags_vertical=Control.SIZE_EXPAND_FILL;columns.add_theme_constant_override("separation",18);root.add_child(columns)
-	var left=panel(columns);left.custom_minimum_size.x=310
+	columns.name="OpenDayColumns"
+	var left=panel(columns);left.name="OpenDayLeft";left.custom_minimum_size.x=310
 	label(left,"OPEN DAY",14).modulate=Color("c1a573");label(left,"FLYSWARM",44);label(left,"A fly controls a tank.",27);label(left,"Fight a reconstructed model of the Drosophila nervous system.",16).modulate=Color("aebcb4")
 	var start=button(left,"QUICK BATTLE: VISITOR VS FLY",func():AppState.start_demo(selected_vehicle));start.custom_minimum_size.y=72
 	button(left,"AUTONOMOUS BATTLE",func():AppState.configure("battle"))
@@ -73,12 +79,19 @@ func build_main(root: VBoxContainer):
 	button(left,"TEST RANGE",func():AppState.configure("range"))
 	button(left,"REPLAYS",AppState.show_page.bind("ReplayBrowser"))
 	button(left,"SETTINGS",AppState.show_page.bind("Settings"))
-	var center=panel(columns);center.custom_minimum_size.x=450;preview(center,Vector2(450,330));label(center,"This is Drosophila.",22);label(center,"We use a reconstructed model of its nervous system to control an agent in a virtual environment.",16).modulate=Color("aebcb4")
+	var center=panel(columns);center.name="OpenDayCenter";center.custom_minimum_size.x=450
+	preview(center,Vector2(400,185))
+	label(center,"This is Drosophila.",20)
+	var summary=label(center,"We use a reconstructed nervous system model to control an agent in a virtual world.",14);summary.modulate=Color("aebcb4")
 	label(center,"CHOOSE YOUR VEHICLE",13).modulate=Color("c1a573")
 	var choices=HBoxContainer.new();choices.add_theme_constant_override("separation",6);center.add_child(choices)
 	for choice in [["T-34-85","t34_85"],["PANTHER G","panther_g"],["TIGER I","tiger_i"]]:
-		var choice_button=button(choices,choice[0],func(id=choice[1]):selected_vehicle=id);choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	var right=panel(columns);right.custom_minimum_size.x=285
+		var choice_button=button(choices,choice[0],func(id=choice[1]):select_vehicle(id));choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;choice_button.custom_minimum_size.y=40
+		vehicle_buttons[choice[1]]=choice_button
+	selected_vehicle_label=label(center,"T-34-85",12);selected_vehicle_label.modulate=Color("c1a573")
+	vehicle_preview=VehiclePreview.new();vehicle_preview.custom_minimum_size=Vector2(400,155);vehicle_preview.size_flags_horizontal=Control.SIZE_EXPAND_FILL;vehicle_preview.vehicle_id=selected_vehicle;center.add_child(vehicle_preview)
+	_update_vehicle_selection()
+	var right=panel(columns);right.name="OpenDayRight";right.custom_minimum_size.x=285
 	label(right,"WHY A FLY?",22);label(right,"EYES",14).modulate=Color("c1a573");label(right,"Visual signals enter the reconstructed sensory pathways.",15)
 	label(right,"NERVOUS SYSTEM",14).modulate=Color("c1a573");label(right,"The fixed MaleCNS model processes those signals.",15)
 	label(right,"MOVEMENT",14).modulate=Color("c1a573");label(right,"Descending-neuron signals pass through an external engineered motor adapter.",15)
@@ -89,6 +102,18 @@ func build_main(root: VBoxContainer):
 	var attract_card=PanelContainer.new();attract_card.set_anchors_preset(Control.PRESET_CENTER);attract_card.offset_left=-460;attract_card.offset_right=460;attract_card.offset_top=-92;attract_card.offset_bottom=92;attract_card.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var attract_style=StyleBoxFlat.new();attract_style.bg_color=Color(.035,.065,.06,.93);attract_style.border_color=Color("c1a573");attract_style.set_border_width_all(1);attract_style.set_corner_radius_all(7);attract_style.content_margin_left=28;attract_style.content_margin_right=28;attract_card.add_theme_stylebox_override("panel",attract_style)
 	attract_label=Label.new();attract_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;attract_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;attract_label.add_theme_font_size_override("font_size",40);attract_label.add_theme_color_override("font_color",Color("ead58f"));attract_label.add_theme_color_override("font_shadow_color",Color.BLACK);attract_label.add_theme_constant_override("shadow_offset_x",2);attract_label.add_theme_constant_override("shadow_offset_y",2);attract_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;attract_card.add_child(attract_label);attract_card.visible=false;add_child(attract_card)
+
+func select_vehicle(vehicle_id: String) -> void:
+	selected_vehicle=vehicle_id
+	if is_instance_valid(vehicle_preview):vehicle_preview.set_vehicle(vehicle_id)
+	_update_vehicle_selection()
+
+func _update_vehicle_selection() -> void:
+	if is_instance_valid(selected_vehicle_label):
+		selected_vehicle_label.text={"t34_85":"T-34-85","panther_g":"PANTHER G","tiger_i":"TIGER I"}.get(selected_vehicle,selected_vehicle)
+	for id in vehicle_buttons:
+		var choice_button: Button=vehicle_buttons[id]
+		choice_button.modulate=Color("ead58f") if id==selected_vehicle else Color.WHITE
 
 func build_how(root: VBoxContainer):
 	label(root,"HOW DOES THE FLY CONTROL A TANK?",34)

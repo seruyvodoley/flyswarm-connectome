@@ -60,6 +60,9 @@ surface-материалов; просмотрщик в меню загружа�
 | MARL API | PettingZoo ParallelEnv для 16 агентов, random baseline и общий PPO/IPPO readout |
 | Интерфейс | RU/EN, сохранение языка и настроек, пауза, возврат в меню, управление бэкендом |
 
+Расчёт пробития, последствия попаданий и границы исторической точности
+описаны в [модели брони и повреждений](docs/armour_damage_model.md).
+
 Техника: **Panther G, Tiger I, Jagdpanther, T-34-85, IS-2, SU-100, Tiger**.
 
 

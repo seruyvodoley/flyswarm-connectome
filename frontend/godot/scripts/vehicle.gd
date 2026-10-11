@@ -86,7 +86,7 @@ func setup(config: Dictionary, index: int, battle):
 	var l=float(cfg.length_m)/2
 	var w=float(cfg.width_m)/2
 	add_plate("upper_front",Vector3(0,1.4,l-.4),Vector3(w*1.8,1.0,.12),Vector3(deg_to_rad(-cfg.armour_data.upper_front.slope_deg),0,0))
-	add_plate("lower_front",Vector3(0,.65,l-.15),Vector3(w*1.8,.65,.12),Vector3.ZERO)
+	add_plate("lower_front",Vector3(0,.65,l-.15),Vector3(w*1.8,.65,.12),Vector3(deg_to_rad(-float(cfg.armour_data.lower_front.slope_deg)),0,0))
 	add_plate("side",Vector3(-w+.18,1.15,0),Vector3(.15,1.6,l*1.9),Vector3.ZERO)
 	add_plate("side",Vector3(w-.18,1.15,0),Vector3(.15,1.6,l*1.9),Vector3.ZERO)
 	add_plate("rear",Vector3(0,1.2,-l+.2),Vector3(w*1.8,1.5,.15),Vector3.ZERO)
@@ -94,8 +94,12 @@ func setup(config: Dictionary, index: int, battle):
 	var mount=Node3D.new()
 	mount.name="ArmourTurretPivot"
 	add_child(mount)
-	mount.position=Vector3(0,2.3,.4)
-	add_plate("turret_front" if cfg.turreted else "casemate_front",Vector3(0,0,1.2),Vector3(2.5,.9,.12),Vector3.ZERO,mount)
+	# The casemate sits far forward on the Jagdpanther and SU-100. Match the
+	# actual vehicle asset pivot rather than placing every fighting compartment
+	# at the same generic hull coordinate.
+	mount.position=to_local(turret.global_position)+Vector3(0,.42 if cfg.turreted else 0,0)
+	var front_zone="turret_front" if cfg.turreted else "casemate_front"
+	add_plate(front_zone,Vector3(0,0,1.2),Vector3(2.5,.9,.12),Vector3(deg_to_rad(-float(cfg.armour_data[front_zone].slope_deg)),0,0),mount)
 	for sign_value in [-1,1]: add_plate("turret_side" if cfg.turreted else "casemate_side",Vector3(sign_value*1.2,0,0),Vector3(.12,.9,2.5),Vector3.ZERO,mount)
 	add_plate("turret_rear",Vector3(0,0,-1.2),Vector3(2.4,.9,.12),Vector3.ZERO,mount)
 	add_plate("mantlet",Vector3(0,0,1.35),Vector3(.8,.6,.2),Vector3.ZERO,mount)
@@ -340,21 +344,33 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 		return
 	world.vehicles[shell.owner].metrics.penetrations+=1
 	var start=local_start
-	var direction=local_direction
+	var direction=local_direction.normalized()
 	var disabled=[]
 	var damaged=[]
-	var excess=clampf(float(last_impact.capability)/maxf(1.0,float(last_impact.effective)),1.0,2.0)
+	var remaining=float(last_impact.remaining_penetration_mm)
+	var energy_fraction=clampf(remaining/maxf(1.0,float(last_impact.capability)),0.0,1.0)
+	var travel_limit=.55+4.0*sqrt(energy_fraction)
+	var turret_pivot=to_local(turret.global_position)
 	for key in volumes:
-		var relative=volumes[key]-start
+		var centre: Vector3=volumes[key]
+		if cfg.turreted and key in ["gunner","commander","loader","breech","turret_drive"]:
+			centre=turret_pivot+Basis(Vector3.UP,turret_angle)*(centre-turret_pivot)
+		var relative=centre-start
 		var depth=relative.dot(direction)
-		if depth<0 or depth>float(cfg.length_m):continue
+		if depth<0.0 or depth>travel_limit:continue
 		var miss_distance=(relative-direction*depth).length()
-		# A narrow penetrator path causes severe local damage; a small widening
-		# spall cone can injure nearby crew and modules without disabling all of them.
-		var direct_radius=.16+depth*.018
-		var spall_radius=.32+depth*.035
-		if miss_distance>spall_radius:continue
-		var severity=clampf(1.45*excess,1.0,2.4) if miss_distance<=direct_radius else .34*(1.0-miss_distance/spall_radius)*excess
+		var direct_radius=module_radius(key)
+		var fragment_radius=direct_radius+.35+minf(depth,2.5)*.18
+		if miss_distance>fragment_radius:continue
+		var severity=0.0
+		if miss_distance<=direct_radius:
+			severity=1.8 if key!="ammo_rack" else 1.55
+		else:
+			# Fragment intensity falls off with distance from the penetrator.
+			# An ammo rack only detonates from a direct strike; fragments can
+			# damage it, but cannot cause an automatic one-shot explosion.
+			var falloff=1.0-(miss_distance-direct_radius)/(fragment_radius-direct_radius)
+			severity=(.72 if key=="ammo_rack" else 1.05)*falloff*sqrt(energy_fraction)
 		module_damage[key]=minf(3.0,float(module_damage.get(key,0.0))+severity)
 		if not damaged.has(key):damaged.append(key)
 		var threshold=1.0 if key in ["driver","gunner","commander","loader","radio_operator"] else (1.35 if key=="ammo_rack" else 1.6)
@@ -374,7 +390,16 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	var ammo_destroyed=(modules.has("ammo_rack") and not bool(modules["ammo_rack"]))
 	var crew_knockout=(crew_total>=2 and crew_alive<=1)
 	if ammo_destroyed or crew_knockout:
+		last_impact.outcome="lethal"
+		last_impact.kill_reason="ammo_rack" if ammo_destroyed else "crew_knockout"
 		destroy_vehicle(int(shell.owner))
+
+func module_radius(key: String) -> float:
+	if key in ["driver","gunner","commander","loader","radio_operator"]:return .38
+	if key=="ammo_rack":return .44
+	if key in ["engine","transmission","fuel"]:return .58
+	if key in ["track_left","track_right"]:return .43
+	return .43
 
 func destroy_vehicle(killer_id: int):
 	if not alive:return
@@ -409,7 +434,9 @@ func reset_destroyed_state():
 	stuck_intent_s=0.0
 	recovery_left_s=0.0
 	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
-	for key in modules:modules[key]=true
+	for key in modules:
+		modules[key]=true
+		module_damage[key]=0.0
 	VehicleAppearance.set_destroyed(model,str(cfg.id),false)
 	var identification=find_child("Identification",true,false)
 	if identification is Label3D:

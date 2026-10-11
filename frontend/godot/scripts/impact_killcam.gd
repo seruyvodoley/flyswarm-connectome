@@ -87,7 +87,8 @@ func show_impact(event: Dictionary):
 	var outcome=str(impact.get("outcome",""))
 	var outcome_text=""
 	if penetrated:
-		if outcome=="critical":outcome_text="КРИТИЧЕСКИЙ УРОН" if russian else "CRITICAL DAMAGE"
+		if outcome=="lethal":outcome_text="ТАНК УНИЧТОЖЕН" if russian else "VEHICLE DESTROYED"
+		elif outcome=="critical":outcome_text="КРИТИЧЕСКИЙ УРОН" if russian else "CRITICAL DAMAGE"
 		elif outcome=="minor_damage":outcome_text="НЕЗНАЧИТЕЛЬНЫЙ УРОН" if russian else "MINOR DAMAGE"
 		elif outcome=="penetration_no_internal_damage":outcome_text="ПРОБИТИЕ БЕЗ ПОРАЖЕНИЯ МОДУЛЕЙ" if russian else "PENETRATION, NO MODULE HIT"
 	body.text="%s\n%s · %s %s\n%s: %s\n%s: %.0f / %.0f mm\n%s: %s" % [vehicle_name,shell_name,result,outcome_text,"Зона попадания" if russian else "Hit zone",str(impact.get("zone","unknown")),"Пробитие" if russian else "Penetration",float(impact.get("capability",0.0)),float(impact.get("effective",0.0)),"Повреждения" if russian else "Damage",damaged_text]

@@ -38,6 +38,26 @@ func run():
 	b.rotation.y=PI
 	await physics_frame
 	check(scene.has_los(a,b),"clear LOS")
+	# End-to-end shot: the imported barrel, projectile ray, armor collider,
+	# penetration calculation and internal module must agree.
+	a.cfg.gun_data.dispersion_mrad=0.0
+	scene.fire(a)
+	for shot_frame in range(30):
+		if scene.shells.is_empty():break
+		scene.step_shells(1.0/60.0)
+	check(scene.shells.is_empty(),"projectile reaches opposing vehicle")
+	check(bool(b.last_impact.get("penetrated",false)),"Panther round penetrates T-34/85 mantlet at 100 m")
+	check(str(b.last_impact.get("outcome",""))=="critical" and not b.modules.breech,"penetration disables breech")
+	b.reset_destroyed_state()
+	check(b.modules.breech and is_zero_approx(float(b.module_damage.breech)),"range reset restores module health")
+	var side_round={"ammo":Catalog.read_json("ammunition/pak43_ap.json"),"distance":100.0,"velocity":b.global_basis.x*1000.0,"owner":0}
+	for local_target in [Vector3(-1.35,2.15,.3),Vector3(-1.35,2.2,-.5),Vector3(-1.35,1.1,1.65)]:
+		if not b.alive:break
+		b.hit(side_round,b.to_global(local_target),-b.global_basis.x,"side" if local_target.y<1.5 else "turret_side")
+	check(not b.alive and str(b.last_impact.get("kill_reason",""))=="crew_knockout","crew loss with one survivor destroys vehicle")
+	b.reset_destroyed_state()
+	var stopped=Combat.impact(Catalog.read_json("ammunition/zis53_ap.json"),1500,Vector3.FORWARD,Vector3.BACK,{"thickness_mm":100})
+	check(not stopped.penetrated and not stopped.ricochet,"insufficient penetration stops at vertical Tiger armor")
 	var blocker=scene.terrain.box(Vector3(500,102,150),Vector3(20,10,5),Color.GRAY)
 	await physics_frame
 	check(not scene.has_los(a,b),"building blocks LOS")

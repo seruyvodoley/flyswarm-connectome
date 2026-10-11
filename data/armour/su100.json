@@ -47,7 +47,7 @@
     },
     "casemate_front": {
       "thickness_mm": 75,
-      "slope_deg": 0,
+      "slope_deg": 50,
       "material": "homogeneous approximation"
     },
     "casemate_side": {

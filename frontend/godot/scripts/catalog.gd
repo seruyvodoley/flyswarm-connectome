@@ -19,5 +19,6 @@ static func vehicle(id: String, normalized: bool = false) -> Dictionary:
 	p.visual_turreted = visual.parameters.turreted
 	p.gun_data = read_json("guns/" + p.gun + ".json")
 	p.ammo_data = read_json("ammunition/" + p.gun_data.ammo + ".json")
+	p.ammo_data.calibre_mm = p.gun_data.calibre_mm
 	p.armour_data = read_json("armour/" + p.armour + ".json").zones
 	return p

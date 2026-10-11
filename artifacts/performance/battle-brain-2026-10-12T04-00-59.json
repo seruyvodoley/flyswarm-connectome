@@ -1,0 +1,89 @@
+{
+  "backend_state": "READY",
+  "battle_simulation_seconds": 5.59999999999997,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 2517.0,
+    "mean": 2450.4329725229,
+    "p99": 2516.0
+  },
+  "frame_ms": {
+    "max": 13.768,
+    "mean": 8.31675020815986,
+    "p99": 11.733
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "male_cns": "real FlyBrain(batch=1)",
+  "male_cns_tick_count": 271,
+  "male_cns_tick_ms": 5.95708400942385,
+  "male_cns_tick_ms_series": {
+    "max": 8.3773749647662,
+    "mean": 5.05788966757245,
+    "p99": 7.5222909799777
+  },
+  "mode": "battle-brain",
+  "physics_ms": {
+    "max": 166.304,
+    "mean": 17.2531315570361,
+    "p99": 166.304
+  },
+  "presentation_fps": 120.079922636935,
+  "preview_rate_hz": 30.0,
+  "process_ms": {
+    "max": 73.145,
+    "mean": 15.5625353871774,
+    "p99": 73.145
+  },
+  "rendered_objects": {
+    "max": 2840.0,
+    "mean": 2773.4329725229,
+    "p99": 2839.0
+  },
+  "rendered_primitives": {
+    "max": 5024682.0,
+    "mean": 5000027.12073272,
+    "p99": 5024082.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 10.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sampled_frames": 1201,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "static_memory_bytes": {
+    "max": 318844918.0,
+    "mean": 318050073.129892,
+    "p99": 318727930.0
+  },
+  "subviewport_count": 0,
+  "video_memory_bytes": {
+    "max": 214548480.0,
+    "mean": 214548480.0,
+    "p99": 214548480.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

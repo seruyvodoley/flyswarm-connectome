@@ -35,13 +35,34 @@ These one-off 10-second A/B samples stayed near the window's observed cadence;
 they do not show a frame-time win from either quality reduction. The app retains
 the default full vegetation and shadow settings.
 
-With real MaleCNS(batch=1), a 20-second profile sampled 2,345 frames: mean
-frame 8.52 ms, p99 18.04 ms, maximum 314.3 ms. Backend tick distribution was
-mean 6.24 ms, p99 25.12 ms, maximum 134.66 ms. A bounded one-simulation-second
-Open Day functional smoke also passed and measured 5.53 ms for the reported
-brain tick. The resulting battle advanced at 0.38 × real time in the sustained
-sample, so the neural run is not real-time at this workload. The large maximum
-frame spike and tick tail remain unresolved.
+Before the scheduler change, the same synchronous physics/request cycle could
+advance world time only after a backend reply; a 20-second sample measured
+about 0.38 × realtime with a reported tick mean of 6.24 ms, p99 25.12 ms and
+maximum 134.66 ms. The Open Day path now advances physics at the configured
+50 Hz regardless of backend readiness, begins with neutral input, and holds
+the last validated motor command between replies. It permits one in-flight
+request, validates increasing response sequence numbers and applies neural
+trace/audio telemetry only on a new accepted response. Research and training
+keep their synchronous response-before-step path and their two batch=8 brains.
+
+After the change, three comparable GUI samples used MaleCNS(batch=1), the same
+T-34-85 Open Day scenario, 1280 × 800 window, VSync and five seconds of warm-up:
+
+| Run | Sim / wall | xRT | Physics steps | Fresh MaleCNS responses | Tick mean / p99 / max | IPC mean / p99 | FPS mean / p99 frame |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `04-12-50` | 15.02 / 15.00 s | 1.001× | 751 | 749 (49.92 Hz) | 5.07 / 11.16 / 18.79 ms | 18.72 / 26.12 ms | 120.1 / 12.75 ms |
+| `04-13-32` | 15.00 / 15.02 s | 0.999× | 750 | 750 (49.94 Hz) | 4.44 / 5.89 / 7.11 ms | 18.69 / 32.50 ms | 59.9 / 20.49 ms |
+| `04-24-20` | 15.00 / 15.00 s | 1.000× | 750 | 671 (44.72 Hz) | 7.63 / 38.48 / 162.75 ms | 20.87 / 68.12 ms | 104.2 / 26.18 ms |
+
+A longer real-brain battle ran until the match ended: the measured active window
+advanced 88.82 simulated seconds in 88.83 wall seconds (0.9999×), taking 4,441
+physics steps and accepting 4,096 fresh replies (46.11 Hz). Mean frame time was
+9.98 ms, p99 21.18 ms, and presentation rate 99.8 FPS. Tick mean/p99/max was
+6.73/42.32/349.82 ms; IPC mean/p99/max was 20.38/58.25/403.29 ms. The world
+clock stayed at 50 Hz while slower replies caused command holds; these outlier
+latencies remain visible in the diagnostics instead of dropping physics time.
+The fight ended at 88.82 sample seconds, so this run verifies a long, nearly
+90-second battle but did not run all the way to the 90-second timeout.
 
 Godot reported mean static memory near 319 MB and video memory near 229 MB in
 the real-brain run; the Rule AI arena reported about 318 MB and 219 MB. These
@@ -56,13 +77,10 @@ Preview screenshots were inspected after throttling; tanks remain full imported
 
 ## Build and release gate
 
-`python tools/package_macos.py --export` now succeeds after installing the
-official Godot 4.7.2 macOS export template. It creates `build/FlySwarm.zip`
-containing a universal `FlySwarm.app` with the project icon. This is a frontend
-export only: it does not include Python, `flybrain`, NumPy/SciPy, the research
-job runner, or a dataset setup flow, so it cannot satisfy the standalone Open
-Day release requirement. No DMG or GitHub Release was produced. The project
-still needs a relocatable backend and an installed-app smoke test before
-release. `security find-identity -v -p codesigning` found no Developer ID
-signing identity; current build output is unsigned. MaleCNS data remains
-outside the repository in the local user data directory.
+The supported build is `.venv/bin/python tools/package_macos.py --build
+--version 0.2.0-beta.1`. It combines the Godot app and an arm64 PyInstaller
+onedir backend with FlyBrain, NumPy, SciPy, Numba and llvmlite, runtime source
+for packaged research jobs, and third-party license notices. The external
+MaleCNS data is SHA-256 checked through Settings and is not included. The
+installed-app and release gate results are tracked in the release notes and
+`docs/macos_packaging.md`; do not use the legacy frontend-only ZIP as a release.

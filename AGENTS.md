@@ -18,3 +18,13 @@ applicable dataset setup instructions, a drag-and-drop DMG, a ZIP, and SHA-256
 checksums. Test a copy of the app from the mounted DMG outside the checkout.
 State signing/notarization status accurately. Do not bundle MaleCNS research
 data until its license and redistribution terms have been verified.
+
+The supported packaging entry point is
+`.venv/bin/python tools/package_macos.py --build --version <semver>` on Apple
+Silicon with the matching Godot export template installed. It builds the arm64
+PyInstaller onedir runtime, bundles its support files, ad-hoc signs the complete
+app when no Developer ID is available, and creates the versioned DMG, ZIP and
+`SHA256SUMS.txt`. `build/FlySwarm.zip` is a Godot-only legacy export and must
+never be treated as a release artifact. Verify the installed app copy from
+outside the checkout and test the GUI MaleCNS folder picker/check before
+tagging or publishing.

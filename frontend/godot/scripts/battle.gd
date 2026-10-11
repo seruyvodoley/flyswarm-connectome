@@ -66,6 +66,8 @@ var time_limit=600.0
 var record_path=""
 var recorder: FileAccess
 var start_wall=0
+var simulation_clock_started=false
+var pause_start_usec=0
 var physics_usec=0.0
 var rng=RandomNumberGenerator.new()
 var paused=false
@@ -654,7 +656,11 @@ func update_demo_hud():
 	lines.append("%s  %s" % [AppState.tr_text("MOVE"),demo_signal_bar(movement)])
 	lines.append("%s    %s" % [AppState.tr_text("AIM"),demo_signal_bar(aiming)])
 	lines.append("%s   %s" % [AppState.tr_text("FIRE"),AppState.tr_text("LIVE" if firing>.15 else "IDLE")])
-	lines.append("%s: %.1f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0))])
+	var command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else -1.0
+	if command_age_ms>=0:
+		lines.append("%s: %.1f ms · #%d · age %.0f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0)),bridge.responses_received,command_age_ms])
+	else:
+		lines.append("%s: waiting for first MaleCNS response" % AppState.tr_text("Tick"))
 	demo_brain_text.text="\n".join(lines)
 
 func demo_command_for_point(point: Vector3,brake: bool=false,fire_pressed: bool=false) -> Array:
@@ -757,17 +763,38 @@ func _physics_process(delta):
 
 		return
 	if ended or paused:return
+	if is_demo and not simulation_clock_started:
+		# Realtime factor measures the running match, excluding its visible intro.
+		start_wall=Time.get_ticks_usec()
+		simulation_clock_started=true
 	var started=Time.get_ticks_usec()
 	bridge.poll()
+	var brain_response_fresh=bridge.fresh_response
 	if requires_brain:
-		if bridge.pending and (Time.get_ticks_usec()-bridge.sent_at)>10000000:
+		var response_timeout_usec=3000000 if is_demo else 10000000
+		if bridge.pending and (Time.get_ticks_usec()-bridge.sent_at)>response_timeout_usec:
+			bridge.timeout_count+=1
 			push_error("Brain response timeout; no silent baseline fallback")
-			if session_config!=null:paused=true;backend_failed.emit("No neural response for 10 seconds.")
+			if session_config!=null:paused=true;backend_failed.emit("No neural response before the %s second timeout." % str(response_timeout_usec/1000000))
 			else:get_tree().quit(2)
 			return
 		if sim_time>0 and bridge.tcp.get_status()!=StreamPeerTCP.STATUS_CONNECTED and session_config!=null:
-			paused=true;backend_failed.emit("Connection to the local brain server was lost.");return
-		if bridge.commands.is_empty():
+			if not is_demo or bridge.responses_received>0 or Time.get_ticks_usec()-start_wall>3000000:
+				bridge.disconnect_count+=1
+				paused=true;backend_failed.emit("Connection to the local brain server was lost.");return
+		if is_demo:
+			# Physics is authoritative and advances every fixed Godot physics tick.
+			# Neural requests stay sequential and bounded to one in-flight request;
+			# until a newer valid sequence arrives, keep applying the last command.
+			# Before the first real MaleCNS response, use neutral control only.
+			if not brain_response_fresh:
+				if bridge.last_valid_commands.size()==16:
+					bridge.commands=bridge.last_valid_commands.duplicate(true)
+					bridge.repeated_command_steps+=1
+				else:
+					bridge.commands=[]
+					for _agent in 16:bridge.commands.append([0.0,0.0,0.0,0.0,0.0,0.0])
+		elif bridge.commands.is_empty():
 			if not bridge.pending:
 				var observations=[]
 				for v in vehicles:
@@ -782,11 +809,13 @@ func _physics_process(delta):
 		for i in range(16):
 			var command=bridge.commands[i].duplicate()
 			var layer={}
-			var reply_layers=bridge.last_reply.get("control_layers",[])
-			if reply_layers.size()==16:
-				layer=reply_layers[i].duplicate(true)
+			if is_demo and not brain_response_fresh and control_layers.size()==16:
+				layer=control_layers[i].duplicate(true)
+			else:
+				var reply_layers=bridge.last_reply.get("control_layers",[])
+				if reply_layers.size()==16:layer=reply_layers[i].duplicate(true)
 
-			if is_demo and i==8 and is_malecns_controller(vehicles[i]):
+			if is_demo and i==8 and bridge.last_valid_commands.size()==16 and is_malecns_controller(vehicles[i]):
 				var before_tactical=command.duplicate()
 				command=apply_demo_tactical_aux(vehicles[i],command)
 				layer["objective_aux_action"]=[]
@@ -805,16 +834,18 @@ func _physics_process(delta):
 
 			vehicles[i].cmd=command
 
-			var traces=bridge.last_reply.get("traces",[])
-			if traces.size()==16:
-				vehicles[i].dn=traces[i]
-
-			var heard=bridge.last_reply.get("heard",[])
-			if heard.size()==16:
-				vehicles[i].audio_input=heard[i]
-		ingest_communication(bridge.last_reply.get("communication",{}))
+			if not is_demo or brain_response_fresh:
+				var traces=bridge.last_reply.get("traces",[])
+				if traces.size()==16:vehicles[i].dn=traces[i]
+				var heard=bridge.last_reply.get("heard",[])
+				if heard.size()==16:vehicles[i].audio_input=heard[i]
+			if layer.size()>0:
+				while control_layers.size()<16:control_layers.append({})
+				control_layers[i]=layer
+		if not is_demo or brain_response_fresh:
+			ingest_communication(bridge.last_reply.get("communication",{}))
 		bridge.commands=[]
-		delta=.02
+		if not is_demo:delta=.02
 	for v in vehicles:
 		if not requires_brain:
 			if frame%5==0:v.sense(delta*5)
@@ -848,7 +879,6 @@ func _physics_process(delta):
 		telemetry_samples.append(telemetry_sample)
 		if telemetry_samples.size()>7200:telemetry_samples.pop_front()
 		FileAccess.open(record_path.path_join("live.json"),FileAccess.WRITE).store_string(JSON.stringify({"sim_time":sim_time,"wall_time":(Time.get_ticks_usec()-start_wall)/1000000.0}))
-
 	var elimination_end = (
 		minf(tickets[0], tickets[1]) <= 0 or
 		alive_count(0) == 0 or
@@ -857,6 +887,22 @@ func _physics_process(delta):
 
 	if sim_time>=time_limit or (not is_range and elimination_end):
 		finish()
+		return
+	if requires_brain and is_demo and not bridge.pending and bridge.tcp.get_status()==StreamPeerTCP.STATUS_CONNECTED:
+		var observations=[]
+		for v in vehicles:
+			v.sense(delta)
+			observations.append(v.observation())
+		bridge.request(observations,audio_mode)
+
+func suspend_active_clock() -> void:
+	if is_demo and simulation_clock_started and pause_start_usec==0:
+		pause_start_usec=Time.get_ticks_usec()
+
+func resume_active_clock() -> void:
+	if is_demo and pause_start_usec>0:
+		start_wall+=Time.get_ticks_usec()-pause_start_usec
+		pause_start_usec=0
 
 func fire(v):
 	var p=v.muzzle.global_position
@@ -1612,9 +1658,19 @@ func finish(notify_result=true):
 	report.wall_seconds=wall
 	report.realtime_factor=sim_time/maxf(.001,wall)
 	report.mean_physics_ms=physics_usec/maxf(1,frame)/1000
+	report.physics_steps=frame
 	report.render_fps=Engine.get_frames_per_second() if DisplayServer.get_name()!="headless" else null
 	report.ipc_roundtrip_ms=bridge.latency_ms
 	report.brain_tick_ms=bridge.last_reply.get("tick_ms",null)
+	report.neural_steps=bridge.responses_received
+	report.neural_requests=bridge.tick
+	report.neural_response_rate_hz=bridge.responses_received/maxf(.001,wall)
+	report.repeated_motor_command_steps=bridge.repeated_command_steps
+	report.neural_response_timeouts=bridge.timeout_count
+	report.backend_disconnects=bridge.disconnect_count
+	report.last_valid_command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else null
+	report.male_cns_tick_ms=sample_statistics(bridge.tick_ms_samples)
+	report.ipc_latency_ms=sample_statistics(bridge.latency_ms_samples)
 	report.shot_distances=shot_distances
 	report.backend_metadata=bridge.last_reply.get("metadata",{})
 	report.capture_changes=capture_changes
@@ -1632,6 +1688,14 @@ func finish(notify_result=true):
 	report_cache=report
 	if session_config!=null and notify_result:completed.emit(report)
 	if has("--quit"):get_tree().quit()
+
+func sample_statistics(samples: Array[float]) -> Dictionary:
+	if samples.is_empty():return {"count":0,"mean":null,"p95":null,"p99":null,"max":null}
+	var ordered=samples.duplicate()
+	ordered.sort()
+	var total=0.0
+	for value in samples:total+=value
+	return {"count":samples.size(),"mean":total/samples.size(),"p95":ordered[mini(ordered.size()-1,int(ceil(samples.size()*.95))-1)],"p99":ordered[mini(ordered.size()-1,int(ceil(samples.size()*.99))-1)],"max":ordered[-1]}
 
 func csv_value(value) -> String:
 	var text=JSON.stringify(value) if value is Array or value is Dictionary else str(value)
@@ -1662,7 +1726,12 @@ func _process(dt):
 		demo_intro_left=maxf(0,demo_intro_left-dt)
 		if demo_intro_left>3.0:demo_intro.text=demo_intro_copy("NERVOUS SYSTEM MODEL CONNECTED")
 		elif demo_intro_left>2.0:
-			demo_intro.text=("ТВОЙ ТАНК: %s\nМЫШЬ — НАВЕДЕНИЕ · ЛКМ — ОГОНЬ · ПКМ — ТОРМОЗ" % vehicles[8].cfg.display_name) if str(AppState.settings.language)=="ru" else AppState.tr_format("demo.intro.vehicle",[vehicles[8].cfg.display_name])
+			if str(AppState.settings.language)=="ru":
+				demo_intro.text="ТВОЙ ТАНК: %s\nМЫШЬ — НАВЕДЕНИЕ · ЛКМ — ОГОНЬ · ПКМ — ТОРМОЗ" % vehicles[8].cfg.display_name
+			else:
+				var intro_format=AppState.tr_text("demo.intro.vehicle")
+				if intro_format=="demo.intro.vehicle":intro_format="Your vehicle: %s\nMove the pointer to steer · LMB fire · RMB brake / reverse"
+				demo_intro.text=intro_format % [vehicles[8].cfg.display_name]
 		elif demo_intro_left>1.0:demo_intro.text=demo_intro_copy("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
 		else:demo_intro.text=demo_intro_copy("FIGHT")
 		if demo_intro_left<=0:demo_intro.visible=false

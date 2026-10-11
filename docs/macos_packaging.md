@@ -1,23 +1,61 @@
 # macOS packaging
 
-`./run.sh` is the working repository application launcher. It locates Godot,
-sets repository/Python paths, prepares the import cache if absent and starts
-Bootstrap/MainMenu. Godot owns optional backend processes; jobs supervise their
-own children. Missing Python does not prevent Rule AI or the manual range.
+The supported release workflow builds the Godot app and its Python backend as
+one arm64 bundle, then produces the DMG, ZIP and checksums from that exact app.
+Do not publish `build/FlySwarm.zip`; that legacy file is a Godot-only export.
 
-`frontend/godot/export_presets.cfg` provides a universal macOS frontend preset.
-`python tools/package_macos.py` prepares an isolated export staging directory,
-including only small vehicle/gun/armour/scenario JSON and original GLBs. It
-excludes MaleCNS data, caches and local references. `--export` runs Godot's
-exporter and writes `build/FlySwarm.zip`; matching macOS export templates must
-be installed. The archive currently contains only an unsigned universal Godot
-frontend app with the FlySwarm icon.
+Build on Apple Silicon with Godot 4.7.2, its matching macOS export templates,
+and the project's Python 3.11 virtual environment:
 
-This archive is not a standalone distributable. Python, scipy/numpy/flybrain,
-the research job runner and MaleCNS dataset are not bundled. Neural modes rely
-on repository-relative paths and a configured external `FLYSWARM_ROOT` and
-`FLYSWARM_PYTHON`; a moved exported app cannot start them. Exported user
-sessions/settings go to `user://`, not into the application bundle. A release
-still requires a relocatable backend runtime, a user-facing dataset setup flow,
-an arm64 DMG and ZIP, checksums, and a clean installed-app test. The current
-local export is unsigned and not notarized.
+```sh
+./tools/run run-tests
+.venv/bin/python tools/package_macos.py --build --version 0.2.0-beta.1
+```
+
+For an installer-only iteration with an unchanged backend already built in that
+version's output directory, `--reuse-backend` skips only PyInstaller; normal
+release builds should use the full command above.
+
+The build uses Godot's official macOS template and thins its universal engine
+binary to arm64. PyInstaller creates an onedir runtime so NumPy, SciPy, Numba,
+llvmlite, FlyBrain, PettingZoo and Gymnasium plus their native libraries and
+runtime data files are relocatable within
+`FlySwarm.app/Contents/Resources/backend/FlySwarmBackend`. The app also carries
+the small Python research job runner and its runtime source modules. It does
+not carry the developer virtual environment, project checkout, personal paths,
+results or MaleCNS data. Third-party license texts are bundled in
+`Contents/Resources/THIRD_PARTY_LICENSES.txt`.
+
+Installed-app mode derives backend and support paths from the app bundle and
+stores settings, sessions, logs and job output under Godot's per-user writable
+data directory. It does not depend on the current working directory or
+environment variables. Developer mode continues to use `.venv`, `src/` and the
+local checkout. Research and training jobs run through the packaged backend
+entry point and the bundled job supervisor.
+
+MaleCNS `brain.npz` and `weights.npz` are external data and are never copied
+into the public app. In Settings, choose the folder containing both files and
+press **Check MaleCNS data**. The app validates the files against FlyBrain's
+published SHA-256 values, saves the location in user settings, and supplies
+`FLY_DATA` to its child backend. The Open Day launch then waits for the actual
+FlyBrain(batch=1) initialization and warm-up before reporting the backend
+ready. The official MaleCNS download page identifies its dataset as CC-BY; the
+release still avoids redistributing the 260 MB derived runtime files.
+
+The build ad-hoc signs the app bundle for internal consistency. It has no
+Developer ID signature and is not notarized. macOS Gatekeeper may show an
+unidentified-developer warning; users must follow Apple's normal per-app
+approval flow. The build never changes system security settings.
+
+Outputs are written to `build/releases/<version>/`:
+
+- `FlySwarm.app`
+- `FlySwarm-<version>-macos-arm64.dmg` with an Applications shortcut
+- `FlySwarm-<version>-macos-arm64.zip`
+- `SHA256SUMS.txt`
+
+The release gate includes checking every Mach-O slice for arm64, verifying the
+ad-hoc signature and archive checksums, mounting the DMG, copying the app to a
+temporary location outside the checkout, and launching the copied app. Release
+is blocked if the standalone backend, dataset selection, Open Day, research
+job flow, or installed-app smoke fails.

@@ -1,0 +1,89 @@
+{
+  "backend_state": "READY",
+  "battle_simulation_seconds": 11.8999999999998,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 2516.0,
+    "mean": 2444.99615384615,
+    "p99": 2516.0
+  },
+  "frame_ms": {
+    "max": 25.345,
+    "mean": 9.60344615384616,
+    "p99": 19.479
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "male_cns": "real FlyBrain(batch=1)",
+  "male_cns_tick_count": 549,
+  "male_cns_tick_ms": 5.5376670206897,
+  "male_cns_tick_ms_series": {
+    "max": 284.861791005824,
+    "mean": 6.40745346187278,
+    "p99": 28.2622079830617
+  },
+  "mode": "battle-brain",
+  "physics_ms": {
+    "max": 13.671,
+    "mean": 6.95379807692311,
+    "p99": 13.671
+  },
+  "presentation_fps": 103.994925047658,
+  "preview_rate_hz": 30.0,
+  "process_ms": {
+    "max": 23.519,
+    "mean": 13.4487153846153,
+    "p99": 23.519
+  },
+  "rendered_objects": {
+    "max": 2840.0,
+    "mean": 2768.13461538462,
+    "p99": 2839.0
+  },
+  "rendered_primitives": {
+    "max": 5026792.0,
+    "mean": 4950186.89038462,
+    "p99": 5023770.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 10.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sampled_frames": 1040,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "static_memory_bytes": {
+    "max": 320620993.0,
+    "mean": 319342170.088462,
+    "p99": 320507485.0
+  },
+  "subviewport_count": 0,
+  "video_memory_bytes": {
+    "max": 218710016.0,
+    "mean": 218710016.0,
+    "p99": 218710016.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

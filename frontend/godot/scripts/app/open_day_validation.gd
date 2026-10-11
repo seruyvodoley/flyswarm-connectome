@@ -21,10 +21,11 @@ func run():
 	var original_language=app.settings.language
 	for language in ["ru","en"]:
 		app.settings.language=language
-		for page in ["OpenDayMain","HowItWorks"]:
+		for page in ["OpenDayMain","HowItWorks","Settings"]:
 			app.show_page(page);await process_frame
 			check(is_instance_valid(app.view),"Open Day page loads: "+page+" "+language)
-			check(not app.view.find_children("*","SubViewportContainer",true,false).is_empty(),"Fly viewport visible: "+page)
+			if page!="Settings":check(not app.view.find_children("*","SubViewportContainer",true,false).is_empty(),"Fly viewport visible: "+page)
+			else:check(app.view.find_child("MaleCNSDatasetPath",true,false)!=null,"Dataset folder setting is available: "+language)
 			if language=="ru":await capture("main-ru" if page=="OpenDayMain" else "how-it-works-ru")
 	for size in [Vector2i(1280,720),Vector2i(1440,900),Vector2i(1920,1080),Vector2i(2560,1440)]:
 		DisplayServer.window_set_size(size);app.show_page("OpenDayMain");await capture(str(size.x)+"x"+str(size.y))
@@ -64,6 +65,27 @@ func run():
 	check(absf(casemate[2])>.1,"Casemate falls back to hull traverse")
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_demo_hud();await capture("battle-1280x720")
+	# Exercise the Open Day scheduler with no live socket: fixed physics must
+	# advance on neutral startup and continue using a last accepted command.
+	var test_bridge=load("res://scripts/bridge.gd").new()
+	battle.bridge=test_bridge;battle.requires_brain=true;battle.session_config=null;battle.paused=false
+	var before_sim=battle.sim_time;var before_frame=battle.frame
+	for _step in 26:await physics_frame
+	battle.paused=true
+	var neutral_steps=battle.frame-before_frame
+	check(neutral_steps>=24 and neutral_steps<=26,"Open Day physics advances each fixed tick before the first neural reply")
+	check(absf((battle.sim_time-before_sim)-float(neutral_steps)*.02)<.001,"Simulation time advances by the configured 0.02 seconds per fixed step")
+	var accepted_actions=[]
+	for _agent in 16:accepted_actions.append([.25,0.0,0.0,0.0,0.0,0.0])
+	test_bridge.last_valid_commands=accepted_actions
+	test_bridge.responses_received=1
+	test_bridge.last_response_at_usec=Time.get_ticks_usec()
+	before_sim=battle.sim_time;before_frame=battle.frame
+	battle.paused=false
+	for _step in 26:await physics_frame
+	battle.paused=true
+	check(battle.frame-before_frame>=24 and battle.frame-before_frame<=26 and absf((battle.sim_time-before_sim)-float(battle.frame-before_frame)*.02)<.001,"Open Day physics keeps advancing under zero-order hold (steps=%d, sim=%.3f)" % [battle.frame-before_frame,battle.sim_time-before_sim])
+	check(test_bridge.repeated_command_steps==battle.frame-before_frame and test_bridge.responses_received==1,"Held motor commands do not fabricate fresh neural responses (repeats=%d, physics=%d, responses=%d)" % [test_bridge.repeated_command_steps,battle.frame-before_frame,test_bridge.responses_received])
 	battle.queue_free();await process_frame
 	print("OPEN DAY VALIDATION failures=",failures)
 	quit(0 if failures==0 else 1)

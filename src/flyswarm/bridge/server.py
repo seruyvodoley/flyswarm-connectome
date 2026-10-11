@@ -39,7 +39,25 @@ def main():
     p.add_argument('--blue-controller',default='brain');p.add_argument('--red-controller',default='brain')
     p.add_argument('--blue-policy');p.add_argument('--red-policy')
     p.add_argument('--demo',action='store_true',help='Run one real MaleCNS batch=1 opponent for the isolated 1v1 demo')
+    p.add_argument('--check-data',action='store_true',help='Validate an existing MaleCNS dataset directory and exit')
+    p.add_argument('--data-dir',type=Path,help='Dataset folder containing brain.npz and weights.npz')
     a=p.parse_args()
+    if a.check_data:
+        from flybrain.data import FILES,has_data
+        data_dir=a.data_dir or Path(os.environ.get('FLY_DATA',Path.home()/'fly-data'))
+        if not has_data(data_dir):
+            print(json.dumps({'ready':False,'path':str(data_dir),'error':'Required files brain.npz and weights.npz were not found'}))
+            return 1
+        for name,expected in FILES.items():
+            digest=hashlib.sha256()
+            with (data_dir/name).open('rb') as source:
+                for block in iter(lambda:source.read(1<<20),b''):digest.update(block)
+            actual=digest.hexdigest()
+            if actual!=expected:
+                print(json.dumps({'ready':False,'path':str(data_dir),'error':f'{name} checksum does not match the FlyBrain release'}))
+                return 1
+        print(json.dumps({'ready':True,'path':str(data_dir),'files':list(FILES)}))
+        return 0
     def status(stage,error=None):
         if a.status_file:
             dest=Path(a.status_file);dest.parent.mkdir(parents=True,exist_ok=True)
@@ -52,7 +70,7 @@ def main():
     if a.parent_pid:threading.Thread(target=watch_parent,daemon=True).start()
     try:brain=DemoBrain(a.seed,status=status) if a.demo else DualBrain(a.seed,status=status)
     except Exception as exc:
-        status('ERROR',str(exc));return
+        status('ERROR',str(exc));return 1
 
     policies={}
     policy_hashes={}
@@ -143,4 +161,4 @@ def main():
                     print('SAVED',len(xs),'imitation samples',a.collect,flush=True)
             if a.once:break
             brain.reset(a.seed)
-if __name__=='__main__':main()
+if __name__=='__main__':raise SystemExit(main() or 0)

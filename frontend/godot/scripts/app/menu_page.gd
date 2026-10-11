@@ -237,11 +237,40 @@ func settings_menu():
 	toggle("Debug overlays by default",s.debug,func(v):s.debug=v)
 	var box=row("Brain server host");var host=LineEdit.new();host.text=s.host;host.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(host);host.text_changed.connect(func(v):s.host=v)
 	number("Brain server port",s.port,1024,65535,func(v):s.port=int(v))
+	malecns_dataset_settings()
 	dropdown("Default communication",["No Audio","Team Audio","All Audio"],["no_audio","team_audio","all_audio"],s.audio,func(v):s.audio=v)
 	text_block("The launcher manages localhost only. Audio communication is a neural signal; application sound playback is not implemented. LOD bias uses imported mesh LODs where present.")
 	button(body,"SAVE SETTINGS",func():AppState.save_settings();AppState.menu())
-	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en"))};AppState.save_settings();AppState.show_page("Settings"))
+	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"dataset_path":str(AppState.settings.get("dataset_path",""))};AppState.save_settings();AppState.show_page("Settings"))
 	back()
+
+func malecns_dataset_settings() -> void:
+	var russian=str(AppState.settings.get("language","en"))=="ru"
+	var heading=label(body,"ДАННЫЕ MALECNS" if russian else "MALECNS DATASET",22)
+	heading.modulate=Color("c1a573")
+	var path_row=HBoxContainer.new();path_row.add_theme_constant_override("separation",12);body.add_child(path_row)
+	var path_edit=LineEdit.new();path_edit.name="MaleCNSDatasetPath";path_edit.text=str(AppState.settings.dataset_path);path_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;path_row.add_child(path_edit)
+	var browse=Button.new();browse.text="Выбрать папку…" if russian else "Choose folder…";browse.custom_minimum_size.y=48;path_row.add_child(browse)
+	var check=Button.new();check.text="Проверить MaleCNS" if russian else "Check MaleCNS data";body.add_child(check)
+	var status=Label.new();status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status.custom_minimum_size.y=32;body.add_child(status)
+	status.text="Два файла данных не включены в приложение." if russian else "The connectome files are not included in the app."
+	status.modulate=Color("b3c0b8")
+	browse.pressed.connect(func():
+		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_DIR;dialog.use_native_dialog=true;add_child(dialog)
+		dialog.dir_selected.connect(func(path):path_edit.text=path;AppState.set_dataset_path(path);dialog.queue_free())
+		dialog.canceled.connect(func():dialog.queue_free())
+		dialog.popup_centered_ratio(.75))
+	check.pressed.connect(func():
+		AppState.set_dataset_path(path_edit.text)
+		status.text="Проверяю контрольные суммы…" if russian else "Checking dataset files and checksums…"
+		var result=AppState.validate_malecns_dataset(path_edit.text)
+		if result.get("ready",false):
+			status.text=("MALECNS ГОТОВ · " if russian else "MALECNS READY · ")+str(result.get("path",path_edit.text))
+			status.modulate=Color("8ccf9b")
+		else:
+			status.text=("ДАННЫЕ MALECNS НЕ НАЙДЕНЫ · " if russian else "MALECNS DATA NOT READY · ")+str(result.get("error",""))
+			status.modulate=Color("ef9a7a"))
+
 func pause_screen():
 	title("SESSION PAUSED","Pause")
 	button(body,"RESUME",AppState.resume)
@@ -291,6 +320,7 @@ func backend_unavailable(reason: String):
 	button(body,"Retry",AppState.launch)
 	if AppState.session.mode=="demo":
 		text_block("The interactive Fly battle requires the real MaleCNS backend. Rule AI is never presented as the fly.")
+		button(body,"MALECNS DATASET SETTINGS",func():AppState.show_page("Settings"))
 		button(body,"RETURN TO OPEN DAY",AppState.open_day_menu)
 	else:
 		button(body,"Use Rule AI",func():AppState.session.blue_controller="rule";AppState.session.red_controller="rule";AppState.launch())

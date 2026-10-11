@@ -8,6 +8,7 @@ class Job:
  def __init__(self,config):
   self.c=config;self.out=Path(config['output']);self.children=[];self.logs=[];self.started=time.monotonic();self.state={};self.stopping=False
   self.env={**os.environ,'PYTHONPATH':str(ROOT/'src'),'PYTHONUNBUFFERED':'1'}
+  if config.get('dataset_path'):self.env['FLY_DATA']=str(config['dataset_path'])
   signal.signal(signal.SIGTERM,lambda *_:setattr(self,'stopping',True))
   signal.signal(signal.SIGINT,lambda *_:setattr(self,'stopping',True))
  def status(self,**fields):
@@ -38,7 +39,10 @@ class Job:
   try:
    if neural:
     backend_status=dest/'backend-status.json'
-    args=[sys.executable,'-m','flyswarm.bridge.server','--port',str(port),'--seed',str(seed),'--once','--status-file',str(backend_status),'--parent-pid',str(os.getpid()),'--blue-controller',controllers[0],'--red-controller',controllers[1]]
+    if self.c.get('packaged'):
+     args=[self.c['backend_executable'],'--port',str(port),'--seed',str(seed),'--once','--status-file',str(backend_status),'--parent-pid',str(os.getpid()),'--blue-controller',controllers[0],'--red-controller',controllers[1]]
+    else:
+     args=[sys.executable,'-m','flyswarm.bridge.server','--port',str(port),'--seed',str(seed),'--once','--status-file',str(backend_status),'--parent-pid',str(os.getpid()),'--blue-controller',controllers[0],'--red-controller',controllers[1]]
     if collect:args+=['--collect',str(collect)]
     if policy:args+=['--policy',str(policy)]
     else:
@@ -56,7 +60,8 @@ class Job:
      time.sleep(.15)
    args=[self.c['godot']]
    if self.c['render_mode']!='visual':args+=['--headless']
-   args+=['--path',str(ROOT/'frontend/godot'),'--','--legacy-battle','--seed',str(self.c['map_seed']),'--battle-seed',str(seed),'--seconds',str(self.c['seconds']),'--quit','--record',str(dest),'--audio',self.c['audio_mode']]
+   if not self.c.get('packaged'):args+=['--path',str(ROOT/'frontend/godot')]
+   args+=['--','--legacy-battle','--seed',str(self.c['map_seed']),'--battle-seed',str(seed),'--seconds',str(self.c['seconds']),'--quit','--record',str(dest),'--audio',self.c['audio_mode']]
    if not self.c['record']:args+=['--no-replay']
    if self.c['physics_mode']=='normalized':args+=['--normalized']
    if self.c['swap']:args+=['--swap']

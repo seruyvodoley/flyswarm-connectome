@@ -15,9 +15,10 @@ var primitives: Array[float] = []
 var video_memory: Array[float] = []
 var static_memory: Array[float] = []
 var brain_tick_ms: Array[float] = []
+var ipc_latency_ms: Array[float] = []
 var disabled_previews: Array[String] = []
 var graphics_overrides := {}
-var last_brain_tick := -1
+var last_brain_response := -1
 var preview_rate_override := -1.0
 
 func _initialize() -> void:
@@ -87,17 +88,33 @@ func run() -> void:
 	video_memory.clear()
 	static_memory.clear()
 	brain_tick_ms.clear()
+	ipc_latency_ms.clear()
+	if is_instance_valid(app.battle):
+		app.battle.bridge.tick_ms_samples.clear()
+		app.battle.bridge.latency_ms_samples.clear()
+		last_brain_response=app.battle.bridge.responses_received
+		_sample_start_responses=app.battle.bridge.responses_received
+		_sample_start_match_wall=maxf(0.0,float(Time.get_ticks_usec()-app.battle.start_wall)/1000000.0)
+	else:
+		last_brain_response=-1
+		_sample_start_responses=0
+		_sample_start_match_wall=0.0
+	_sample_start_sim=app.battle.sim_time if is_instance_valid(app.battle) else 0.0
+	_sample_start_frame=app.battle.frame if is_instance_valid(app.battle) else 0
 	_sample_started_usec = Time.get_ticks_usec()
 	var started := _sample_started_usec
 	while float(Time.get_ticks_usec() - started) / 1000000.0 < seconds:
 		var frame_started := Time.get_ticks_usec()
 		await process_frame
+		if mode.begins_with("battle") and is_instance_valid(app.battle) and app.battle.finished_report:
+			break
 		frame_ms.append(float(Time.get_ticks_usec() - frame_started) / 1000.0)
-		if is_instance_valid(app.battle) and app.battle.bridge.tick != last_brain_tick:
-			last_brain_tick = app.battle.bridge.tick
+		if is_instance_valid(app.battle) and app.battle.bridge.responses_received != last_brain_response:
+			last_brain_response = app.battle.bridge.responses_received
 			var tick_ms = app.battle.bridge.last_reply.get("tick_ms", null)
 			if tick_ms != null:
 				brain_tick_ms.append(float(tick_ms))
+			ipc_latency_ms.append(float(app.battle.bridge.latency_ms))
 		_sample(Performance.TIME_PROCESS, process_ms)
 		_sample(Performance.TIME_PHYSICS_PROCESS, physics_ms)
 		_sample(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME, draw_calls)
@@ -139,6 +156,12 @@ func _report(mode: String, seconds: float, app: Node) -> Dictionary:
 	var size := DisplayServer.window_get_size()
 	var root_viewport := get_root().get_viewport()
 	var presentation_hz := float(frame_ms.size()) / maxf(0.001, float(Time.get_ticks_usec() - int(_sample_started_usec)) / 1000000.0) if _sample_started_usec > 0 else 0.0
+	var wall_elapsed := maxf(0.001,float(Time.get_ticks_usec()-int(_sample_started_usec))/1000000.0)
+	if is_instance_valid(app.battle) and app.battle.finished_report:
+		wall_elapsed=maxf(0.001,float(app.battle.report_cache.wall_seconds)-_sample_start_match_wall)
+	var sim_elapsed: float = app.battle.sim_time-_sample_start_sim if is_instance_valid(app.battle) else 0.0
+	var physics_steps: int = app.battle.frame-_sample_start_frame if is_instance_valid(app.battle) else 0
+	var neural_responses: int = app.battle.bridge.responses_received-_sample_start_responses if is_instance_valid(app.battle) else 0
 	return {
 		"mode": mode,
 		"requested_sample_seconds": seconds,
@@ -153,6 +176,13 @@ func _report(mode: String, seconds: float, app: Node) -> Dictionary:
 		"video_memory_bytes": _summary(video_memory),
 		"static_memory_bytes": _summary(static_memory),
 		"male_cns_tick_ms_series": _summary(brain_tick_ms),
+		"ipc_latency_ms_series": _summary(ipc_latency_ms),
+		"sample_wall_elapsed_seconds": wall_elapsed,
+		"sample_simulation_elapsed_seconds": sim_elapsed,
+		"sample_realtime_factor": sim_elapsed/wall_elapsed,
+		"sample_physics_steps": physics_steps,
+		"sample_neural_responses": neural_responses,
+		"sample_neural_response_rate_hz": neural_responses/wall_elapsed,
 		"battle_simulation_seconds": app.battle.sim_time if is_instance_valid(app.battle) else null,
 		"window_logical_px": [size.x, size.y],
 		"screen_pixels": [DisplayServer.screen_get_size().x, DisplayServer.screen_get_size().y],
@@ -166,7 +196,8 @@ func _report(mode: String, seconds: float, app: Node) -> Dictionary:
 		"cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
 		"backend_state": app.backend_state,
 		"male_cns_tick_ms": app.battle.bridge.last_reply.get("tick_ms", null) if is_instance_valid(app.battle) else null,
-		"male_cns_tick_count": app.battle.bridge.tick if is_instance_valid(app.battle) else null,
+		"male_cns_request_count": app.battle.bridge.tick if is_instance_valid(app.battle) else null,
+		"male_cns_response_count": app.battle.bridge.responses_received if is_instance_valid(app.battle) else null,
 		"male_cns": "real FlyBrain(batch=1)" if mode == "battle-brain" else "not used" if mode == "battle-rule" else "not applicable",
 		"subviewport_count": app.view.find_children("*", "SubViewport", true, false).size() if is_instance_valid(app.view) else 0,
 		"disabled_previews": disabled_previews,
@@ -181,3 +212,7 @@ func _to_milliseconds(values: Array[float]) -> Array[float]:
 	return result
 
 var _sample_started_usec := 0
+var _sample_start_sim := 0.0
+var _sample_start_frame := 0
+var _sample_start_responses := 0
+var _sample_start_match_wall := 0.0

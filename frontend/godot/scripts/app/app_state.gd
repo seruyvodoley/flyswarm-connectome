@@ -2,9 +2,11 @@ extends Node
 const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 var session=Config.new()
-var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en"}
+var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","dataset_path":""}
 var root_path=""
 var python=""
+var packaged_app=false
+var bundle_resources=""
 var view: Node
 var battle
 var backend_pid=-1
@@ -20,14 +22,24 @@ var loading_message="Preparing simulation…"
 var backend_dialog_open=false
 var open_day_mode=false
 func _ready():
-	root_path=OS.get_environment("FLYSWARM_ROOT")
-	if root_path=="":root_path=ProjectSettings.globalize_path("res://../..").simplify_path()
-	python=OS.get_environment("FLYSWARM_PYTHON")
-	if python=="":python=root_path.path_join(".venv/bin/python")
-	OS.set_environment("PYTHONPATH",root_path.path_join("src"))
+	packaged_app=not OS.has_feature("editor")
+	if packaged_app:
+		bundle_resources=OS.get_executable_path().get_base_dir().path_join("../Resources").simplify_path()
+		root_path=bundle_resources.path_join("support")
+		python=bundle_resources.path_join("backend/FlySwarmBackend/FlySwarmBackend")
+		OS.unset_environment("PYTHONPATH")
+	else:
+		root_path=OS.get_environment("FLYSWARM_ROOT")
+		if root_path=="":root_path=ProjectSettings.globalize_path("res://../..").simplify_path()
+		python=OS.get_environment("FLYSWARM_PYTHON")
+		if python=="":python=root_path.path_join(".venv/bin/python")
+		OS.set_environment("PYTHONPATH",root_path.path_join("src"))
 	var file=ConfigFile.new()
 	if file.load("user://settings.cfg")==OK:
 		for key in settings:settings[key]=file.get_value("settings",key,settings[key])
+	if str(settings.dataset_path)=="":
+		settings.dataset_path=OS.get_environment("FLY_DATA")
+		if str(settings.dataset_path)=="":settings.dataset_path=OS.get_environment("HOME").path_join("fly-data")
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	get_tree().auto_accept_quit=false
 	apply_settings()
@@ -47,6 +59,28 @@ func tr_text(text: String) -> String:
 
 func tr_format(key: String,args: Array) -> String:
 	return I18n.format(key,str(settings.get("language","en")),args)
+
+func validate_malecns_dataset(path: String) -> Dictionary:
+	if path.strip_edges()=="":return {"ready":false,"error":"Select a folder first"}
+	var args=PackedStringArray()
+	if packaged_app:args.append_array(["--check-data","--data-dir",path])
+	else:args.append_array(["-m","flyswarm.bridge.server","--check-data","--data-dir",path])
+	var output: Array=[]
+	var exit_code=OS.execute(python,args,output,true)
+	for line in output:
+		var parsed=JSON.parse_string(line)
+		if parsed is Dictionary:
+			if exit_code==0 and parsed.get("ready",false):
+				settings.dataset_path=path
+				OS.set_environment("FLY_DATA",path)
+				persist_settings()
+			return parsed
+	return {"ready":false,"error":"Dataset check failed (exit %d): %s" % [exit_code,"\n".join(output)]}
+
+func set_dataset_path(path: String) -> void:
+	settings.dataset_path=path
+	OS.set_environment("FLY_DATA",path)
+	persist_settings()
 
 func language_switch_label() -> String:
 	return I18n.next_language_label(str(settings.get("language","en")))
@@ -206,8 +240,15 @@ func start_backend(token: int) -> bool:
 	if not FileAccess.file_exists(python):
 		loading_message=tr_text("Python environment is missing: ")+python+tr_text(". Rule AI and Test Range remain available.")
 		return false
+	var data_check=validate_malecns_dataset(str(settings.dataset_path))
+	if not data_check.get("ready",false):
+		loading_message=tr_text("MaleCNS dataset is not ready: ")+str(data_check.get("error","missing data"))
+		return false
+	OS.set_environment("FLY_DATA",str(settings.dataset_path))
 	status_path=new_output("backend").path_join("status.json")
-	var args=PackedStringArray(["-m","flyswarm.bridge.server","--port",str(session.port),"--seed",str(session.battle_seed),"--once","--status-file",status_path,"--parent-pid",str(OS.get_process_id()),"--blue-controller",session.blue_controller,"--red-controller",session.red_controller])
+	var args=PackedStringArray()
+	if not packaged_app:args.append_array(["-m","flyswarm.bridge.server"])
+	args.append_array(["--port",str(session.port),"--seed",str(session.battle_seed),"--once","--status-file",status_path,"--parent-pid",str(OS.get_process_id()),"--blue-controller",session.blue_controller,"--red-controller",session.red_controller])
 	if str(session.mode)=="demo":args.append("--demo")
 	for team in ["blue","red"]:
 		if session.get(team+"_controller")=="adapter":args.append_array(["--"+team+"-policy",session.get(team+"_policy")])
@@ -229,6 +270,7 @@ func on_backend_failed(message: String):
 	if backend_dialog_open:return
 	backend_dialog_open=true
 	backend_state="DISCONNECTED"
+	battle.suspend_active_clock()
 	battle.paused=true
 	show_page("LoadingScreen")
 	view.disconnect_dialog(message)
@@ -240,7 +282,7 @@ func reconnect():
 	if ok:
 		battle.bridge=load("res://scripts/bridge.gd").new()
 		battle.bridge.connect_backend(session.port)
-		battle.start_wall=Time.get_ticks_usec()
+		battle.resume_active_clock()
 		battle.paused=false
 		backend_dialog_open=false
 		clear_view()
@@ -248,10 +290,11 @@ func reconnect():
 	else:view.disconnect_dialog(loading_message)
 func pause_menu():
 	if not is_instance_valid(battle):return
+	battle.suspend_active_clock()
 	battle.paused=true
 	show_page("PauseMenu")
 func resume():
-	if is_instance_valid(battle):battle.paused=false
+	if is_instance_valid(battle):battle.resume_active_clock();battle.paused=false
 	clear_view()
 	set_battle_overlay_visible(true)
 func on_completed(report: Dictionary):
@@ -272,8 +315,14 @@ func start_job(evaluate=false):
 	config.evaluate=evaluate
 	config.godot=OS.get_executable_path()
 	config.parent_pid=OS.get_process_id()
+	config.dataset_path=str(settings.dataset_path)
+	if packaged_app:
+		config.packaged=true
+		config.backend_executable=python
+		config.support_root=root_path
 	FileAccess.open(job_path.path_join("job.json"),FileAccess.WRITE).store_string(JSON.stringify(config,"  "))
-	job_pid=OS.create_process(python,[root_path.path_join("tools/app_job.py"),job_path.path_join("job.json")])
+	if packaged_app:job_pid=OS.create_process(python,["--job-config",job_path.path_join("job.json")])
+	else:job_pid=OS.create_process(python,[root_path.path_join("tools/app_job.py"),job_path.path_join("job.json")])
 	backend_state="BUSY"
 	show_page("JobProgress")
 func _process(_dt):

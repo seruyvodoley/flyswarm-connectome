@@ -52,17 +52,22 @@ func run():
 	check(only_active_models==2,"Demo loads and renders only its two active tank models")
 	check(battle.vehicles[0].find_child("OpenDayParticipantMark",true,false)!=null and battle.vehicles[8].find_child("OpenDayParticipantMark",true,false)!=null,"Player and MaleCNS receive project identity marks")
 	check(not battle.objectives[0].marker.visible,"Domination UI hidden")
-	var forward=battle.demo_command_for_point(battle.vehicles[0].position+Vector3(0,0,100),false,false)
-	var right=battle.demo_command_for_point(battle.vehicles[0].position+Vector3(100,0,0),false,true)
-	battle.vehicles[0].speed=0
-	var reverse=battle.demo_command_for_point(battle.vehicles[0].position+Vector3(0,0,100),true,false)
-	check(forward[0]>0 and absf(forward[2])<.01,"Mouse aim inside dead zone keeps forward drive")
-	check(absf(right[2])>.1 and right[5]>0,"Aim outside dead zone turns hull and LMB fires")
-	check(reverse[0]<0,"RMB at rest selects reverse")
-	var original_turreted=battle.vehicles[0].cfg.turreted;var original_limit=battle.vehicles[0].cfg.traverse_limit_deg;battle.vehicles[0].cfg.turreted=false;battle.vehicles[0].cfg.traverse_limit_deg=10
-	var casemate=battle.demo_command_for_point(battle.vehicles[0].position+Vector3(100,0,0),false,false)
-	battle.vehicles[0].cfg.turreted=original_turreted;battle.vehicles[0].cfg.traverse_limit_deg=original_limit
-	check(absf(casemate[2])>.1,"Casemate falls back to hull traverse")
+	var idle_command=battle.demo_command(false);var firing_command=battle.demo_command(true)
+	check(idle_command[0]>.5 and idle_command.slice(1,5)==[0.0,0.0,0.0,0.0],"Open Day drives forward without autonomous hull or turret steering")
+	check(firing_command[5]==1.0,"Right mouse button maps to fire action")
+	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
+	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
+	battle.paused=false;battle.camera_mode=2
+	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
+	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle>original_turret and vehicle.gun_angle>original_gun,"Mouse movement aims the turret and raises the gun independently")
+	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
+	battle.demo_apply_mouse_motion(Vector2(30,0),true)
+	check(vehicle.rotation.y!=original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Middle-button drag rotates the hull without changing gun aim")
+	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_camera_button();battle.demo_set_sniper_mode(true);await process_frame
+	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
+	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
+	await capture("battle-gunner-scope-1280x720")
+	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_demo_hud();await capture("battle-1280x720")
 	# Exercise the Open Day scheduler with no live socket: fixed physics must

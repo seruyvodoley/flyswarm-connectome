@@ -31,6 +31,10 @@ Tiger I; машина едет вперёд автоматически, мышь
 Полный исследовательский режим сохранён как два независимых
 `FlyBrain(batch=8)`. Визуальные модели, PBR-карты, лицензии и источники
 перечислены в [`ASSET_SOURCES.md`](frontend/godot/assets/environment/ASSET_SOURCES.md).
+Для техники применяются индивидуальные процедурные ливреи поверх исходных
+surface-материалов; просмотрщик в меню загружает выбранный GLB без физики.
+Скриншоты трёх машин в просмотрщике и бою, четырёх ракурсов мухи и экранов
+результата лежат в [`artifacts/open_day_final_validation/`](artifacts/open_day_final_validation/).
 Кадры главного экрана, объясняющей схемы, живого боя с MaleCNS и результата
 лежат в [`artifacts/open_day_graphics/`](artifacts/open_day_graphics/).
 

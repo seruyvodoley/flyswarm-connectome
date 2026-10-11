@@ -616,11 +616,20 @@ func demo_health(vehicle) -> float:
 
 func demo_bar(value: float) -> String:
 	var filled=clampi(roundi(clampf(value,0,1)*10),0,10)
-	return "["+"■".repeat(filled)+"·".repeat(10-filled)+"]"
+	return "["+"#".repeat(filled)+"-".repeat(10-filled)+"]"
 
 func demo_signal_bar(value: float) -> String:
 	var filled=clampi(roundi(clampf(absf(value),0,1)*7),0,7)
-	return "▮".repeat(filled)+"▯".repeat(7-filled)
+	return "#".repeat(filled)+"-".repeat(7-filled)
+
+func demo_intro_copy(key: String) -> String:
+	if str(AppState.settings.language)=="ru":
+		return {
+			"NERVOUS SYSTEM MODEL CONNECTED":"МОДЕЛЬ MALECNS УПРАВЛЯЕТ ТАНКОМ",
+			"YOU VS THE FLY":"ТЫ ПРОТИВ МУХИ",
+			"FIGHT":"БОЙ",
+		}.get(key,key)
+	return AppState.tr_text(key)
 
 func update_demo_hud():
 	if not is_instance_valid(demo_status) or vehicles.size()<9:return
@@ -1651,10 +1660,11 @@ func write_research_exports(report: Dictionary):
 func _process(dt):
 	if is_demo and demo_intro_left>0:
 		demo_intro_left=maxf(0,demo_intro_left-dt)
-		if demo_intro_left>3.0:demo_intro.text=AppState.tr_text("NERVOUS SYSTEM MODEL CONNECTED")
-		elif demo_intro_left>2.0:demo_intro.text=AppState.tr_format("demo.intro.vehicle",[vehicles[8].cfg.display_name])
-		elif demo_intro_left>1.0:demo_intro.text=AppState.tr_text("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
-		else:demo_intro.text=AppState.tr_text("FIGHT")
+		if demo_intro_left>3.0:demo_intro.text=demo_intro_copy("NERVOUS SYSTEM MODEL CONNECTED")
+		elif demo_intro_left>2.0:
+			demo_intro.text=("ТВОЙ ТАНК: %s\nМЫШЬ — НАВЕДЕНИЕ · ЛКМ — ОГОНЬ · ПКМ — ТОРМОЗ" % vehicles[8].cfg.display_name) if str(AppState.settings.language)=="ru" else AppState.tr_format("demo.intro.vehicle",[vehicles[8].cfg.display_name])
+		elif demo_intro_left>1.0:demo_intro.text=demo_intro_copy("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
+		else:demo_intro.text=demo_intro_copy("FIGHT")
 		if demo_intro_left<=0:demo_intro.visible=false
 	for i in range(effects.size()-1,-1,-1):
 		var fx=effects[i]

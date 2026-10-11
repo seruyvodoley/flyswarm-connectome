@@ -1,5 +1,6 @@
 extends CharacterBody3D
 const Combat=preload("res://scripts/combat.gd")
+const VehicleAppearance=preload("res://scripts/vehicles/vehicle_appearance.gd")
 var cfg: Dictionary
 var world
 var agent_id=0
@@ -55,25 +56,30 @@ func setup(config: Dictionary, index: int, battle):
 	# Keep the lower face of the CharacterBody collider at the vehicle root.
 	shape.position.y=.7
 	add_child(shape)
+	for key in cfg.modules:
+		var xyz=cfg.modules[key]
+		volumes[key]=Vector3(xyz[0],xyz[1],xyz[2])
+	for key in volumes:modules[key]=true
+	if world.is_demo and index not in [0,8]:
+		model=Node3D.new()
+		model.name="InactiveDemoVehicle_%d" % index
+		add_child(model)
+		_add_identification_label()
+		alive=false
+		visible=false
+		collision_layer=0
+		collision_mask=0
+		return
 	model=load("res://assets/vehicles/"+cfg.id+".glb").instantiate()
 	add_child(model)
+	VehicleAppearance.apply(model,str(cfg.id))
 	turret=model.find_child("TurretPivot",true,false)
 	gun=model.find_child("GunElevationPivot",true,false)
 	muzzle=model.find_child("Muzzle",true,false)
 	gun_rest=gun.position
 	for child in model.find_children("Wheel*","MeshInstance3D",true,false): wheels.append(child)
-	var label=Label3D.new()
-	label.text=("B" if team==0 else "R")+str(index%8+1)+" · "+cfg.display_name
-	label.position=Vector3(0,5,0)
-	label.font_size=36
-	label.pixel_size=.015
-	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-	label.fixed_size=false
-	label.name="Identification"
-	label.outline_size=6
-	label.modulate=Color(.35,.65,1) if team==0 else Color(1,.4,.25)
-	label.visibility_range_end=4000
-	add_child(label)
+	_add_identification_label()
+	_add_demo_participant_mark()
 	var l=float(cfg.length_m)/2
 	var w=float(cfg.width_m)/2
 	add_plate("upper_front",Vector3(0,1.4,l-.4),Vector3(w*1.8,1.0,.12),Vector3(deg_to_rad(-cfg.armour_data.upper_front.slope_deg),0,0))
@@ -90,10 +96,49 @@ func setup(config: Dictionary, index: int, battle):
 	for sign_value in [-1,1]: add_plate("turret_side" if cfg.turreted else "casemate_side",Vector3(sign_value*1.2,0,0),Vector3(.12,.9,2.5),Vector3.ZERO,mount)
 	add_plate("turret_rear",Vector3(0,0,-1.2),Vector3(2.4,.9,.12),Vector3.ZERO,mount)
 	add_plate("mantlet",Vector3(0,0,1.35),Vector3(.8,.6,.2),Vector3.ZERO,mount)
-	for key in cfg.modules:
-		var xyz=cfg.modules[key]
-		volumes[key]=Vector3(xyz[0],xyz[1],xyz[2])
-	for key in volumes: modules[key]=true
+
+func _add_identification_label() -> void:
+	var label=Label3D.new()
+	label.text=("B" if team==0 else "R")+str(agent_id%8+1)+" · "+cfg.display_name
+	label.position=Vector3(0,5,0)
+	label.font_size=36
+	label.pixel_size=.015
+	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	label.fixed_size=false
+	label.name="Identification"
+	label.outline_size=6
+	label.modulate=Color(.35,.65,1) if team==0 else Color(1,.4,.25)
+	label.visibility_range_end=4000
+	add_child(label)
+
+func _add_demo_participant_mark() -> void:
+	if not world.is_demo or agent_id not in [0,8]:return
+	var parent: Node3D=turret if is_instance_valid(turret) else model
+	var bounds:=AABB()
+	var found:=false
+	var inverse:=parent.global_transform.affine_inverse()
+	for node in parent.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node:=node as MeshInstance3D
+		if mesh_node.mesh==null:continue
+		var transform_to_parent:=inverse*mesh_node.global_transform
+		for point in _box_corners(mesh_node.get_aabb()):
+			var local_point:=transform_to_parent*point
+			if not found:bounds=AABB(local_point,Vector3.ZERO);found=true
+			else:bounds=bounds.expand(local_point)
+	if not found:return
+	var mark:=Sprite3D.new()
+	mark.name="OpenDayParticipantMark"
+	mark.texture=load("res://assets/environment/fly/flyswarm-mark.svg")
+	mark.pixel_size=.0017
+	mark.modulate=Color("83b5dd") if team==0 else Color("df925e")
+	mark.rotation.x=-PI*.5
+	mark.position=Vector3(bounds.get_center().x,bounds.end.y+.018,bounds.get_center().z)
+	parent.add_child(mark)
+
+func _box_corners(box: AABB) -> Array[Vector3]:
+	var p:=box.position
+	var e:=box.end
+	return [p,Vector3(e.x,p.y,p.z),Vector3(p.x,e.y,p.z),Vector3(p.x,p.y,e.z),Vector3(e.x,e.y,p.z),Vector3(e.x,p.y,e.z),Vector3(p.x,e.y,e.z),e]
 
 func add_plate(zone: String, pos: Vector3, size: Vector3, rot: Vector3, parent: Node3D=null):
 	var body=StaticBody3D.new()
@@ -117,6 +162,14 @@ func excluded() -> Array[RID]:
 	return ids
 
 func sense(dt: float):
+	if not alive:
+		target=-1
+		seen=false
+		target_range=0.0
+		aim_error=0.0
+		elevation_error=0.0
+		looming=0.0
+		return
 	var previous_target=target
 	target=-1
 	seen=false
@@ -314,11 +367,7 @@ func destroy_vehicle(killer_id: int):
 		world.vehicle_destroyed_effect(global_position+Vector3(0,1.0,0),catastrophic)
 	else:
 		world.effect(global_position+Vector3(0,1.5,0),Color(.16,.13,.10),1.5,2.2)
-	var charred=StandardMaterial3D.new()
-	charred.albedo_color=Color(.075,.065,.055)
-	charred.roughness=1.0
-	charred.metallic=.18
-	for mesh in model.find_children("*","MeshInstance3D",true,false):mesh.material_override=charred
+	VehicleAppearance.set_destroyed(model,str(cfg.id),true)
 	if gun:gun.rotation.x=deg_to_rad(8.0)
 	var identification=find_child("Identification",true,false)
 	if identification is Label3D:
@@ -336,7 +385,7 @@ func reset_destroyed_state():
 	recovery_left_s=0.0
 	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
 	for key in modules:modules[key]=true
-	for mesh in model.find_children("*","MeshInstance3D",true,false):mesh.material_override=null
+	VehicleAppearance.set_destroyed(model,str(cfg.id),false)
 	var identification=find_child("Identification",true,false)
 	if identification is Label3D:
 		identification.text=("B" if team==0 else "R")+str(agent_id%8+1)+" · "+str(cfg.display_name)

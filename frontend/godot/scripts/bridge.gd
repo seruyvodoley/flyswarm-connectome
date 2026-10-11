@@ -55,7 +55,7 @@ func poll():
 		and last_reply.get("actions",[]).size()==16
 		and is_instance_valid(AppState)
 		and AppState.session!=null
-		and str(AppState.session.mode)=="battle"
+		and str(AppState.session.mode) in ["battle","demo"]
 	):
 		commands=last_reply.actions.duplicate(true)
 func request(observations: Array, audio_mode: String):

@@ -7,6 +7,27 @@ var attract_active=false
 var attract_label: Label
 var attract_phase=0
 var attract_clock=0.0
+const RU_COPY={
+	"OPEN DAY":"ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ","FLYSWARM":"FLYSWARM","A fly controls a tank.":"Муха управляет танком.",
+	"Fight a reconstructed model of the Drosophila nervous system.":"Сразись с реконструированной моделью нервной системы дрозофилы.",
+	"QUICK BATTLE: VISITOR VS FLY":"БЫСТРЫЙ БОЙ: ТЫ ПРОТИВ МУХИ","AUTONOMOUS BATTLE":"АВТОНОМНЫЙ БОЙ",
+	"HOW IT WORKS":"КАК ЭТО РАБОТАЕТ","TEST RANGE":"ПОЛИГОН","REPLAYS":"ПОВТОРЫ","SETTINGS":"НАСТРОЙКИ",
+	"This is Drosophila.":"Это дрозофила.","We use a reconstructed model of its nervous system to control an agent in a virtual environment.":"Реконструированная модель её нервной системы управляет агентом в виртуальном мире.",
+	"CHOOSE YOUR VEHICLE":"ВЫБЕРИ ТАНК","WHY A FLY?":"ПОЧЕМУ МУХА?","EYES":"ЗРИТЕЛЬНЫЕ СИГНАЛЫ",
+	"Visual signals enter the reconstructed sensory pathways.":"Зрительные сигналы поступают в реконструированные сенсорные пути.","NERVOUS SYSTEM":"НЕРВНАЯ СИСТЕМА",
+	"The fixed MaleCNS model processes those signals.":"Зафиксированная модель MaleCNS обрабатывает сигналы.","MOVEMENT":"УПРАВЛЕНИЕ",
+	"Descending-neuron signals pass through an external engineered motor adapter.":"Сигналы нисходящих нейронов преобразует внешний инженерный адаптер.","START DEMO":"НАЧАТЬ ДЕМО","RESEARCH INTERFACE":"ИССЛЕДОВАТЕЛЬСКИЙ РЕЖИМ",
+	"HOW DOES THE FLY CONTROL A TANK?":"КАК МУХА УПРАВЛЯЕТ ТАНКОМ?","1. FLY":"1. МУХА","Sensory signals from the virtual world":"Сенсорные сигналы из виртуального мира",
+	"2. BIOLOGICAL MODEL":"2. БИОЛОГИЧЕСКАЯ МОДЕЛЬ","FIXED MALECNS":"ЗАФИКСИРОВАННАЯ MALECNS",
+	"Reconstructed connectome\nDNp09 · DNa02 · DNp01 · wing/song":"Реконструированный коннектом\nDNp09 · DNa02 · DNp01 · wing/song",
+	"The connectome is frozen and does not understand tanks, objectives or tactics.":"Коннектом зафиксирован: он не понимает танки, цели или тактику.","3. ENGINEERED ADAPTER":"3. ИНЖЕНЕРНЫЙ АДАПТЕР","SIGNALS → CONTROLS":"СИГНАЛЫ → КОМАНДЫ",
+	"motor decoder\nmovement auxiliary\naiming and firing helper":"декодер движений\nвспомогательное управление\nпомощь в наведении и стрельбе",
+	"This external layer converts neural activity into safe vehicle controls.":"Внешний слой преобразует активность нейронов в команды управления техникой.","4. VIRTUAL VEHICLE":"4. ВИРТУАЛЬНЫЙ ТАНК",
+	"movement\nturning\naiming\nfiring":"движение\nповорот\nнаведение\nвыстрел","The existing FlySwarm physics, armour and ballistics remain active.":"Физика FlySwarm, броня и баллистика остаются активны.","BACK":"НАЗАД",
+	"YOU DEFEATED THE FLY":"ТЫ ПОБЕДИЛ МУХУ","THE FLY WON":"МУХА ПОБЕДИЛА","Yes. A reconstructed model of the Drosophila nervous system just won this round.":"Да. Реконструированная модель нервной системы дрозофилы выиграла этот раунд.",
+	"Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d":"Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d","MaleCNS + external engineered motor/tactical layer":"MaleCNS + внешний инженерный адаптер управления",
+	"PLAY AGAIN":"ЕЩЁ РАЗ","OPEN DAY MENU":"В МЕНЮ ДЕМО","A FLY CONTROLS A TANK":"МУХА УПРАВЛЯЕТ ТАНКОМ","REAL MALECNS ACTIVITY":"АКТИВНОСТЬ МОДЕЛИ MALECNS","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT":"СМОЖЕШЬ ПОБЕДИТЬ МУХУ?\nНАЖМИ, ЧТОБЫ СРАЗИТЬСЯ"
+}
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -29,9 +50,12 @@ func _ready():
 		"DemoResult":build_result(root)
 
 func label(parent: Node,text: String,size=18) -> Label:
-	var value=Label.new();value.text=AppState.tr_text(text);value.add_theme_font_size_override("font_size",size);value.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;parent.add_child(value);return value
+	var value=Label.new();value.text=copy_text(text);value.add_theme_font_size_override("font_size",size);value.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;parent.add_child(value);return value
 func button(parent: Node,text: String,callback: Callable) -> Button:
-	var value=Button.new();value.text=AppState.tr_text(text);value.name=text.to_pascal_case();value.custom_minimum_size.y=48;value.pressed.connect(callback);parent.add_child(value);return value
+	var value=Button.new();value.text=copy_text(text);value.name=text.to_pascal_case();value.custom_minimum_size.y=48;value.pressed.connect(callback);parent.add_child(value);return value
+func copy_text(text: String) -> String:
+	if str(AppState.settings.language)=="ru":return str(RU_COPY.get(text,AppState.tr_text(text)))
+	return AppState.tr_text(text)
 func panel(parent: Node) -> VBoxContainer:
 	var frame=PanelContainer.new();frame.size_flags_vertical=Control.SIZE_EXPAND_FILL;frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var style=StyleBoxFlat.new();style.bg_color=Color("101d1a");style.border_color=Color("3b5149");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;frame.add_theme_stylebox_override("panel",style);parent.add_child(frame)
@@ -62,7 +86,9 @@ func build_main(root: VBoxContainer):
 	button(right,"START DEMO",func():AppState.start_demo(selected_vehicle))
 	button(right,AppState.language_switch_label(),AppState.toggle_language)
 	button(right,"RESEARCH INTERFACE",AppState.research_menu)
-	attract_label=Label.new();attract_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);attract_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;attract_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;attract_label.add_theme_font_size_override("font_size",42);attract_label.add_theme_color_override("font_color",Color("ead58f"));attract_label.add_theme_color_override("font_shadow_color",Color.BLACK);attract_label.add_theme_constant_override("shadow_offset_x",3);attract_label.add_theme_constant_override("shadow_offset_y",3);attract_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;attract_label.visible=false;add_child(attract_label)
+	var attract_card=PanelContainer.new();attract_card.set_anchors_preset(Control.PRESET_CENTER);attract_card.offset_left=-460;attract_card.offset_right=460;attract_card.offset_top=-92;attract_card.offset_bottom=92;attract_card.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var attract_style=StyleBoxFlat.new();attract_style.bg_color=Color(.035,.065,.06,.93);attract_style.border_color=Color("c1a573");attract_style.set_border_width_all(1);attract_style.set_corner_radius_all(7);attract_style.content_margin_left=28;attract_style.content_margin_right=28;attract_card.add_theme_stylebox_override("panel",attract_style)
+	attract_label=Label.new();attract_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;attract_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;attract_label.add_theme_font_size_override("font_size",40);attract_label.add_theme_color_override("font_color",Color("ead58f"));attract_label.add_theme_color_override("font_shadow_color",Color.BLACK);attract_label.add_theme_constant_override("shadow_offset_x",2);attract_label.add_theme_constant_override("shadow_offset_y",2);attract_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;attract_card.add_child(attract_label);attract_card.visible=false;add_child(attract_card)
 
 func build_how(root: VBoxContainer):
 	label(root,"HOW DOES THE FLY CONTROL A TANK?",34)
@@ -85,7 +111,9 @@ func build_result(root: VBoxContainer):
 	var box=panel(root);box.alignment=BoxContainer.ALIGNMENT_CENTER
 	preview(box,Vector2(520,280));label(box,"YOU DEFEATED THE FLY" if human_won else "THE FLY WON",40)
 	if not human_won:label(box,"Yes. A reconstructed model of the Drosophila nervous system just won this round.",20)
-	label(box,"Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d" % [report.get("time",0),shots,hits],18)
+	var result_stats=("Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d" % [report.get("time",0),shots,hits])
+	if str(AppState.settings.language)=="ru":result_stats=("Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d" % [report.get("time",0),shots,hits])
+	label(box,result_stats,18)
 	label(box,"MaleCNS + external engineered motor/tactical layer",14).modulate=Color("aebcb4")
 	var buttons=HBoxContainer.new();box.add_child(buttons);button(buttons,"PLAY AGAIN",AppState.rerun);button(buttons,"HOW IT WORKS",AppState.show_page.bind("HowItWorks"));button(buttons,"OPEN DAY MENU",AppState.open_day_menu)
 
@@ -95,10 +123,10 @@ func _process(delta):
 	if attract_elapsed>=30.0:
 		attract_active=true;attract_clock+=delta
 		if attract_clock>=4.0:attract_clock=0;attract_phase=(attract_phase+1)%3
-		attract_label.visible=true
-		attract_label.text=AppState.tr_text(["A FLY CONTROLS A TANK","REAL MALECNS ACTIVITY","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT"][attract_phase])
+		attract_label.get_parent().visible=true
+		attract_label.text=copy_text(["A FLY CONTROLS A TANK","REAL MALECNS ACTIVITY","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT"][attract_phase])
 
-func _unhandled_input(event):
-	if page=="OpenDayMain" and event is InputEventMouseButton and event.pressed:
-		attract_elapsed=0;attract_active=false
-		if is_instance_valid(attract_label):attract_label.visible=false
+func _input(event):
+	if page=="OpenDayMain" and attract_active and event is InputEventMouseButton and event.pressed:
+		get_viewport().set_input_as_handled()
+		AppState.start_demo(selected_vehicle)

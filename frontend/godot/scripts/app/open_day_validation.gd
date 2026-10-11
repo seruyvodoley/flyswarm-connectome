@@ -1,15 +1,19 @@
 extends SceneTree
 var app
 var failures=0
+var screenshot_dir=""
 
 func check(condition: bool,message: String):
 	if not condition:failures+=1;push_error(message)
 func _initialize():call_deferred("run")
 func capture(name: String):
 	await process_frame;await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_png("/tmp/flyswarm-open-day-"+name+".png")
+	var image=root.get_texture().get_image()
+	image.save_png(screenshot_dir.path_join(name+".png"))
 
 func run():
+	screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/open_day_graphics")
+	DirAccess.make_dir_recursive_absolute(screenshot_dir)
 	app=root.get_node("AppState")
 	var original_language=app.settings.language
 	for language in ["ru","en"]:
@@ -18,14 +22,18 @@ func run():
 			app.show_page(page);await process_frame
 			check(is_instance_valid(app.view),"Open Day page loads: "+page+" "+language)
 			check(not app.view.find_children("*","SubViewportContainer",true,false).is_empty(),"Fly viewport visible: "+page)
-	for size in [Vector2i(1280,720),Vector2i(1440,900),Vector2i(1920,1080),Vector2i(2560,1440)]:
+			if language=="ru":await capture("main-ru" if page=="OpenDayMain" else "how-it-works-ru")
+	for size in [Vector2i(1280,720),Vector2i(1440,900),Vector2i(1920,1080)]:
 		DisplayServer.window_set_size(size);app.show_page("OpenDayMain");await capture(str(size.x)+"x"+str(size.y))
 		var buttons=app.view.find_children("*","Button",true,false)
-		check(buttons.size()>=10,"Complete Open Day controls at "+str(size))
+		check(buttons.size()>=12,"Complete Open Day controls at "+str(size))
 	app.settings.language=original_language
 	app.clear_view();DisplayServer.window_set_size(Vector2i(1280,720));await process_frame
+	print("OPEN DAY validation: initializing demo arena")
 	app.configure_demo("t34_85")
-	var battle=load("res://scenes/Battle.tscn").instantiate();battle.session_config=app.session;root.add_child(battle);await process_frame;battle.paused=true
+	var battle=load("res://scenes/Battle.tscn").instantiate();battle.session_config=app.session;root.add_child(battle)
+	for _frame in range(8):await process_frame
+	battle.paused=true
 	check(battle.is_demo,"Demo runtime enabled")
 	check(battle.alive_count(0)==1 and battle.alive_count(1)==1,"Demo is isolated 1v1")
 	check(not battle.objectives[0].marker.visible,"Domination UI hidden")

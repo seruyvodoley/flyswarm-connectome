@@ -52,8 +52,10 @@ func run():
 		"vehicle destruction creates visual effects"
 	)
 
-	var maximum_visual_radius=0.0
+	var maximum_sprite_width=0.0
 	var maximum_expansion=0.0
+	var particle_bursts=0
+	var radial_sprites=0
 
 	for fx in scene.effects:
 		var node=fx.get("node",null)
@@ -61,10 +63,16 @@ func run():
 		if not is_instance_valid(node):
 			continue
 
-		var sphere=node.mesh as SphereMesh
-
-		if sphere==null:
+		if node is GPUParticles3D:
+			particle_bursts+=1
+			check(node.one_shot and node.amount>=12,"destruction uses a bounded one-shot particle burst")
 			continue
+		if not node is MeshInstance3D:continue
+		var quad=node.mesh as QuadMesh
+		if quad==null:continue
+		radial_sprites+=1
+		maximum_sprite_width=maxf(maximum_sprite_width,quad.size.x)
+		check(node.material_override is ShaderMaterial,"effects use soft radial sprite materials")
 
 		var expansion=float(
 			fx.get("expansion",0.0)
@@ -75,20 +83,14 @@ func run():
 			expansion
 		)
 
-		var final_radius=(
-			sphere.radius
-			* (1.0+expansion)
-		)
-
-		maximum_visual_radius=maxf(
-			maximum_visual_radius,
-			final_radius
-		)
+		check(expansion<=1.0,"effect sprite remains bounded")
 
 	check(
-		maximum_visual_radius<4.0,
-		"individual explosion sphere must stay below 4 m radius"
+		maximum_sprite_width<4.0,
+		"impact and smoke sprites must remain compact"
 	)
+	check(radial_sprites>=4,"destruction contains flash/fire/smoke radial sprites")
+	check(particle_bursts==1,"destruction contains a single particle burst")
 
 	check(
 		maximum_expansion<=1.0,
@@ -98,8 +100,9 @@ func run():
 	print(
 		"EFFECT/UI VALIDATION",
 		" failures=",failures,
-		" max_radius=",maximum_visual_radius,
+		" max_sprite_width=",maximum_sprite_width,
 		" max_expansion=",maximum_expansion,
+		" sprites=",radial_sprites," particle_bursts=",particle_bursts,
 		" stretch=",
 		ProjectSettings.get_setting(
 			"display/window/stretch/mode"

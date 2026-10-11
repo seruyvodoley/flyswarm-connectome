@@ -497,6 +497,14 @@ const RU = {
 		+ "ИНЖЕНЕРНЫЕ СЛОИ УПРАВЛЕНИЯ\nДвижение / тактика: %s\nНаведение / огонь: %s\n\nBrain tick: %.1f мс",
 
 	"demo.intro.vehicle": "Ваша машина: %s\nВедите указателем · ЛКМ огонь · ПКМ тормоз / задний ход",
+	"BIOLOGICAL SIGNALS": "БИОЛОГИЧЕСКИЕ СИГНАЛЫ",
+	"ENGINEERED CONTROL": "ИНЖЕНЕРНЫЙ СЛОЙ УПРАВЛЕНИЯ",
+	"MOVE": "ДВИЖЕНИЕ",
+	"AIM": "НАВЕДЕНИЕ",
+	"FIRE": "ОГОНЬ",
+	"IDLE": "ОЖИДАНИЕ",
+	"LIVE": "АКТИВЕН",
+	"Tick": "Шаг сети",
 }
 
 static func t(key: String, language: String) -> String:

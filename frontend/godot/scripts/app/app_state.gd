@@ -208,6 +208,7 @@ func start_backend(token: int) -> bool:
 		return false
 	status_path=new_output("backend").path_join("status.json")
 	var args=PackedStringArray(["-m","flyswarm.bridge.server","--port",str(session.port),"--seed",str(session.battle_seed),"--once","--status-file",status_path,"--parent-pid",str(OS.get_process_id()),"--blue-controller",session.blue_controller,"--red-controller",session.red_controller])
+	if str(session.mode)=="demo":args.append("--demo")
 	for team in ["blue","red"]:
 		if session.get(team+"_controller")=="adapter":args.append_array(["--"+team+"-policy",session.get(team+"_policy")])
 	backend_state="STARTING"

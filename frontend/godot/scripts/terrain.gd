@@ -3,12 +3,15 @@ var training = false
 var range_flat=false
 var mobility_course=false
 var vegetation_density=1.0
+var demo_mode=false
 var map_seed = 1944
 var extent = 750.0
 var forest_center = Vector2(-380, -20)
 var forest_radius = 170.0
 
 func height_at(x: float, z: float) -> float:
+	if demo_mode:
+		return demo_height_at(x,z)
 	if range_flat:
 		if mobility_course:return 9*exp(-pow((x-80)/45,2))*exp(-pow(z/250,2))
 		return 0.0
@@ -22,6 +25,11 @@ func height_at(x: float, z: float) -> float:
 	# broad, gently graded crossing; no water volume in this dry riverbed scenario
 	if absf(x)<30: river = -1
 	return hills+ridge+valley+river
+
+func demo_height_at(x: float,z: float) -> float:
+	# Small rolling ground keeps the 1v1 readable and gives the imported
+	# vegetation a believable footing without changing the research terrain.
+	return 1.35*sin(x/78.0)*cos(z/92.0)+.8*sin(z/46.0)*sin(x/61.0)+.25*cos(x/24.0+z/31.0)
 
 func material(c: Color) -> StandardMaterial3D:
 	var m=StandardMaterial3D.new()
@@ -51,6 +59,9 @@ func build(is_training: bool, seed_value: int, size: float):
 	training=is_training
 	map_seed=seed_value
 	extent=size/2
+	if demo_mode:
+		build_demo_ground(size)
+		return
 	var st=SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var steps=100
@@ -117,6 +128,37 @@ func build(is_training: bool, seed_value: int, size: float):
 	add_child(trees)
 	# Decorative bridge deck follows crossing, solid approach slopes remain terrain.
 	box(Vector3(0,height_at(0,0)-.1,0),Vector3(22,.3,42),Color(.28,.25,.19),false)
+
+func build_demo_ground(size: float):
+	var surface=SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steps=112
+	var spacing=size/float(steps)
+	for zi in range(steps):
+		for xi in range(steps):
+			var x=-extent+xi*spacing
+			var z=-extent+zi*spacing
+			for offset in [Vector2(0,0),Vector2(1,0),Vector2(0,1),Vector2(1,0),Vector2(1,1),Vector2(0,1)]:
+				var px=x+offset.x*spacing
+				var pz=z+offset.y*spacing
+				var normal=Vector3(height_at(px-1,pz)-height_at(px+1,pz),2.0,height_at(px,pz-1)-height_at(px,pz+1)).normalized()
+				surface.set_normal(normal)
+				surface.set_uv(Vector2(px,pz)/16.0)
+				surface.add_vertex(Vector3(px,height_at(px,pz),pz))
+	var ground=MeshInstance3D.new()
+	ground.name="DemoArenaGround"
+	ground.mesh=surface.commit()
+	var mat=ShaderMaterial.new()
+	mat.shader=load("res://shaders/demo_ground.gdshader")
+	for key in ["grass_diffuse","grass_normal","grass_roughness","dirt_diffuse","dirt_normal","dirt_roughness","road_diffuse","road_normal","road_roughness"]:
+		var texture_name=key
+		var suffix="diffuse" if key.ends_with("diffuse") else ("normal" if key.ends_with("normal") else "roughness")
+		var resource=load("res://assets/environment/textures/"+texture_name.replace("_"+suffix,"")+"_"+suffix+"_1k.jpg")
+		mat.set_shader_parameter(key,resource)
+	ground.material_override=mat
+	add_child(ground)
+	# A single static terrain mesh is the only arena collision surface.
+	ground.create_trimesh_collision()
 
 func forest_blocks(a: Vector3,b: Vector3) -> bool:
 	if training: return false

@@ -3,6 +3,7 @@ import argparse,hashlib,json,socket,time,os,signal,threading,sys
 from pathlib import Path
 import numpy as np
 from flyswarm.brain import DualBrain
+from flyswarm.brain.demo import DemoBrain
 from flyswarm.bridge import read,encode
 from flyswarm.policy import Readout,features
 from flyswarm.marl.policy import SharedPPOPolicy
@@ -37,6 +38,7 @@ def main():
     p.add_argument('--status-file');p.add_argument('--parent-pid',type=int)
     p.add_argument('--blue-controller',default='brain');p.add_argument('--red-controller',default='brain')
     p.add_argument('--blue-policy');p.add_argument('--red-policy')
+    p.add_argument('--demo',action='store_true',help='Run one real MaleCNS batch=1 opponent for the isolated 1v1 demo')
     a=p.parse_args()
     def status(stage,error=None):
         if a.status_file:
@@ -48,7 +50,7 @@ def main():
             try:os.kill(a.parent_pid,0)
             except ProcessLookupError:os._exit(0)
     if a.parent_pid:threading.Thread(target=watch_parent,daemon=True).start()
-    try:brain=DualBrain(a.seed,status=status)
+    try:brain=DemoBrain(a.seed,status=status) if a.demo else DualBrain(a.seed,status=status)
     except Exception as exc:
         status('ERROR',str(exc));return
 
@@ -68,12 +70,12 @@ def main():
             try:team_policies[team]=load_policy(file)
             except Exception as exc:status('ERROR',str(exc));return
     xs=[];ys=[];vehicles=[];seeds=[]
-    metadata={'brain_seeds':[a.seed,a.seed+1000],'neuron_count':sum(b.n*b.batch for b in brain.brains),'feature_mode':a.feature_mode,'mode':'imitation' if a.collect else 'evaluation','controllers':{'blue':a.blue_controller,'red':a.red_controller},'policy_ids':{key:value.metadata for key,value in policies.items()},'policy_sha256':policy_hashes,'team_policy_ids':{key:value.metadata for key,value in team_policies.items()},'team_policy_sha256':{team:hashlib.sha256(Path(getattr(a,team+'_policy')).read_bytes()).hexdigest() for team in team_policies}}
+    metadata={'brain_seeds':[a.seed] if a.demo else [a.seed,a.seed+1000],'neuron_count':sum(b.n*b.batch for b in brain.brains),'feature_mode':a.feature_mode,'mode':'imitation' if a.collect else 'evaluation','runtime':'single_agent_demo' if a.demo else 'dual_8v8','controllers':{'blue':a.blue_controller,'red':a.red_controller},'policy_ids':{key:value.metadata for key,value in policies.items()},'policy_sha256':policy_hashes,'team_policy_ids':{key:value.metadata for key,value in team_policies.items()},'team_policy_sha256':{team:hashlib.sha256(Path(getattr(a,team+'_policy')).read_bytes()).hexdigest() for team in team_policies}}
     with socket.socket() as server:
         server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         server.bind(('127.0.0.1',a.port));server.listen(1)
         status('READY')
-        print('READY 2 x FlyBrain(batch=8)',json.dumps(metadata),flush=True)
+        print('READY 1 x FlyBrain(batch=1)' if a.demo else 'READY 2 x FlyBrain(batch=8)',json.dumps(metadata),flush=True)
         while True:
             connection,_=server.accept()
             try:

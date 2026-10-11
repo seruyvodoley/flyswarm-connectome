@@ -16,6 +16,8 @@ const Vehicle=preload("res://scripts/vehicle.gd")
 const Bridge=preload("res://scripts/bridge.gd")
 const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
 const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
+const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
+const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
 var terrain
 var tracks
 var vehicles=[]
@@ -224,8 +226,8 @@ func _ready():
 	audio_mode=option("--audio","no_audio")
 	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
 	if is_demo:
-		scenario.size_m=700
-		scenario.spawn_z=90
+		scenario.size_m=420
+		scenario.spawn_z=82
 		scenario.spawn_spacing=0
 		scenario.time_limit_s=90
 	scenario.seed=int(option("--seed",str(scenario.seed)))
@@ -250,8 +252,13 @@ func _ready():
 	add_child(terrain)
 	terrain.range_flat=is_range
 	terrain.mobility_course=is_range and session_config!=null and session_config.range_mode=="mobility"
+	terrain.demo_mode=is_demo
 	terrain.vegetation_density=AppState.settings.vegetation if session_config!=null else 1.0
 	terrain.build(training,int(scenario.seed),float(scenario.size_m))
+	if is_demo:
+		var demo_arena=DemoArena.instantiate()
+		demo_arena.configure(terrain,AppState.settings.vegetation if session_config!=null else 1.0)
+		add_child(demo_arena)
 	tracks=load("res://scripts/tracks.gd").new()
 	add_child(tracks)
 	tracks.setup(self)
@@ -262,24 +269,29 @@ func _ready():
 	var sky_mat=ProceduralSkyMaterial.new()
 	sky_mat.sky_top_color=Color(.23,.36,.48)
 	sky_mat.sky_horizon_color=Color(.69,.73,.67)
+	if is_demo:
+		sky_mat.sky_top_color=Color(.24,.39,.53)
+		sky_mat.sky_horizon_color=Color(.78,.77,.65)
+		sky_mat.ground_bottom_color=Color(.31,.35,.29)
+		sky_mat.ground_horizon_color=Color(.63,.66,.56)
 	sky_res.sky_material=sky_mat
 	env.sky=sky_res
 	env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color=Color(.62,.69,.75)
-	env.ambient_light_energy=.65
+	env.ambient_light_energy=.65 if not is_demo else .86
 	env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled=true
-	env.fog_density=.00018
-	env.fog_light_color=Color(.61,.68,.65)
+	env.fog_density=.00018 if not is_demo else .00065
+	env.fog_light_color=Color(.61,.68,.65) if not is_demo else Color(.71,.73,.66)
 	observer_environment=env
 	sky.environment=env
 	add_child(sky)
 	var sun=DirectionalLight3D.new()
 	sun.rotation_degrees=Vector3(-42,-28,0)
 	sun.light_color=Color(1,.92,.77)
-	sun.light_energy=1.7
+	sun.light_energy=1.7 if not is_demo else 1.55
 	sun.shadow_enabled=AppState.settings.shadows if session_config!=null else true
-	sun.directional_shadow_max_distance=300
+	sun.directional_shadow_max_distance=300 if not is_demo else 245
 	add_child(sun)
 	for i in range(3):
 		var v=scenario.objectives[i]
@@ -336,7 +348,7 @@ func _ready():
 				for plate in tank.armour_bodies:plate.collision_layer=0
 		if is_demo:
 			if i in [0,8]:
-				var demo_z=-90 if i==0 else 90
+				var demo_z=-82 if i==0 else 82
 				tank.position=Vector3(0,terrain.height_at(0,demo_z)+.1,demo_z)
 				tank.rotation.y=0 if i==0 else PI
 			else:
@@ -349,7 +361,7 @@ func _ready():
 	sensor_debug=MeshInstance3D.new()
 	add_child(sensor_debug)
 	camera=Camera3D.new()
-	camera.far=4000
+	camera.far=620 if is_demo else 4000
 	camera.near=.1
 	camera.fov=62
 	add_child(camera)
@@ -587,7 +599,7 @@ func setup_demo_ui(canvas: CanvasLayer):
 	selected=0;camera_mode=1;last_camera_mode=-1;demo_intro_left=4.0
 	hud.visible=false;detail.visible=false;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=false
 	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
-	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
+	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
 	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
 	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
 	var brain_box=VBoxContainer.new();brain_box.add_theme_constant_override("separation",10);demo_brain_panel.add_child(brain_box)
@@ -606,6 +618,10 @@ func demo_bar(value: float) -> String:
 	var filled=clampi(roundi(clampf(value,0,1)*10),0,10)
 	return "["+"■".repeat(filled)+"·".repeat(10-filled)+"]"
 
+func demo_signal_bar(value: float) -> String:
+	var filled=clampi(roundi(clampf(absf(value),0,1)*7),0,7)
+	return "▮".repeat(filled)+"▯".repeat(7-filled)
+
 func update_demo_hud():
 	if not is_instance_valid(demo_status) or vehicles.size()<9:return
 	var player=vehicles[0];var fly=vehicles[8];var remaining=maxf(0,time_limit-sim_time)
@@ -613,7 +629,24 @@ func update_demo_hud():
 	var trace=fly.dn.duplicate() if fly.dn is Array else []
 	while trace.size()<6:trace.append(0.0)
 	var control=control_layers[8] if control_layers.size()==16 else {}
-	demo_brain_text.text=AppState.tr_format("demo.brain",[fly.cfg.display_name,trace[0],trace[1],trace[2],trace[3],trace[4],trace[5],str(control.get("objective_aux_action",[0,0,0,0,0,0])),str(control.get("gunnery_aux_action",[0,0,0,0,0,0])),bridge.last_reply.get("tick_ms",0)])
+	var signal_names=["DNp09 L","DNp09 R","DNa02 L","DNa02 R","DNp01","Wing"]
+	var lines=PackedStringArray(["MALECNS · "+AppState.tr_text("BIOLOGICAL SIGNALS")])
+	for index in range(6):
+		var value=float(trace[index])
+		var polarity="+" if value>=0 else "−"
+		lines.append("%-8s %s %s%.2f" % [signal_names[index],demo_signal_bar(value),polarity,absf(value)])
+	var action=control.get("final_action",fly.cmd)
+	while action.size()<6:action.append(0.0)
+	var movement=maxf(absf(float(action[0])),maxf(absf(float(action[1])),absf(float(action[2]))))
+	var aiming=maxf(absf(float(action[3])),absf(float(action[4])))
+	var firing=float(action[5])
+	lines.append("")
+	lines.append(AppState.tr_text("ENGINEERED CONTROL"))
+	lines.append("%s  %s" % [AppState.tr_text("MOVE"),demo_signal_bar(movement)])
+	lines.append("%s    %s" % [AppState.tr_text("AIM"),demo_signal_bar(aiming)])
+	lines.append("%s   %s" % [AppState.tr_text("FIRE"),AppState.tr_text("LIVE" if firing>.15 else "IDLE")])
+	lines.append("%s: %.1f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0))])
+	demo_brain_text.text="\n".join(lines)
 
 func demo_command_for_point(point: Vector3,brake: bool=false,fire_pressed: bool=false) -> Array:
 	var vehicle=vehicles[0];var delta=point-vehicle.global_position;delta.y=0
@@ -826,9 +859,11 @@ func fire(v):
 	var dir=v.muzzle.global_basis.z.normalized()
 	dir=dir.rotated(Vector3.UP,rng.randfn(0,dispersion)).rotated(v.global_basis.x,rng.randfn(0,dispersion))
 	var vis=MeshInstance3D.new()
-	var mesh=SphereMesh.new()
-	mesh.radius=.12
-	mesh.height=.24
+	var mesh=CapsuleMesh.new()
+	mesh.radius=.045
+	mesh.height=.34
+	mesh.radial_segments=6
+	mesh.rings=2
 	vis.mesh=mesh
 	var material=terrain.material(Color(1,.65,.17))
 	material.emission_enabled=true
@@ -836,6 +871,8 @@ func fire(v):
 	vis.material_override=material
 	add_child(vis)
 	vis.position=p
+	vis.look_at(p+dir,Vector3.UP)
+	vis.rotate_object_local(Vector3.RIGHT,-PI/2.0)
 	shells.append({"position":p,"velocity":dir*v.cfg.ammo_data.muzzle_velocity_m_s,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"origin":p,"distance":0.0,"age":0.0,"visual":vis})
 	effect(p,Color(1,.65,.16),.7,.10)
 	shot_distances.append(v.target_range)
@@ -853,6 +890,7 @@ func step_shells(dt: float):
 		var q=PhysicsRayQueryParameters3D.create(from,to,5,vehicles[s.owner].excluded())
 		var hit=get_world_3d().direct_space_state.intersect_ray(q)
 		if not hit.is_empty():
+			effect_burst(hit.position+hit.normal*.15,10,.7)
 			var victim=hit.collider.get_meta("vehicle") if hit.collider.has_meta("vehicle") else null
 
 			if victim!=null:
@@ -876,6 +914,8 @@ func step_shells(dt: float):
 		else:
 			s.position=to
 			s.visual.position=to
+			s.visual.look_at(to+s.velocity.normalized(),Vector3.UP)
+			s.visual.rotate_object_local(Vector3.RIGHT,-PI/2.0)
 
 func is_malecns_controller(vehicle) -> bool:
 	if not requires_brain:
@@ -1459,25 +1499,11 @@ func effect(
 			return
 
 	var mesh=MeshInstance3D.new()
-
-	var sphere=SphereMesh.new()
-	sphere.radius=size
-	sphere.height=size*2.0
-	sphere.radial_segments=10
-	sphere.rings=6
-	mesh.mesh=sphere
-
-	var material=StandardMaterial3D.new()
-	material.albedo_color=c
-	material.roughness=.9
-	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
-
-	# Bright orange/yellow effects get a small self-lit component.
-	# Smoke remains normally shaded.
-	if maxf(c.r,maxf(c.g,c.b))>.55:
-		material.emission_enabled=true
-		material.emission=Color(c.r,c.g,c.b)
-
+	var quad=QuadMesh.new();quad.size=Vector2(size*2.0,size*2.0);mesh.mesh=quad
+	var material=ShaderMaterial.new();material.shader=EffectSpriteShader
+	material.set_shader_parameter("tint",c)
+	material.set_shader_parameter("irregularity",.12 if c.r<.4 else .28)
+	material.set_shader_parameter("glow",.9 if c.r>.7 else .0)
 	mesh.material_override=material
 
 	add_child(mesh)
@@ -1491,6 +1517,17 @@ func effect(
 		"rise_speed":rise_speed,
 		"base_alpha":c.a
 	})
+
+func effect_burst(p: Vector3,amount: int=20,lifetime: float=1.25):
+	if session_config!=null and effects.size()>=maxi(6,int(60*AppState.settings.effects)):return
+	var particles=GPUParticles3D.new();particles.name="ImpactBurst";particles.position=p
+	particles.amount=amount;particles.lifetime=lifetime;particles.one_shot=true;particles.explosiveness=.92;particles.emitting=true
+	var process=ParticleProcessMaterial.new();process.direction=Vector3(0,1,0);process.spread=180;process.initial_velocity_min=1.6;process.initial_velocity_max=4.8;process.gravity=Vector3(0,-2.6,0);process.scale_min=.22;process.scale_max=.58
+	particles.process_material=process
+	var quad=QuadMesh.new();quad.size=Vector2(.7,.7);particles.draw_pass_1=quad
+	var material=ShaderMaterial.new();material.shader=EffectSpriteShader;material.set_shader_parameter("tint",Color(.29,.25,.19,.76));material.set_shader_parameter("irregularity",.36);particles.material_override=material
+	add_child(particles)
+	effects.append({"node":particles,"life":lifetime+.15,"particles":true})
 
 
 func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
@@ -1509,6 +1546,7 @@ func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
 		.40,
 		.2
 	)
+	effect_burst(p+Vector3(0,.55,0),22 if catastrophic else 16,1.35)
 
 	# Fireball.
 	effect(
@@ -1622,6 +1660,10 @@ func _process(dt):
 		var fx=effects[i]
 
 		fx["life"]=float(fx["life"])-dt
+		if fx.get("particles",false):
+			if float(fx["life"])<=0.0:
+				fx["node"].queue_free();effects.remove_at(i)
+			continue
 
 		var initial=maxf(
 			.001,
@@ -1650,6 +1692,7 @@ func _process(dt):
 		fx["node"].position.y+=float(
 			fx.get("rise_speed",0.0)
 		)*dt
+		if is_demo and is_instance_valid(camera):fx["node"].look_at(camera.global_position,Vector3.UP)
 
 		var material=fx["node"].material_override
 
@@ -1724,7 +1767,7 @@ func _process(dt):
 		var follow=v.position-v.global_basis.z*(13 if is_demo else 16)+Vector3(0,7 if is_demo else 8,0)
 		camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,minf(1,dt*4))
 		var look_target=v.position+Vector3(0,2,0)
-		if is_demo and vehicles.size()>8:look_target=look_target.lerp(vehicles[8].position+Vector3(0,2,0),.16)
+		if is_demo and vehicles.size()>8:look_target=look_target.lerp(vehicles[8].position+Vector3(0,2,0),.10)
 		camera.look_at(look_target)
 	elif camera_mode==2:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE

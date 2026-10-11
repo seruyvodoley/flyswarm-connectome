@@ -15,6 +15,7 @@ const Terrain=preload("res://scripts/terrain.gd")
 const Vehicle=preload("res://scripts/vehicle.gd")
 const Bridge=preload("res://scripts/bridge.gd")
 const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
+const ImpactKillcam=preload("res://scripts/impact_killcam.gd")
 const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
 const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
 const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
@@ -94,6 +95,7 @@ var demo_brain_text: Label
 var demo_brain_visible=true
 var demo_hud_clock=0.0
 var demo_sniper_mode=false
+var impact_killcam: Control
 
 # ============================================================
 # TEST RANGE KILLCAM / HIT FEEDBACK
@@ -459,6 +461,9 @@ func _ready():
 	killcam_box.add_child(reset_target_button)
 
 	canvas.add_child(range_killcam_panel)
+	impact_killcam=ImpactKillcam.new()
+	impact_killcam.visible=false
+	canvas.add_child(impact_killcam)
 
 	range_killcam_path=MeshInstance3D.new()
 	range_killcam_path.visible=false
@@ -954,6 +959,8 @@ func step_shells(dt: float):
 					hit.normal,
 					hit.collider.get_meta("zone")
 				)
+				if is_demo and is_instance_valid(impact_killcam):
+					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"shell":s.ammo.get("id","unknown"),"fatal":not victim.alive})
 
 				if is_range and victim.agent_id==8 and int(s.owner)==0:
 					on_range_target_impact(

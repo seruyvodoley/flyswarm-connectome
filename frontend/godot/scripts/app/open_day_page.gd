@@ -29,7 +29,7 @@ const RU_COPY={
 	"motor decoder\nmovement auxiliary\naiming and firing helper":"декодер движений\nвспомогательное управление\nпомощь в наведении и стрельбе",
 	"This external layer converts neural activity into safe vehicle controls.":"Внешний слой преобразует активность нейронов в команды управления техникой.","4. VIRTUAL VEHICLE":"4. ВИРТУАЛЬНЫЙ ТАНК",
 	"movement\nturning\naiming\nfiring":"движение\nповорот\nнаведение\nвыстрел","The existing FlySwarm physics, armour and ballistics remain active.":"Физика FlySwarm, броня и баллистика остаются активны.","BACK":"НАЗАД",
-	"YOU DEFEATED THE FLY":"ТЫ ПОБЕДИЛ МУХУ","THE FLY WON":"МУХА ПОБЕДИЛА","Yes. A reconstructed model of the Drosophila nervous system just won this round.":"Да. Реконструированная модель нервной системы дрозофилы выиграла этот раунд.",
+	"YOU DEFEATED THE FLY":"ТЫ ПОБЕДИЛ МУХУ","THE FLY WON":"МУХА ПОБЕДИЛА","DRAW":"НИЧЬЯ","Neither vehicle was destroyed; no winner was awarded.":"Ни одна машина не уничтожена; победитель не определён.","Yes. A reconstructed model of the Drosophila nervous system just won this round.":"Да. Реконструированная модель нервной системы дрозофилы выиграла этот раунд.",
 	"Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d":"Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d","MaleCNS + external engineered motor/tactical layer":"MaleCNS + внешний инженерный адаптер управления",
 	"PLAY AGAIN":"ЕЩЁ РАЗ","OPEN DAY MENU":"В МЕНЮ ДЕМО","A FLY CONTROLS A TANK":"МУХА УПРАВЛЯЕТ ТАНКОМ","REAL MALECNS ACTIVITY":"АКТИВНОСТЬ МОДЕЛИ MALECNS","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT":"СМОЖЕШЬ ПОБЕДИТЬ МУХУ?\nНАЖМИ, ЧТОБЫ СРАЗИТЬСЯ"
 }
@@ -125,31 +125,33 @@ func build_how(root: VBoxContainer):
 	var footer=HBoxContainer.new();root.add_child(footer);button(footer,"START DEMO",func():AppState.start_demo("t34_85"));button(footer,"BACK",AppState.open_day_menu)
 
 func build_result(root: VBoxContainer):
-	var report=AppState.last_report;var human_alive=false;var fly_alive=false;var human_health=0.0;var fly_health=0.0;var shots=0;var hits=0
+	var report=AppState.last_report;var human_alive=false;var fly_alive=false;var shots=0;var hits=0
+	var fatal_vehicle_name="";var fatal_impact={}
 	for state in report.get("vehicles",[]):
-		var working=0
-		for value in state.modules.values():working+=1 if value else 0
-		var health=float(working)/maxf(1.0,float(state.modules.size())) if state.alive else 0.0
-		if int(state.id)==0:human_alive=state.alive;human_health=health;shots=int(state.metrics.shots);hits=int(state.metrics.penetrations)
-		if int(state.id)==8:fly_alive=state.alive;fly_health=health
-	var outcome=result_outcome(human_alive,human_health,fly_alive,fly_health)
+		if int(state.id)==0:human_alive=state.alive;shots=int(state.metrics.shots);hits=int(state.metrics.penetrations)
+		if int(state.id)==8:fly_alive=state.alive
+		if not state.alive and state.impact is Dictionary and not state.impact.is_empty():fatal_vehicle_name=str(state.vehicle);fatal_impact=state.impact
+	var outcome=result_outcome(human_alive,fly_alive)
 	var box=panel(root);box.alignment=BoxContainer.ALIGNMENT_CENTER
 	var outcome_text="YOU DEFEATED THE FLY" if outcome=="human" else ("THE FLY WON" if outcome=="fly" else "DRAW")
 	if str(AppState.settings.language)=="ru":outcome_text="ТЫ ПОБЕДИЛ МУХУ" if outcome=="human" else ("МУХА ПОБЕДИЛА" if outcome=="fly" else "НИЧЬЯ")
 	preview(box,Vector2(520,280));label(box,outcome_text,40)
 	if outcome=="fly":label(box,"Yes. A reconstructed model of the Drosophila nervous system just won this round.",20)
+	if outcome=="draw":label(box,copy_text("Neither vehicle was destroyed; no winner was awarded."),18)
 	var result_stats=("Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d" % [report.get("time",0),shots,hits])
 	if str(AppState.settings.language)=="ru":result_stats=("Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d" % [report.get("time",0),shots,hits])
 	label(box,result_stats,18)
 	label(box,"MaleCNS + external engineered motor/tactical layer",14).modulate=Color("aebcb4")
 	var buttons=HBoxContainer.new();box.add_child(buttons);button(buttons,"PLAY AGAIN",AppState.rerun);button(buttons,"HOW IT WORKS",AppState.show_page.bind("HowItWorks"));button(buttons,"OPEN DAY MENU",AppState.open_day_menu)
+	if not fatal_impact.is_empty():
+		var killcam=load("res://scripts/impact_killcam.gd").new()
+		root.get_parent().get_parent().add_child(killcam)
+		killcam.show_impact({"impact":fatal_impact,"vehicle":fatal_vehicle_name,"fatal":true})
 
-func result_outcome(human_alive: bool,human_health: float,fly_alive: bool,fly_health: float) -> String:
+func result_outcome(human_alive: bool,fly_alive: bool) -> String:
 	if human_alive and not fly_alive:return "human"
 	if fly_alive and not human_alive:return "fly"
-	if not human_alive and not fly_alive:return "draw"
-	if is_equal_approx(human_health,fly_health):return "draw"
-	return "human" if human_health>fly_health else "fly"
+	return "draw"
 
 func _process(delta):
 	if page!="OpenDayMain":return

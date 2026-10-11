@@ -56,11 +56,11 @@ func run():
 	check(idle_command[0]>.5 and idle_command.slice(1,5)==[0.0,0.0,0.0,0.0],"Open Day drives forward without autonomous hull or turret steering")
 	check(firing_command[5]==1.0,"Right mouse button maps to fire action")
 	var result_page=load("res://scripts/app/open_day_page.gd").new()
-	check(result_page.result_outcome(true,1.0,true,1.0)=="draw","Equal surviving vehicles are reported as a draw")
-	check(result_page.result_outcome(true,1.0,false,0.0)=="human" and result_page.result_outcome(false,0.0,true,1.0)=="fly" and result_page.result_outcome(false,0.0,false,0.0)=="draw","Elimination awards the survivor and mutual elimination is a draw")
-	check(result_page.result_outcome(true,.5,true,1.0)=="fly","Survivors are compared by remaining vehicle condition")
+	check(result_page.result_outcome(true,true)=="draw","Surviving vehicles are never scored as a win")
+	check(result_page.result_outcome(true,false)=="human" and result_page.result_outcome(false,true)=="fly" and result_page.result_outcome(false,false)=="draw","A winner requires destruction of the opposing vehicle")
 	result_page.free()
 	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
+	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
 	battle.paused=false;battle.camera_mode=2
 	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
@@ -72,6 +72,9 @@ func run():
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
 	await capture("battle-gunner-scope-1280x720")
+	battle.impact_killcam.show_impact({"vehicle":"T-34-85","shell":"test shell","fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
+	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Fatal impact panel shows the hit and internal damage")
+	await capture("battle-impact-killcam-1280x720")
 	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_demo_hud();await capture("battle-1280x720")

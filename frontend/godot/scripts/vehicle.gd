@@ -327,10 +327,14 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	last_impact.zone=zone
 	last_impact.distance=shell.distance
 	last_impact.damaged=[]
+	var local_start=to_local(point)
+	var local_direction=global_basis.inverse()*shell.velocity.normalized()
+	last_impact.point_local=[local_start.x,local_start.y,local_start.z]
+	last_impact.incoming_local=[local_direction.x,local_direction.y,local_direction.z]
 	if not last_impact.penetrated:return
 	world.vehicles[shell.owner].metrics.penetrations+=1
-	var start=to_local(point)
-	var direction=global_basis.inverse()*shell.velocity.normalized()
+	var start=local_start
+	var direction=local_direction
 	for key in volumes:
 		var relative=volumes[key]-start
 		var depth=relative.dot(direction)

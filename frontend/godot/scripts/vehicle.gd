@@ -21,6 +21,7 @@ var previous_size=0.0
 var looming=0.0
 var cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
 var modules={}
+var module_damage={}
 var volumes={}
 var armour_bodies=[]
 var metrics={"distance_travelled":0.0,"stationary_s":0.0,"reverse_s":0.0,"shots":0,"penetrations":0,"kills":0,"capture_s":0.0,"objective_presence_s":0.0,"contest_s":0.0,"target_switches":0,"target_visible_s":0.0,"chassis_aim_s":0.0,"stuck_recoveries":0}
@@ -59,7 +60,9 @@ func setup(config: Dictionary, index: int, battle):
 	for key in cfg.modules:
 		var xyz=cfg.modules[key]
 		volumes[key]=Vector3(xyz[0],xyz[1],xyz[2])
-	for key in volumes:modules[key]=true
+	for key in volumes:
+		modules[key]=true
+		module_damage[key]=0.0
 	if world.is_demo and index not in [0,8]:
 		model=Node3D.new()
 		model.name="InactiveDemoVehicle_%d" % index
@@ -331,18 +334,36 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	var local_direction=global_basis.inverse()*shell.velocity.normalized()
 	last_impact.point_local=[local_start.x,local_start.y,local_start.z]
 	last_impact.incoming_local=[local_direction.x,local_direction.y,local_direction.z]
-	if not last_impact.penetrated:return
+	if not last_impact.penetrated:
+		last_impact.outcome="ricochet" if last_impact.ricochet else "non_penetration"
+		last_impact.disabled=[]
+		return
 	world.vehicles[shell.owner].metrics.penetrations+=1
 	var start=local_start
 	var direction=local_direction
+	var disabled=[]
+	var damaged=[]
+	var excess=clampf(float(last_impact.capability)/maxf(1.0,float(last_impact.effective)),1.0,2.0)
 	for key in volumes:
 		var relative=volumes[key]-start
 		var depth=relative.dot(direction)
 		if depth<0 or depth>float(cfg.length_m):continue
-		var radius=.4+depth*.16
-		if (relative-direction*depth).length()<radius:
+		var miss_distance=(relative-direction*depth).length()
+		# A narrow penetrator path causes severe local damage; a small widening
+		# spall cone can injure nearby crew and modules without disabling all of them.
+		var direct_radius=.16+depth*.018
+		var spall_radius=.32+depth*.035
+		if miss_distance>spall_radius:continue
+		var severity=clampf(1.45*excess,1.0,2.4) if miss_distance<=direct_radius else .34*(1.0-miss_distance/spall_radius)*excess
+		module_damage[key]=minf(3.0,float(module_damage.get(key,0.0))+severity)
+		if not damaged.has(key):damaged.append(key)
+		var threshold=1.0 if key in ["driver","gunner","commander","loader","radio_operator"] else (1.35 if key=="ammo_rack" else 1.6)
+		if module_damage[key]>=threshold and bool(modules.get(key,true)):
 			modules[key]=false
-			last_impact.damaged.append(key)
+			disabled.append(key)
+	last_impact.damaged=damaged
+	last_impact.disabled=disabled
+	last_impact.outcome="critical" if not disabled.is_empty() else ("minor_damage" if not damaged.is_empty() else "penetration_no_internal_damage")
 	var crew_keys=["driver","gunner","commander","loader","radio_operator"]
 	var crew_total=0
 	var crew_alive=0

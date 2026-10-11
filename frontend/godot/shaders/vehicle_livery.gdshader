@@ -1,5 +1,7 @@
 shader_type spatial;
-render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+// Imported historical vehicle meshes do not all share consistent winding.
+// Keep livery visible on both sides instead of culling whole mis-wound surfaces.
+render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform mat4 mesh_to_model = mat4(1.0);
 uniform vec4 source_tint : source_color = vec4(0.62, 0.64, 0.60, 1.0);

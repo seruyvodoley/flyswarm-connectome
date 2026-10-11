@@ -959,7 +959,8 @@ func step_shells(dt: float):
 					hit.normal,
 					hit.collider.get_meta("zone")
 				)
-				if is_demo and is_instance_valid(impact_killcam):
+				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
+				if shooter!=null and victim.team!=shooter.team and is_instance_valid(impact_killcam):
 					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"shell":s.ammo.get("id","unknown"),"fatal":not victim.alive})
 
 				if is_range and victim.agent_id==8 and int(s.owner)==0:
@@ -2642,6 +2643,7 @@ func reset_range_target():
 
 	for key in target.modules:
 		target.modules[key]=true
+		target.module_damage[key]=0.0
 
 	# Remove destruction-char material override and restore materials embedded
 	# in the GLB.

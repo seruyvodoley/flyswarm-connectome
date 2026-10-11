@@ -72,14 +72,25 @@ func show_impact(event: Dictionary):
 	var shell_name=str(event.get("shell",impact.get("shell","unknown")))
 	var penetrated=bool(impact.get("penetrated",false))
 	var damaged=impact.get("damaged",[])
+	var disabled=impact.get("disabled",[])
 	var damaged_text="Нет внутренних повреждений" if russian else "No internal damage"
 	if damaged is Array and not damaged.is_empty():
 		var readable=[]
 		for module in damaged:readable.append(str(module).replace("_"," "))
 		damaged_text=", ".join(PackedStringArray(readable))
+		if disabled is Array and not disabled.is_empty():
+			var disabled_readable=[]
+			for module in disabled:disabled_readable.append(str(module).replace("_"," "))
+			damaged_text+=(" · выведено из строя: " if russian else " · disabled: ")+", ".join(PackedStringArray(disabled_readable))
 	title.text=("КРИТИЧЕСКОЕ ПОПАДАНИЕ · КИЛЛКАМ" if russian else "FATAL HIT · IMPACT CAM") if bool(event.get("fatal",false)) else ("ПОСЛЕДНЕЕ ПОПАДАНИЕ · КИЛЛКАМ" if russian else "LAST IMPACT · HIT CAM")
 	var result="ПРОБИТИЕ" if penetrated and russian else ("PENETRATED" if penetrated else ("РИКОШЕТ" if russian and bool(impact.get("ricochet",false)) else ("RICOCHET" if bool(impact.get("ricochet",false)) else ("НЕ ПРОБИЛО" if russian else "STOPPED"))))
-	body.text="%s\n%s · %s\n%s: %s\n%s: %.0f / %.0f mm\n%s: %s" % [vehicle_name,shell_name,result,"Зона попадания" if russian else "Hit zone",str(impact.get("zone","unknown")),"Пробитие" if russian else "Penetration",float(impact.get("capability",0.0)),float(impact.get("effective",0.0)),"Повреждено" if russian else "Damaged",damaged_text]
+	var outcome=str(impact.get("outcome",""))
+	var outcome_text=""
+	if penetrated:
+		if outcome=="critical":outcome_text="КРИТИЧЕСКИЙ УРОН" if russian else "CRITICAL DAMAGE"
+		elif outcome=="minor_damage":outcome_text="НЕЗНАЧИТЕЛЬНЫЙ УРОН" if russian else "MINOR DAMAGE"
+		elif outcome=="penetration_no_internal_damage":outcome_text="ПРОБИТИЕ БЕЗ ПОРАЖЕНИЯ МОДУЛЕЙ" if russian else "PENETRATION, NO MODULE HIT"
+	body.text="%s\n%s · %s %s\n%s: %s\n%s: %.0f / %.0f mm\n%s: %s" % [vehicle_name,shell_name,result,outcome_text,"Зона попадания" if russian else "Hit zone",str(impact.get("zone","unknown")),"Пробитие" if russian else "Penetration",float(impact.get("capability",0.0)),float(impact.get("effective",0.0)),"Повреждения" if russian else "Damage",damaged_text]
 	diagram.impact=impact.duplicate(true)
 	diagram.queue_redraw()
 	show()

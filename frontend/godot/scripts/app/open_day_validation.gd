@@ -15,7 +15,7 @@ func capture(name: String):
 
 func run():
 	capture_enabled=DisplayServer.get_name()!="headless"
-	screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/open_day_graphics")
+	screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/performance/open_day_validation")
 	DirAccess.make_dir_recursive_absolute(screenshot_dir)
 	app=root.get_node("AppState")
 	var original_language=app.settings.language

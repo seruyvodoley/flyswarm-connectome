@@ -8,7 +8,7 @@ const PREVIEW_IDS = ["t34_85", "panther_g", "tiger_i"]
 
 var failures := 0
 var capture_enabled := false
-var output_dir := "res://../../artifacts/open_day_final_validation"
+var output_dir := "res://../../artifacts/performance/open_day_vehicle_validation"
 
 func _initialize() -> void:
 	call_deferred("run")
@@ -66,6 +66,8 @@ func _capture_vehicle_switches(preview: VehiclePreview) -> void:
 		if capture_enabled and index in [27, 28, 29]:
 			var viewport := preview.get_child(0) as SubViewport
 			await _frames(15)
+			preview._request_viewport_frame()
+			await RenderingServer.frame_post_draw
 			_save_viewport(viewport, "vehicle-%s.png" % id)
 			if not _has_foreground(viewport.get_texture().get_image(), Color("101817")):
 				_fail("Vehicle preview rendered no visible model for %s" % id)

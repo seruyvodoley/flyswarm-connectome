@@ -16,6 +16,8 @@ var rotation_speed := 0.16
 var load_generation := 0
 var target := Vector3.ZERO
 var model_size := Vector3.ONE
+@export_range(0.0, 60.0, 1.0) var preview_render_hz := 30.0
+var render_elapsed := 0.0
 
 func _ready() -> void:
 	stretch = true
@@ -24,7 +26,9 @@ func _ready() -> void:
 	viewport = SubViewport.new()
 	viewport.size = Vector2i(512, 256)
 	viewport.transparent_bg = false
-	viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+	# UPDATE_ONCE is re-armed at 30 Hz below, which limits the extra preview
+	# render without tying vehicle rotation or the simulation to this cadence.
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if preview_render_hz <= 0.0 else SubViewport.UPDATE_ONCE
 	viewport.world_3d = World3D.new()
 	add_child(viewport)
 	resized.connect(_sync_viewport_size)
@@ -86,6 +90,7 @@ func _replace_deferred(generation: int) -> void:
 	if overrides == 0:
 		push_error("No livery surfaces were applied to %s" % vehicle_id)
 	_fit_camera(preview_model)
+	_request_viewport_frame()
 
 func _fit_camera(model: Node3D) -> void:
 	var bounds := AABB()
@@ -120,6 +125,12 @@ func _fit_camera(model: Node3D) -> void:
 func _sync_viewport_size() -> void:
 	if not is_instance_valid(viewport):return
 	if is_instance_valid(preview_model):_fit_camera(preview_model)
+	_request_viewport_frame()
+
+func _request_viewport_frame() -> void:
+	if not is_instance_valid(viewport) or not is_visible_in_tree():return
+	render_elapsed=0.0
+	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
 
 func _corners(box: AABB) -> Array[Vector3]:
 	var p := box.position
@@ -129,3 +140,16 @@ func _corners(box: AABB) -> Array[Vector3]:
 func _process(delta: float) -> void:
 	if is_instance_valid(turntable):
 		turntable.rotate_y(delta * rotation_speed)
+	if not is_instance_valid(viewport):
+		return
+	if not is_visible_in_tree():
+		render_elapsed = 0.0
+		viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		return
+	if preview_render_hz <= 0.0:
+		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		return
+	render_elapsed += delta
+	if render_elapsed >= 1.0 / preview_render_hz:
+		render_elapsed = fmod(render_elapsed, 1.0 / preview_render_hz)
+		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE

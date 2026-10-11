@@ -1,6 +1,6 @@
 config_version=5
 [application]
-config/name="FlySwarm • Krasny Valley"
+config/name="FlySwarm"
 run/main_scene="res://scenes/Bootstrap.tscn"
 [autoload]
 AppState="*res://scripts/app/app_state.gd"
@@ -15,6 +15,7 @@ window/size/window_height_override=800
 renderer/rendering_method="mobile"
 rendering_device/driver.macos="metal"
 textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
 lights_and_shadows/directional_shadow/size=2048
 [physics]
 common/physics_ticks_per_second=50

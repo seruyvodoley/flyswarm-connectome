@@ -8,13 +8,16 @@ own children. Missing Python does not prevent Rule AI or the manual range.
 `frontend/godot/export_presets.cfg` provides a universal macOS frontend preset.
 `python tools/package_macos.py` prepares an isolated export staging directory,
 including only small vehicle/gun/armour/scenario JSON and original GLBs. It
-excludes MaleCNS data, caches and local references. `--export` additionally runs
-Godot's exporter, requiring matching macOS export templates. Output is an
-unsigned frontend archive in build/FlySwarm.zip; signing/notarization is not done.
+excludes MaleCNS data, caches and local references. `--export` runs Godot's
+exporter and writes `build/FlySwarm.zip`; matching macOS export templates must
+be installed. The archive currently contains only an unsigned universal Godot
+frontend app with the FlySwarm icon.
 
-No finished standalone distributable is claimed. Python, scipy/numpy/flybrain
-and the MaleCNS dataset are NOT bundled. Exported Rule AI/range can read embedded
-JSON; neural modes need a configured external FLYSWARM_ROOT and FLYSWARM_PYTHON.
-Exported user sessions/settings go to user://, not into the application bundle.
-A future signed release needs a relocatable backend runtime, dependency licenses,
-dataset provisioning UX and native package testing.
+This archive is not a standalone distributable. Python, scipy/numpy/flybrain,
+the research job runner and MaleCNS dataset are not bundled. Neural modes rely
+on repository-relative paths and a configured external `FLYSWARM_ROOT` and
+`FLYSWARM_PYTHON`; a moved exported app cannot start them. Exported user
+sessions/settings go to `user://`, not into the application bundle. A release
+still requires a relocatable backend runtime, a user-facing dataset setup flow,
+an arm64 DMG and ZIP, checksums, and a clean installed-app test. The current
+local export is unsigned and not notarized.

@@ -1,0 +1,81 @@
+{
+  "backend_state": "READY",
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 2517.0,
+    "mean": 2452.19472361809,
+    "p99": 2516.0
+  },
+  "frame_ms": {
+    "max": 271.45,
+    "mean": 12.5575100502513,
+    "p99": 30.097
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "male_cns": "real FlyBrain(batch=1)",
+  "male_cns_tick_count": 233,
+  "male_cns_tick_ms": 91.9344170251861,
+  "mode": "battle-brain",
+  "physics_ms": {
+    "max": 28.56,
+    "mean": 8.60031407035184,
+    "p99": 28.56
+  },
+  "presentation_fps": 79.5664468293721,
+  "process_ms": {
+    "max": 77.859,
+    "mean": 23.7505577889445,
+    "p99": 77.859
+  },
+  "rendered_objects": {
+    "max": 2893.0,
+    "mean": 2826.95854271357,
+    "p99": 2892.0
+  },
+  "rendered_primitives": {
+    "max": 5019838.0,
+    "mean": 4988381.38693467,
+    "p99": 5019416.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 10.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sampled_frames": 796,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "static_memory_bytes": {
+    "max": 319225487.0,
+    "mean": 318105630.128141,
+    "p99": 319225307.0
+  },
+  "subviewport_count": 0,
+  "video_memory_bytes": {
+    "max": 227622912.0,
+    "mean": 226535475.457286,
+    "p99": 227622912.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

@@ -14,7 +14,7 @@ TASK_ACTION=${1:-run-demo}
 if [ "$#" -gt 0 ]; then shift; fi
 # A fresh checkout has GLBs but no local Godot import cache.
 case "$TASK_ACTION" in
- run-demo|run-open-day|run-battle|run-training|run-tests|run-ballistics-test|headless)
+ run-demo|run-open-day|run-battle|run-training|run-tests|run-ballistics-test|run-profile|headless)
   if [ ! -d frontend/godot/.godot/imported ]; then
    "$TASK_GODOT" --headless --editor --path frontend/godot --import
   fi ;;
@@ -27,6 +27,7 @@ case "$TASK_ACTION" in
  run-training) exec "$TASK_PYTHON" tools/training_smoke.py --godot "$TASK_GODOT" "$@" ;;
  run-tests) "$TASK_PYTHON" -m unittest discover -s tests -v; exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;
  run-ballistics-test) exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;
+ run-profile) exec "$TASK_GODOT" --path frontend/godot --script res://scripts/app/performance_profile.gd -- "$@" ;;
  headless) exec "$TASK_GODOT" --headless --path frontend/godot -- --legacy-battle "$@" ;;
  *) echo "Unknown command: $TASK_ACTION" >&2; exit 2 ;;
 esac

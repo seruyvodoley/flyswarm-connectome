@@ -12,7 +12,7 @@ func wait_battle() -> bool:
 		await create_timer(.1).timeout
 	return false
 func run():
-	screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/open_day_graphics")
+	screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/performance/open_day_real_validation")
 	DirAccess.make_dir_recursive_absolute(screenshot_dir)
 	app=root.get_node("AppState");app.configure_demo("t34_85");app.session.seconds=1.0;app.launch()
 	check(await wait_battle(),"Real Open Day battle starts")

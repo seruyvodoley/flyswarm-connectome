@@ -6,6 +6,8 @@ var orientation_correction: Node3D
 var preview_camera: Camera3D
 var fit_bounds=AABB()
 var viewport: SubViewport
+@export_range(0.0, 60.0, 1.0) var preview_render_hz := 30.0
+var render_elapsed := 0.0
 
 func _ready():
 	stretch=true
@@ -13,7 +15,10 @@ func _ready():
 	viewport=SubViewport.new()
 	viewport.size=Vector2i(512,288)
 	viewport.transparent_bg=false
-	viewport.render_target_update_mode=SubViewport.UPDATE_WHEN_VISIBLE
+	# Keep the imported model's animation smooth in the UI while avoiding a
+	# second full scene render on every game frame. UPDATE_ONCE is re-armed by
+	# _process() at a fixed 30 Hz and hidden menus do no offscreen work.
+	viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS if preview_render_hz<=0.0 else SubViewport.UPDATE_ONCE
 	viewport.world_3d=World3D.new()
 	add_child(viewport)
 	resized.connect(_sync_viewport_size)
@@ -38,6 +43,7 @@ func _ready():
 	var fly_model=fly_scene.instantiate() as Node3D
 	orientation_correction.add_child(fly_model)
 	fit_model_to_preview(fly_model,3.2,orientation_correction.transform)
+	_request_viewport_frame()
 	_sync_viewport_size()
 
 func fit_model_to_preview(model: Node3D,target_length: float,orientation: Transform3D=Transform3D.IDENTITY):
@@ -72,5 +78,22 @@ func set_yaw_degrees(angle: float) -> void:
 func get_yaw_axis() -> Vector3:
 	return fly_root.global_basis.y.normalized() if is_instance_valid(fly_root) else Vector3.ZERO
 
+func _request_viewport_frame() -> void:
+	if not is_instance_valid(viewport) or not is_visible_in_tree():return
+	render_elapsed=0.0
+	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
+
 func _process(delta):
 	if is_instance_valid(fly_root):fly_root.rotate_y(delta*rotation_speed)
+	if not is_instance_valid(viewport):return
+	if not is_visible_in_tree():
+		render_elapsed=0.0
+		viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
+		return
+	if preview_render_hz<=0.0:
+		viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
+		return
+	render_elapsed+=delta
+	if render_elapsed>=1.0/preview_render_hz:
+		render_elapsed=fmod(render_elapsed,1.0/preview_render_hz)
+		viewport.render_target_update_mode=SubViewport.UPDATE_ONCE

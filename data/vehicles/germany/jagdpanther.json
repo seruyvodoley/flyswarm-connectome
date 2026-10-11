@@ -12,7 +12,10 @@
     "track_width_m": 0.55,
     "traction": 0.65,
     "rolling_resistance": 0.055,
-    "turn_rate_deg_s": 26,
+    "turn_rate_deg_s": 22,
+    "hull_yaw_accel_deg_s2": 18,
+    "drive_accel_m_s2": 1.45,
+    "throttle_response_s": 0.5,
     "steering_loss": 0.45,
     "brake_m_s2": 3.5,
     "neutral_steering": true,
@@ -25,7 +28,10 @@
       1.0
     ],
     "reload_s": 10,
-    "turret_rate_deg_s": 7,
+    "turret_rate_deg_s": 5.6,
+    "turret_accel_deg_s2": 38,
+    "gun_rate_deg_s": 2.8,
+    "gun_accel_deg_s2": 8,
     "elevation_deg": [
       -8,
       14
@@ -109,6 +115,42 @@
     }
   },
   "provenance": {
+    "hull_yaw_accel_deg_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned response time; no verified historical acceleration curve."
+    },
+    "drive_accel_m_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Cap on engine-derived acceleration; terrain and power still apply."
+    },
+    "throttle_response_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned drivetrain response; not a measured historical value."
+    },
+    "turret_accel_deg_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned traverse acceleration; not a measured historical value."
+    },
+    "gun_rate_deg_s": {
+      "kind": "game_reference",
+      "confidence": "low",
+      "source": "https://wiki.warthunder.com/unit/germ_panzerjager_panther",
+      "note": "Reference vertical guidance speed for basic crew; variant and game settings may differ."
+    },
+    "gun_accel_deg_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned vertical guidance acceleration; not a measured historical value."
+    },
     "mass_kg": {
       "kind": "historically_sourced",
       "confidence": "medium",
@@ -194,10 +236,10 @@
       "note": "Provisional simulation parameter; not a verified engineering specification."
     },
     "turret_rate_deg_s": {
-      "kind": "approximation",
-      "confidence": "low",
-      "source": "docs/known_approximations.md",
-      "note": "Provisional simulation parameter; not a verified engineering specification."
+      "kind": "game_reference",
+      "confidence": "medium",
+      "source": "https://wiki.warthunder.com/unit/germ_panzerjager_panther",
+      "note": "Main-gun horizontal guidance, basic crew/reference configuration; game values vary with mode and crew."
     },
     "elevation_deg": {
       "kind": "approximation",

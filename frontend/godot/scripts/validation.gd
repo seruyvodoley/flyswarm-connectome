@@ -135,9 +135,18 @@ func run():
 	for v in scene.vehicles:
 		v.position=Vector3(0,100,0)
 		v.rotation=Vector3.ZERO
+		v.speed=0.0
+		v.yaw_rate=0.0
+		v.turret_rate=0.0
+		v.gun_rate=0.0
+		v.drive_throttle=0.0
 		v.cmd=[1,0,1,1,1,0]
 		v.step(.1)
 		check(v.speed>0,"accelerates "+v.cfg.id)
+		check(v.speed<=float(v.cfg.drive_accel_m_s2)*.1+.001,"bounded initial acceleration "+v.cfg.id)
+		check(absf(v.yaw_rate)<=deg_to_rad(float(v.cfg.hull_yaw_accel_deg_s2))*.1+.0001,"bounded initial hull yaw "+v.cfg.id)
+		check(absf(v.turret_rate)<=deg_to_rad(float(v.cfg.turret_accel_deg_s2))*.1+.0001,"bounded initial traverse "+v.cfg.id)
+		check(absf(v.gun_rate)<=deg_to_rad(float(v.cfg.gun_accel_deg_s2))*.1+.0001,"bounded initial elevation "+v.cfg.id)
 		if not v.cfg.turreted:check(absf(v.turret_angle)<=deg_to_rad(v.cfg.traverse_limit_deg),"casemate limit")
 		var shell={"ammo":Catalog.read_json("ammunition/pak43_ap.json"),"distance":100.0,"velocity":Vector3.FORWARD*1000,"owner":8 if v.team==0 else 0}
 		v.rotation=Vector3.ZERO

@@ -12,7 +12,10 @@
     "track_width_m": 0.55,
     "traction": 0.65,
     "rolling_resistance": 0.055,
-    "turn_rate_deg_s": 26,
+    "turn_rate_deg_s": 17,
+    "hull_yaw_accel_deg_s2": 13,
+    "drive_accel_m_s2": 1,
+    "throttle_response_s": 0.65,
     "steering_loss": 0.45,
     "brake_m_s2": 3.5,
     "neutral_steering": false,
@@ -25,7 +28,10 @@
       1.0
     ],
     "reload_s": 24,
-    "turret_rate_deg_s": 13,
+    "turret_rate_deg_s": 9.8,
+    "turret_accel_deg_s2": 27,
+    "gun_rate_deg_s": 2.8,
+    "gun_accel_deg_s2": 7,
     "elevation_deg": [
       -3,
       20
@@ -104,6 +110,42 @@
     }
   },
   "provenance": {
+    "hull_yaw_accel_deg_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned response time; no verified historical acceleration curve."
+    },
+    "drive_accel_m_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Cap on engine-derived acceleration; terrain and power still apply."
+    },
+    "throttle_response_s": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned drivetrain response; not a measured historical value."
+    },
+    "turret_accel_deg_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned traverse acceleration; not a measured historical value."
+    },
+    "gun_rate_deg_s": {
+      "kind": "game_reference",
+      "confidence": "low",
+      "source": "https://wiki.warthunder.com/unit/ussr_is_2_1944",
+      "note": "Reference vertical guidance speed for basic crew; variant and game settings may differ."
+    },
+    "gun_accel_deg_s2": {
+      "kind": "approximation",
+      "confidence": "low",
+      "source": "docs/known_approximations.md",
+      "note": "Tuned vertical guidance acceleration; not a measured historical value."
+    },
     "mass_kg": {
       "kind": "approximation",
       "confidence": "low",
@@ -189,10 +231,10 @@
       "note": "Provisional simulation parameter; not a verified engineering specification."
     },
     "turret_rate_deg_s": {
-      "kind": "approximation",
-      "confidence": "low",
-      "source": "docs/known_approximations.md",
-      "note": "Provisional simulation parameter; not a verified engineering specification."
+      "kind": "game_reference",
+      "confidence": "medium",
+      "source": "https://wiki.warthunder.com/unit/ussr_is_2_1944",
+      "note": "Main-gun horizontal guidance, basic crew/reference configuration; game values vary with mode and crew."
     },
     "elevation_deg": {
       "kind": "approximation",

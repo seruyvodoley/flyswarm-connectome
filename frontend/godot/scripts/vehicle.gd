@@ -9,6 +9,14 @@ var speed=0.0
 var yaw_rate=0.0
 var turret_angle=0.0
 var gun_angle=0.0
+var turret_rate=0.0
+var gun_rate=0.0
+var drive_throttle=0.0
+var manual_aim=false
+var manual_turret_target=0.0
+var manual_gun_target=0.0
+var manual_hull_target=0.0
+var manual_hull_aim=false
 var reload_left=0.0
 var ammo_left=0
 var alive=true
@@ -246,6 +254,14 @@ func step(dt: float):
 	var requested_throttle=float(cmd[0])
 	var throttle=requested_throttle
 	var steer=float(cmd[2])
+	if manual_hull_aim:
+		var hull_error=wrapf(manual_hull_target-rotation.y,-PI,PI)
+		var pivot_at_speed=1.0 if cfg.neutral_steering else clampf(absf(speed)/2,.15,1)
+		var hull_max=deg_to_rad(float(cfg.turn_rate_deg_s))*pivot_at_speed/(1.0+absf(speed)*.08)
+		var hull_accel=deg_to_rad(float(cfg.hull_yaw_accel_deg_s2))
+		var hull_stop_rate=sqrt(2.0*hull_accel*absf(hull_error))
+		steer=clampf(signf(hull_error)*minf(hull_max,hull_stop_rate)/maxf(.01,hull_max),-1.0,1.0)
+		if absf(hull_error)<.001 and absf(yaw_rate)<.002:steer=0.0
 	var mechanically_mobile=bool(modules.engine and modules.track_left and modules.track_right)
 	if not mechanically_mobile:
 		throttle=0;steer=0;speed=0
@@ -267,9 +283,10 @@ func step(dt: float):
 
 	var slope=(world.terrain.height_at(position.x+sin(rotation.y)*3,position.z+cos(rotation.y)*3)-world.terrain.height_at(position.x,position.z))/3
 	contact_state=world.tracks.contact(self,dt)
-	var power_acc=minf(minf(float(cfg.traction),contact_state.grip)*9.81,float(cfg.engine_kw)*1000*.7/(float(cfg.mass_kg)*maxf(2,absf(speed))))
+	drive_throttle=move_toward(drive_throttle,throttle,dt/maxf(.05,float(cfg.throttle_response_s)))
+	var power_acc=minf(minf(minf(float(cfg.traction),contact_state.grip)*9.81,float(cfg.engine_kw)*1000*.7/(float(cfg.mass_kg)*maxf(2,absf(speed)))),float(cfg.drive_accel_m_s2))
 	if not modules.transmission: power_acc*=.2
-	var accel=throttle*power_acc-slope*9.81
+	var accel=drive_throttle*power_acc-slope*9.81
 	if absf(speed)>.05: accel-=signf(speed)*float(contact_state.resistance)*9.81
 	if absf(throttle)<.01 or cmd[1]>.5: speed=move_toward(speed,0,float(cfg.brake_m_s2)*dt)
 	else: speed+=accel*dt
@@ -278,8 +295,17 @@ func step(dt: float):
 	speed=clampf(speed,-float(cfg.reverse_kph)/3.6,limit)
 	speed*=1-absf(steer)*float(cfg.steering_loss)*dt
 	var pivot=1.0 if cfg.neutral_steering else clampf(absf(speed)/2,.15,1)
-	yaw_rate=steer*deg_to_rad(cfg.turn_rate_deg_s)*pivot/(1+absf(speed)*.08)
-	rotation.y+=yaw_rate*dt
+	var desired_yaw_rate=steer*deg_to_rad(cfg.turn_rate_deg_s)*pivot/(1+absf(speed)*.08)
+	yaw_rate=move_toward(yaw_rate,desired_yaw_rate,deg_to_rad(float(cfg.hull_yaw_accel_deg_s2))*dt) if mechanically_mobile else 0.0
+	if manual_hull_aim:
+		var remaining_hull=wrapf(manual_hull_target-rotation.y,-PI,PI)
+		if signf(yaw_rate)==signf(remaining_hull) and absf(yaw_rate*dt)>=absf(remaining_hull):
+			rotation.y=manual_hull_target
+			yaw_rate=0.0
+		else:
+			rotation.y=wrapf(rotation.y+yaw_rate*dt,-PI,PI)
+	else:
+		rotation.y+=yaw_rate*dt
 	velocity=Vector3(sin(rotation.y)*speed,-9.81,cos(rotation.y)*speed)
 	move_and_slide()
 	position.x=clampf(position.x,-world.terrain.extent+8,world.terrain.extent-8)
@@ -302,10 +328,38 @@ func step(dt: float):
 			stuck_intent_s=0.0
 
 	var traverse_factor=1.0 if modules.turret_drive else .1
+	var turret_max=deg_to_rad(float(cfg.turret_rate_deg_s))*traverse_factor
+	var gun_max=deg_to_rad(float(cfg.gun_rate_deg_s))*traverse_factor
+	var desired_turret_rate=0.0
+	var desired_gun_rate=0.0
+	if not modules.gunner:
+		turret_rate=0.0
+		gun_rate=0.0
 	if modules.gunner:
-		turret_angle+=float(cmd[3])*deg_to_rad(cfg.turret_rate_deg_s)*dt*traverse_factor
-		turret_angle=wrapf(turret_angle,-PI,PI) if cfg.turreted else clampf(turret_angle,-deg_to_rad(cfg.traverse_limit_deg),deg_to_rad(cfg.traverse_limit_deg))
-		gun_angle=clampf(gun_angle+float(cmd[4])*.12*dt,deg_to_rad(cfg.elevation_deg[0]),deg_to_rad(cfg.elevation_deg[1]))
+		if manual_aim:
+			var turret_error=wrapf(manual_turret_target-turret_angle,-PI,PI) if cfg.turreted else manual_turret_target-turret_angle
+			var gun_error=manual_gun_target-gun_angle
+			desired_turret_rate=signf(turret_error)*minf(turret_max,sqrt(2.0*deg_to_rad(float(cfg.turret_accel_deg_s2))*traverse_factor*absf(turret_error)))
+			desired_gun_rate=signf(gun_error)*minf(gun_max,sqrt(2.0*deg_to_rad(float(cfg.gun_accel_deg_s2))*traverse_factor*absf(gun_error)))
+		else:
+			desired_turret_rate=clampf(float(cmd[3]),-1,1)*turret_max
+			desired_gun_rate=clampf(float(cmd[4]),-1,1)*gun_max
+	turret_rate=move_toward(turret_rate,desired_turret_rate,deg_to_rad(float(cfg.turret_accel_deg_s2))*traverse_factor*dt)
+	gun_rate=move_toward(gun_rate,desired_gun_rate,deg_to_rad(float(cfg.gun_accel_deg_s2))*traverse_factor*dt)
+	if manual_aim and modules.gunner:
+		var remaining=wrapf(manual_turret_target-turret_angle,-PI,PI) if cfg.turreted else manual_turret_target-turret_angle
+		turret_angle+=clampf(turret_rate*dt,-absf(remaining),absf(remaining))
+		if absf(remaining)<=absf(turret_rate*dt):turret_rate=0.0
+		remaining=manual_gun_target-gun_angle
+		gun_angle+=clampf(gun_rate*dt,-absf(remaining),absf(remaining))
+		if absf(remaining)<=absf(gun_rate*dt):gun_rate=0.0
+	else:
+		turret_angle+=turret_rate*dt
+		gun_angle+=gun_rate*dt
+	turret_angle=wrapf(turret_angle,-PI,PI) if cfg.turreted else clampf(turret_angle,-deg_to_rad(cfg.traverse_limit_deg),deg_to_rad(cfg.traverse_limit_deg))
+	gun_angle=clampf(gun_angle,deg_to_rad(cfg.elevation_deg[0]),deg_to_rad(cfg.elevation_deg[1]))
+	if not cfg.turreted and absf(turret_angle)>=deg_to_rad(cfg.traverse_limit_deg)-.0001:turret_rate=0.0
+	if gun_angle<=deg_to_rad(cfg.elevation_deg[0])+.0001 or gun_angle>=deg_to_rad(cfg.elevation_deg[1])-.0001:gun_rate=0.0
 	if turret: turret.rotation.y=turret_angle
 	if gun: gun.rotation.x=-gun_angle
 	get_node("ArmourTurretPivot").rotation.y=turret_angle if cfg.turreted else 0
@@ -407,6 +461,9 @@ func destroy_vehicle(killer_id: int):
 	speed=0.0
 	velocity=Vector3.ZERO
 	yaw_rate=0.0
+	turret_rate=0.0
+	gun_rate=0.0
+	drive_throttle=0.0
 	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
 	stuck_intent_s=0.0
 	recovery_left_s=0.0
@@ -429,6 +486,11 @@ func reset_destroyed_state():
 	speed=0.0
 	velocity=Vector3.ZERO
 	yaw_rate=0.0
+	turret_rate=0.0
+	gun_rate=0.0
+	drive_throttle=0.0
+	manual_aim=false
+	manual_hull_aim=false
 	reload_left=0.0
 	last_impact={}
 	stuck_intent_s=0.0

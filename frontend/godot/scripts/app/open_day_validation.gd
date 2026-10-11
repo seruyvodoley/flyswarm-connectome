@@ -70,10 +70,15 @@ func run():
 	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Second RMB returns to the previous camera")
 	battle.camera_mode=2
 	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
-	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle<original_turret and vehicle.gun_angle>original_gun,"Mouse right turns the turret right, mouse up raises the gun, and free aim leaves hull heading unchanged")
+	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun and vehicle.manual_turret_target<original_turret and vehicle.manual_gun_target>original_gun,"Mouse aim changes target angles without teleporting the turret or gun")
+	vehicle.cmd=battle.demo_command(false)
+	vehicle.step(.1)
+	check(vehicle.turret_angle<original_turret and vehicle.turret_angle>vehicle.manual_turret_target and vehicle.gun_angle>original_gun and vehicle.gun_angle<vehicle.manual_gun_target,"Turret and gun advance toward the target at bounded speed")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(30,0),true)
-	check(vehicle.rotation.y<original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Mouse right with middle button turns the hull right without changing gun aim")
+	check(vehicle.rotation.y==original_yaw and vehicle.manual_hull_target<original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Middle drag changes only the desired hull heading")
+	vehicle.step(.1)
+	check(vehicle.rotation.y<original_yaw and vehicle.rotation.y>vehicle.manual_hull_target,"Hull slews toward requested heading without teleporting")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_camera_button();battle.demo_set_sniper_mode(true);await process_frame
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
@@ -81,7 +86,7 @@ func run():
 	battle.impact_killcam.show_impact({"vehicle":"T-34-85","shell":"test shell","fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Fatal impact panel shows the hit and internal damage")
 	await capture("battle-impact-killcam-1280x720")
-	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;battle.camera_mode=1;battle.paused=true
+	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;vehicle.manual_aim=false;vehicle.manual_hull_aim=false;vehicle.turret_rate=0.0;vehicle.gun_rate=0.0;vehicle.yaw_rate=0.0;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_demo_hud();await capture("battle-1280x720")
 	# Exercise the Open Day scheduler with no live socket: fixed physics must

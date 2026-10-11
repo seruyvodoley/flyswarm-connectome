@@ -676,19 +676,23 @@ func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
 	if not is_demo or vehicles.is_empty() or paused:return
 	var vehicle=vehicles[0]
 	if hull_turning:
-		# Middle-button drag is the only mouse gesture that rotates the hull.
-		# With the vehicle facing +Z, positive Godot yaw turns its nose left on
-		# screen. Negate horizontal mouse delta so dragging right turns right.
-		vehicle.rotation.y=wrapf(vehicle.rotation.y-relative.x*.004,-PI,PI)
+		# Mouse sets a desired heading; the tracks and steering mechanism slew
+		# the hull toward it in Vehicle.step instead of teleporting its angle.
+		if not vehicle.manual_hull_aim:
+			vehicle.manual_hull_target=vehicle.rotation.y
+			vehicle.manual_hull_aim=true
+		vehicle.manual_hull_target=wrapf(vehicle.manual_hull_target-relative.x*.004,-PI,PI)
 		return
-	# In the gunner view the camera follows the gun, so the center reticle stays
-	# on the bore. Mouse delta changes the gun directly instead of ray-casting
-	# from that same moving camera (which caused an aim feedback loop). The same
-	# direct mouse aim works in follow view, with no cursor-target auto tracking.
+	# The reticle follows the actual bore while mouse motion moves only the
+	# desired angle. This leaves visible aim lag in the gunner view.
+	if not vehicle.manual_aim:
+		vehicle.manual_aim=true
+		vehicle.manual_turret_target=vehicle.turret_angle
+		vehicle.manual_gun_target=vehicle.gun_angle
 	var sensitivity=.00085 if camera_mode==2 and demo_sniper_mode else .0032
 	var yaw_delta=-relative.x*sensitivity
-	vehicle.turret_angle=wrapf(vehicle.turret_angle+yaw_delta,-PI,PI) if vehicle.cfg.turreted else clampf(vehicle.turret_angle+yaw_delta,-deg_to_rad(vehicle.cfg.traverse_limit_deg),deg_to_rad(vehicle.cfg.traverse_limit_deg))
-	vehicle.gun_angle=clampf(vehicle.gun_angle-relative.y*sensitivity,deg_to_rad(vehicle.cfg.elevation_deg[0]),deg_to_rad(vehicle.cfg.elevation_deg[1]))
+	vehicle.manual_turret_target=wrapf(vehicle.manual_turret_target+yaw_delta,-PI,PI) if vehicle.cfg.turreted else clampf(vehicle.manual_turret_target+yaw_delta,-deg_to_rad(vehicle.cfg.traverse_limit_deg),deg_to_rad(vehicle.cfg.traverse_limit_deg))
+	vehicle.manual_gun_target=clampf(vehicle.manual_gun_target-relative.y*sensitivity,deg_to_rad(vehicle.cfg.elevation_deg[0]),deg_to_rad(vehicle.cfg.elevation_deg[1]))
 
 func demo_set_sniper_mode(enabled: bool):
 	if enabled and not demo_sniper_mode:
@@ -1988,8 +1992,13 @@ func _unhandled_input(event):
 	if is_demo and event is InputEventMouseMotion:
 		demo_apply_mouse_motion(event.relative,Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE))
 	if is_range and not paused and event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-		vehicles[0].turret_angle+=event.relative.x*.003
-		vehicles[0].gun_angle-=event.relative.y*.002
+		var range_vehicle=vehicles[0]
+		if not range_vehicle.manual_aim:
+			range_vehicle.manual_aim=true
+			range_vehicle.manual_turret_target=range_vehicle.turret_angle
+			range_vehicle.manual_gun_target=range_vehicle.gun_angle
+		range_vehicle.manual_turret_target=wrapf(range_vehicle.manual_turret_target+event.relative.x*.003,-PI,PI) if range_vehicle.cfg.turreted else clampf(range_vehicle.manual_turret_target+event.relative.x*.003,-deg_to_rad(range_vehicle.cfg.traverse_limit_deg),deg_to_rad(range_vehicle.cfg.traverse_limit_deg))
+		range_vehicle.manual_gun_target=clampf(range_vehicle.manual_gun_target-event.relative.y*.002,deg_to_rad(range_vehicle.cfg.elevation_deg[0]),deg_to_rad(range_vehicle.cfg.elevation_deg[1]))
 	if camera_mode==3:
 		if Input.is_physical_key_pressed(KEY_LEFT):camera.rotate_y(.035)
 		if Input.is_physical_key_pressed(KEY_RIGHT):camera.rotate_y(-.035)
@@ -2708,6 +2717,7 @@ func manual_commands() -> Array:
 	var steer=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
 	var turn=float(Input.is_physical_key_pressed(KEY_E))-float(Input.is_physical_key_pressed(KEY_Q))
 	var elevate=float(Input.is_physical_key_pressed(KEY_R))-float(Input.is_physical_key_pressed(KEY_F))
+	if absf(turn)+absf(elevate)>0.0:vehicles[0].manual_aim=false
 	var fire=float(Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	if session_config!=null and session_config.range_mode in ["free","mobility"]:fire=0
 	return [drive,0,steer,turn,elevate,fire]

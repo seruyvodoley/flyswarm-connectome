@@ -20,7 +20,7 @@ def run(args: list[str], *, cwd: Path = ROOT) -> None:
 
 
 def licenses(destination: Path) -> None:
-    names = ["flybrain", "numpy", "scipy", "numba", "llvmlite", "pettingzoo", "gymnasium", "stable-baselines3", "torch"]
+    names = ["flybrain", "numpy", "scipy", "numba", "llvmlite", "pettingzoo", "gymnasium", "stable-baselines3", "torch", "matplotlib"]
     sections = []
     for package in names:
         dist = importlib.metadata.distribution(package)

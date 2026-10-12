@@ -73,7 +73,7 @@ def remove_macos_metadata(root: Path) -> None:
 
 
 def add_third_party_licenses(destination: Path) -> None:
-    packages = ["flybrain", "numpy", "scipy", "numba", "llvmlite", "pettingzoo", "gymnasium", "stable-baselines3", "torch"]
+    packages = ["flybrain", "numpy", "scipy", "numba", "llvmlite", "pettingzoo", "gymnasium", "stable-baselines3", "torch", "matplotlib"]
     sections: list[str] = []
     for package in packages:
         distribution = importlib.metadata.distribution(package)

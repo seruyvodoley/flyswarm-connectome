@@ -89,12 +89,16 @@ def main() -> None:
         f'''[Setup]\nAppId=FlySwarm-Research-Platform\nAppName=FlySwarm\nAppVersion={args.version}\nDefaultDirName={{autopf}}\\FlySwarm\nDefaultGroupName=FlySwarm\nOutputDir={out.as_posix()}\nOutputBaseFilename=FlySwarm-{args.version}-windows-x64-setup\nArchitecturesInstallIn64BitMode=x64\nCompression=lzma2\nSolidCompression=yes\nPrivilegesRequired=lowest\n\n[Files]\nSource: "{(packaged / '*').as_posix()}"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs\n\n[Icons]\nName: "{{group}}\\FlySwarm"; Filename: "{{app}}\\FlySwarm.exe"\nName: "{{autodesktop}}\\FlySwarm"; Filename: "{{app}}\\FlySwarm.exe"; Tasks: desktopicon\n\n[Tasks]\nName: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked\n''', encoding="utf-8")
     run(["iscc", str(out / "FlySwarm.iss")])
     installer = out / f"FlySwarm-{args.version}-windows-x64-setup.exe"
-    digest = hashlib.sha256(installer.read_bytes()).hexdigest()
-    (out / "SHA256SUMS-windows.txt").write_text(f"{digest}  {installer.name}\n", encoding="utf-8")
-    with zipfile.ZipFile(out / f"FlySwarm-{args.version}-windows-x64.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+    portable_zip = out / f"FlySwarm-{args.version}-windows-x64.zip"
+    with zipfile.ZipFile(portable_zip, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in packaged.rglob("*"):
             if path.is_file():
                 archive.write(path, path.relative_to(out))
+    checksum_lines = []
+    for artifact in (installer, portable_zip):
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        checksum_lines.append(f"{digest}  {artifact.name}")
+    (out / "SHA256SUMS-windows.txt").write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
     print(f"WINDOWS_INSTALLER {installer}")
 
 

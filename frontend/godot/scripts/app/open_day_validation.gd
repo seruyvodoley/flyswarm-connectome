@@ -131,8 +131,8 @@ func run():
 	vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun
 	battle.requires_brain=false;battle.paused=false;battle.demo_intro_left=3.0;battle.mouse_fire_pending=false
 	var shots_before=int(vehicle.metrics.shots)
-	var lmb=InputEventMouseButton.new();lmb.button_index=MOUSE_BUTTON_LEFT;lmb.pressed=true
-	battle._unhandled_input(lmb)
+	var lmb=InputEventMouseButton.new();lmb.button_index=MOUSE_BUTTON_LEFT;lmb.pressed=true;lmb.position=battle.get_viewport().get_visible_rect().size*.5
+	battle._input(lmb)
 	check(battle.demo_intro_left==0.0 and battle.mouse_fire_pending,"First Open Day click skips intro and queues a shot")
 	battle._physics_process(.02)
 	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Queued Open Day click fires exactly one round")

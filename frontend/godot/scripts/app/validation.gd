@@ -56,7 +56,7 @@ func run():
 	range_tiger.modules.gunner=true;range_tiger.modules.breech=true;range_tiger.ammo_left=20;range_tiger.reload_left=0.0
 	var range_shots_before=int(range_tiger.metrics.shots)
 	var range_lmb=InputEventMouseButton.new();range_lmb.button_index=MOUSE_BUTTON_LEFT;range_lmb.pressed=true
-	app.battle._unhandled_input(range_lmb)
+	app.battle._input(range_lmb)
 	check(app.battle.mouse_fire_pending and app.battle.manual_commands()[5]>.5,"Range queues a short LMB click")
 	app.battle._physics_process(.02)
 	check(int(range_tiger.metrics.shots)==range_shots_before+1 and not app.battle.mouse_fire_pending,"Range click fires exactly one round")

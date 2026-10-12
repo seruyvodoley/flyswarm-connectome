@@ -1967,9 +1967,6 @@ func _process(dt):
 		get_viewport().get_texture().get_image().save_png(screenshot_path)
 		screenshot_path=""
 func _unhandled_input(event):
-	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
-		if (is_demo or is_range) and camera_mode in [1,2] and not paused and not (is_range and range_killcam_active):
-			mouse_fire_pending=true
 	if is_demo and event is InputEventMouseButton and event.pressed:
 		if event.button_index==MOUSE_BUTTON_RIGHT:
 			demo_toggle_sniper_scope()
@@ -2029,6 +2026,18 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_RIGHT):camera.rotate_y(-.035)
 		if Input.is_physical_key_pressed(KEY_UP):camera.rotate_object_local(Vector3.RIGHT,.035)
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
+
+func _input(event):
+	if not (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed):return
+	if is_demo and demo_intro_left>0:
+		demo_intro_left=0.0
+		if is_instance_valid(demo_intro):demo_intro.visible=false
+	if not (is_demo or is_range) or camera_mode not in [1,2] or paused or (is_range and range_killcam_active):return
+	# Capture before GUI controls can consume a quick click. Buttons retain their
+	# normal behavior; only clicks over the 3D playfield queue a shot.
+	var hovered=get_viewport().gui_get_hovered_control()
+	if hovered==null or hovered.mouse_filter==Control.MOUSE_FILTER_IGNORE:
+		mouse_fire_pending=true
 
 
 

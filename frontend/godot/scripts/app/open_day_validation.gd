@@ -87,6 +87,7 @@ func run():
 	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Impact report shows cumulative crew and module damage")
 	check(battle.impact_killcam.model_view.model!=null and not battle.impact_killcam.model_view.model.find_children("*","MeshInstance3D",true,false).is_empty(),"Impact report renders a 3D tank model for its X-ray damage view")
 	check(battle.impact_killcam.title.text=="ОТЧЁТ О ПОПАДАНИИ" or battle.impact_killcam.title.text=="IMPACT REPORT","Impact report uses a neutral title")
+	check(not battle.impact_killcam.get_global_rect().intersects(battle.demo_brain_panel.get_global_rect()),"Impact report stays clear of the Open Day telemetry panel")
 	await capture("battle-impact-killcam-1280x720")
 	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;vehicle.manual_aim=false;vehicle.manual_hull_aim=false;vehicle.turret_rate=0.0;vehicle.gun_rate=0.0;vehicle.yaw_rate=0.0;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")

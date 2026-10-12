@@ -30,6 +30,7 @@ var looming=0.0
 var cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
 var modules={}
 var module_damage={}
+var impact_history: Array[Dictionary]=[]
 var volumes={}
 var armour_bodies=[]
 var metrics={"distance_travelled":0.0,"stationary_s":0.0,"reverse_s":0.0,"shots":0,"penetrations":0,"kills":0,"capture_s":0.0,"objective_presence_s":0.0,"contest_s":0.0,"target_switches":0,"target_visible_s":0.0,"chassis_aim_s":0.0,"stuck_recoveries":0}
@@ -395,6 +396,7 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	if not last_impact.penetrated:
 		last_impact.outcome="ricochet" if last_impact.ricochet else "non_penetration"
 		last_impact.disabled=[]
+		_record_impact(shell)
 		return
 	world.vehicles[shell.owner].metrics.penetrations+=1
 	var start=local_start
@@ -404,6 +406,7 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	var remaining=float(last_impact.remaining_penetration_mm)
 	var energy_fraction=clampf(remaining/maxf(1.0,float(last_impact.capability)),0.0,1.0)
 	var travel_limit=.55+4.0*sqrt(energy_fraction)
+	var cone_slope=tan(deg_to_rad(12.0))
 	var turret_pivot=to_local(turret.global_position)
 	for key in volumes:
 		var centre: Vector3=volumes[key]
@@ -414,17 +417,21 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 		if depth<0.0 or depth>travel_limit:continue
 		var miss_distance=(relative-direction*depth).length()
 		var direct_radius=module_radius(key)
-		var fragment_radius=direct_radius+.35+minf(depth,2.5)*.18
+		var direct_path_radius=.055+depth*.018
+		var fragment_radius=direct_radius+minf(.72,depth*cone_slope)
 		if miss_distance>fragment_radius:continue
 		var severity=0.0
-		if miss_distance<=direct_radius:
+		if miss_distance<=direct_radius+direct_path_radius:
 			severity=1.8 if key!="ammo_rack" else 1.55
 		else:
-			# Fragment intensity falls off with distance from the penetrator.
-			# An ammo rack only detonates from a direct strike; fragments can
-			# damage it, but cannot cause an automatic one-shot explosion.
-			var falloff=1.0-(miss_distance-direct_radius)/(fragment_radius-direct_radius)
-			severity=(.72 if key=="ammo_rack" else 1.05)*falloff*sqrt(energy_fraction)
+			# A penetrating round sheds a widening, directional cone of fragments.
+			# Their energy fades with distance from the penetrator and along the
+			# post-armour path; repeated hits accumulate against module strength.
+			var cone_width=maxf(.001,fragment_radius-direct_radius)
+			var lateral_fraction=clampf((miss_distance-direct_radius)/cone_width,0.0,1.0)
+			var falloff=1.0-lateral_fraction*.72
+			var residual=clampf(1.0-depth/maxf(.1,travel_limit),.12,1.0)
+			severity=(.72 if key=="ammo_rack" else 1.05)*falloff*sqrt(energy_fraction)*residual
 		module_damage[key]=minf(3.0,float(module_damage.get(key,0.0))+severity)
 		if not damaged.has(key):damaged.append(key)
 		var threshold=1.0 if key in ["driver","gunner","commander","loader","radio_operator"] else (1.35 if key=="ammo_rack" else 1.6)
@@ -443,10 +450,36 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 			if bool(modules[crew_key]):crew_alive+=1
 	var ammo_destroyed=(modules.has("ammo_rack") and not bool(modules["ammo_rack"]))
 	var crew_knockout=(crew_total>=2 and crew_alive<=1)
+	last_impact.crew_alive=crew_alive
+	last_impact.crew_total=crew_total
+	last_impact.destroyed_modules=[]
+	for key in modules:
+		if not bool(modules[key]):last_impact.destroyed_modules.append(key)
 	if ammo_destroyed or crew_knockout:
 		last_impact.outcome="lethal"
 		last_impact.kill_reason="ammo_rack" if ammo_destroyed else "crew_knockout"
 		destroy_vehicle(int(shell.owner))
+	_record_impact(shell)
+
+func _record_impact(shell: Dictionary) -> void:
+	last_impact.shot_number=impact_history.size()+1
+	last_impact.shooter=int(shell.get("owner",-1))
+	last_impact.module_damage=module_damage.duplicate(true)
+	last_impact.modules=modules.duplicate(true)
+	last_impact.destroyed_modules=[]
+	for key in modules:
+		if not bool(modules[key]):last_impact.destroyed_modules.append(key)
+	impact_history.append(last_impact.duplicate(true))
+
+func impact_module_positions() -> Dictionary:
+	var result={}
+	var pivot=to_local(turret.global_position) if is_instance_valid(turret) else Vector3.ZERO
+	for key in volumes:
+		var centre: Vector3=volumes[key]
+		if cfg.turreted and key in ["gunner","commander","loader","breech","turret_drive"]:
+			centre=pivot+Basis(Vector3.UP,turret_angle)*(centre-pivot)
+		result[key]=[centre.x,centre.y,centre.z]
+	return result
 
 func module_radius(key: String) -> float:
 	if key in ["driver","gunner","commander","loader","radio_operator"]:return .38
@@ -493,6 +526,7 @@ func reset_destroyed_state():
 	manual_hull_aim=false
 	reload_left=0.0
 	last_impact={}
+	impact_history.clear()
 	stuck_intent_s=0.0
 	recovery_left_s=0.0
 	cmd=[0.0,0.0,0.0,0.0,0.0,0.0]

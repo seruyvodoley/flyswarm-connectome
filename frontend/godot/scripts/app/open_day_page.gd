@@ -126,11 +126,11 @@ func build_how(root: VBoxContainer):
 
 func build_result(root: VBoxContainer):
 	var report=AppState.last_report;var human_alive=false;var fly_alive=false;var shots=0;var hits=0
-	var fatal_vehicle_name="";var fatal_impact={}
+	var fatal_vehicle_name="";var fatal_impact={};var fatal_state={}
 	for state in report.get("vehicles",[]):
 		if int(state.id)==0:human_alive=state.alive;shots=int(state.metrics.shots);hits=int(state.metrics.penetrations)
 		if int(state.id)==8:fly_alive=state.alive
-		if not state.alive and state.impact is Dictionary and not state.impact.is_empty():fatal_vehicle_name=str(state.vehicle);fatal_impact=state.impact
+		if not state.alive and state.impact is Dictionary and not state.impact.is_empty():fatal_vehicle_name=str(state.vehicle);fatal_impact=state.impact;fatal_state=state
 	var outcome=result_outcome(human_alive,fly_alive)
 	var box=panel(root);box.alignment=BoxContainer.ALIGNMENT_CENTER
 	var outcome_text="YOU DEFEATED THE FLY" if outcome=="human" else ("THE FLY WON" if outcome=="fly" else "DRAW")
@@ -146,7 +146,10 @@ func build_result(root: VBoxContainer):
 	if not fatal_impact.is_empty():
 		var killcam=load("res://scripts/impact_killcam.gd").new()
 		root.get_parent().get_parent().add_child(killcam)
-		killcam.show_impact({"impact":fatal_impact,"vehicle":fatal_vehicle_name,"fatal":true})
+		var cumulative_damaged=[]
+		for module_key in fatal_state.get("module_damage",{}):
+			if float(fatal_state.module_damage[module_key])>0.0:cumulative_damaged.append(module_key)
+		killcam.show_impact({"impact":fatal_impact,"vehicle":fatal_vehicle_name,"vehicle_id":fatal_state.get("vehicle","t34_85"),"shot_count":fatal_state.get("impact_history",[]).size(),"module_positions":fatal_state.get("module_positions",{}),"destroyed_modules":fatal_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged,"turret_angle":fatal_state.get("turret",0.0),"fatal":true})
 
 func result_outcome(human_alive: bool,fly_alive: bool) -> String:
 	if human_alive and not fly_alive:return "human"

@@ -83,8 +83,10 @@ func run():
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
 	await capture("battle-gunner-scope-1280x720")
-	battle.impact_killcam.show_impact({"vehicle":"T-34-85","shell":"test shell","fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
-	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Fatal impact panel shows the hit and internal damage")
+	battle.impact_killcam.show_impact({"vehicle":"T-34-85","vehicle_id":"t34_85","shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
+	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Impact report shows cumulative crew and module damage")
+	check(battle.impact_killcam.model_view.model!=null and not battle.impact_killcam.model_view.model.find_children("*","MeshInstance3D",true,false).is_empty(),"Impact report renders a 3D tank model for its X-ray damage view")
+	check(battle.impact_killcam.title.text=="ОТЧЁТ О ПОПАДАНИИ" or battle.impact_killcam.title.text=="IMPACT REPORT","Impact report uses a neutral title")
 	await capture("battle-impact-killcam-1280x720")
 	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;vehicle.manual_aim=false;vehicle.manual_hull_aim=false;vehicle.turret_rate=0.0;vehicle.gun_rate=0.0;vehicle.yaw_rate=0.0;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")

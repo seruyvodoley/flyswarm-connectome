@@ -17,12 +17,24 @@ ricochet. On penetration, the remaining penetration controls how far the
 projectile and fragments can travel into the tank.
 
 Crew, ammunition, breech, turret drive, engine, transmission, fuel and tracks
-are spatial damage volumes. A direct hit disables a crew member or module;
-fragment damage falls with distance and can accumulate across hits. The
-fighting-compartment volumes rotate with a turret. An ammunition-rack direct
-hit detonates it. A vehicle is destroyed only when its ammunition rack
-detonates or no more than one crew member remains. Lesser module failures
-leave the vehicle alive but impair its corresponding function.
+are spatial damage volumes. A penetrating shot travels along its measured
+local direction and sheds a widening 12-degree fragment cone. Cone reach is
+bounded by residual penetration; fragment severity falls across the cone and
+along the path. Direct and fragment damage add to each module's persistent
+damage until it is disabled. The fighting-compartment volumes rotate with a
+turret. Ammunition-rack damage also accumulates and disables the rack at its
+critical threshold. A vehicle is destroyed only when that rack detonates or
+no more than one crew member remains. Thus multiple shots can disable the
+breech and one crew member, then another crew member, before the fatal hit.
+Lesser module failures leave the vehicle alive but impair the corresponding
+function.
+
+The battle HUD uses the same reticle in every camera mode. Each enemy impact
+opens a compact damage report with the actual 3D vehicle, a translucent
+X-ray-style shell, the incoming path, and colored module markers: amber for
+damaged and red for disabled. The report lists cumulative module damage and
+crew remaining. The final Open Day result retains the same shot history and
+damage state.
 
 ## Historical scope and limitations
 
@@ -33,10 +45,12 @@ actual fighting-compartment pivot, including the forward casemates of the
 Jagdpanther and SU-100. The Jagdpanther and SU-100 casemate fronts use the
 inclined geometry recorded in their armour data. The remaining armour figures,
 projectile curves, module coordinates and fragment sizes are still simulation
-approximations, not surveyed engineering plans. In particular, this model does
-not yet simulate cast-armour variation, ballistic caps, fuze delay, individual
-round stowage, material-quality variation, projectile shatter or internal
-bulkheads. It must not be used for quantitative historical claims.
+approximations, not surveyed engineering plans. The fragment cone is
+deterministic and does not trace individual fragments or conserve their energy
+physically. In particular, this model does not yet simulate cast-armour
+variation, ballistic caps, fuze delay, individual round stowage,
+material-quality variation, projectile shatter or internal bulkheads. It must
+not be used for quantitative historical claims.
 
 Reference points: [The Tank Museum's Tiger I](https://tankmuseum.org/tank-nuts/tank-collection/tiger-i/),
 [Panther](https://tankmuseum.org/tank-nuts/tank-collection/panther/),

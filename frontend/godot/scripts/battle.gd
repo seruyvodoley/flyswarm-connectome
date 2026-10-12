@@ -703,7 +703,7 @@ func demo_set_sniper_mode(enabled: bool):
 	demo_sniper_mode=enabled
 	last_camera_mode=-1
 	update_camera_button()
-	if is_instance_valid(gunner_reticle):gunner_reticle.visible=enabled or camera_mode==2
+	if is_instance_valid(gunner_reticle):gunner_reticle.visible=true
 	if is_instance_valid(gunner_reticle):gunner_reticle.queue_redraw()
 
 func demo_toggle_sniper_scope():
@@ -977,7 +977,10 @@ func step_shells(dt: float):
 				)
 				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
 				if shooter!=null and victim.team!=shooter.team and is_instance_valid(impact_killcam):
-					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"shell":s.ammo.get("id","unknown"),"fatal":not victim.alive})
+					var cumulative_damaged=[]
+					for module_key in victim.module_damage:
+						if float(victim.module_damage[module_key])>0.0:cumulative_damaged.append(module_key)
+					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"vehicle_id":victim.cfg.id,"shell":s.ammo.get("id","unknown"),"shot_count":victim.impact_history.size(),"module_positions":victim.impact_module_positions(),"destroyed_modules":victim.last_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged})
 
 				if is_range and victim.agent_id==8 and int(s.owner)==0:
 					on_range_target_impact(
@@ -1680,6 +1683,10 @@ func finish(notify_result=true):
 	ended=true
 	var wall=(Time.get_ticks_usec()-start_wall)/1000000.0
 	var report=snapshot()
+	for index in vehicles.size():
+		report.vehicles[index].module_damage=vehicles[index].module_damage.duplicate(true)
+		report.vehicles[index].impact_history=vehicles[index].impact_history.duplicate(true)
+		report.vehicles[index].module_positions=vehicles[index].impact_module_positions()
 	report.wall_seconds=wall
 	report.realtime_factor=sim_time/maxf(.001,wall)
 	report.mean_physics_ms=physics_usec/maxf(1,frame)/1000
@@ -1830,8 +1837,8 @@ func _process(dt):
 	if is_demo:
 		demo_hud_clock+=dt
 		if demo_hud_clock>=.1:demo_hud_clock=0;update_demo_hud()
-	gunner_reticle.visible=camera_mode==2
-	if gunner_reticle.visible:gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left,is_demo and demo_sniper_mode)
+	gunner_reticle.visible=true
+	gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left,is_demo and demo_sniper_mode)
 	sensor_debug.visible=debug
 	if debug:
 		var mesh=ImmediateMesh.new()
@@ -2512,7 +2519,7 @@ func start_range_killcam(
 	)
 
 	var killcam_lines = PackedStringArray()
-	killcam_lines.append(AppState.tr_text("Killcam"))
+	killcam_lines.append("ОТЧЁТ О ПОПАДАНИИ" if str(AppState.settings.language)=="ru" else "IMPACT REPORT")
 	killcam_lines.append(target.cfg.display_name)
 	killcam_lines.append("")
 	killcam_lines.append(
@@ -2541,7 +2548,7 @@ func start_range_killcam(
 	)
 	killcam_lines.append("")
 	killcam_lines.append(
-		AppState.tr_text("Press C to skip killcam")
+		("C — закрыть отчёт" if str(AppState.settings.language)=="ru" else "C — close report")
 		+ " · "
 		+ AppState.tr_text("Press Enter to reset target")
 	)

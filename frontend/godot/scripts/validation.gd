@@ -54,8 +54,10 @@ func run():
 	for local_target in [Vector3(-1.35,2.15,.3),Vector3(-1.35,2.2,-.5),Vector3(-1.35,1.1,1.65)]:
 		if not b.alive:break
 		b.hit(side_round,b.to_global(local_target),-b.global_basis.x,"side" if local_target.y<1.5 else "turret_side")
-	check(not b.alive and str(b.last_impact.get("kill_reason",""))=="crew_knockout","crew loss with one survivor destroys vehicle")
+	check(not b.alive and str(b.last_impact.get("kill_reason",""))=="crew_knockout","cumulative crew losses with one survivor destroy vehicle")
+	check(b.impact_history.size()>=2 and int(b.last_impact.get("shot_number",0))==b.impact_history.size() and int(b.last_impact.get("crew_alive",5))<=1 and int(b.impact_history[-2].get("crew_alive",0))>1,"shot-by-shot module and crew damage accumulates across successive hits")
 	b.reset_destroyed_state()
+	check(b.impact_history.is_empty(),"range reset clears accumulated impact report history")
 	var stopped=Combat.impact(Catalog.read_json("ammunition/zis53_ap.json"),1500,Vector3.FORWARD,Vector3.BACK,{"thickness_mm":100})
 	check(not stopped.penetrated and not stopped.ricochet,"insufficient penetration stops at vertical Tiger armor")
 	var blocker=scene.terrain.box(Vector3(500,102,150),Vector3(20,10,5),Color.GRAY)

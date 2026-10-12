@@ -2033,11 +2033,11 @@ func _input(event):
 		demo_intro_left=0.0
 		if is_instance_valid(demo_intro):demo_intro.visible=false
 	if not (is_demo or is_range) or camera_mode not in [1,2] or paused or (is_range and range_killcam_active):return
-	# Capture before GUI controls can consume a quick click. Buttons retain their
-	# normal behavior; only clicks over the 3D playfield queue a shot.
+	# Capture before GUI controls can consume a quick click. Interactive buttons
+	# retain their behavior; decorative HUD labels must not swallow playfield fire.
 	var hovered=get_viewport().gui_get_hovered_control()
-	if hovered==null or hovered.mouse_filter==Control.MOUSE_FILTER_IGNORE:
-		mouse_fire_pending=true
+	if hovered is BaseButton:return
+	mouse_fire_pending=true
 
 
 

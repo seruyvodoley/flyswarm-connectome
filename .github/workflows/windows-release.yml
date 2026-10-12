@@ -84,7 +84,7 @@ jobs:
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FlySwarm-Windows-x64-${{ github.ref_name }}
+          name: FlySwarm-Windows-x64
           path: |
             build/windows/FlySwarm-*-windows-x64-setup.exe
             build/windows/FlySwarm-*-windows-x64.zip

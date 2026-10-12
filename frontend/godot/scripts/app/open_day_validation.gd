@@ -121,8 +121,11 @@ func run():
 	check(str(battle.impact_killcam.model_view.model.scene_file_path).contains("panther_g"),"Impact report renders the actual target type")
 	battle.impact_killcam.model_view.show_event({"vehicle_id":"tiger_i","impact":{}})
 	check(str(battle.impact_killcam.model_view.model.scene_file_path).contains("tiger_i"),"A different victim replaces the X-ray tank model")
-	battle.impact_killcam.model_view.show_event({"vehicle_id":"panther_g","turret_angle":.25,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"impact":{"point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
+	battle.impact_killcam.model_view.show_event({"vehicle_id":"panther_g","turret_angle":.25,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"impact":{"penetrated":true,"damaged":["gunner"],"point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.model_view.model.find_child("DamageMarker",true,false)!=null and battle.impact_killcam.model_view.model.find_child("ImpactPath",true,false)!=null,"X-ray markers and shell path follow the rotated tank model")
+	check(battle.impact_killcam.model_view.projectile!=null and battle.impact_killcam.model_view.path_start.distance_to(battle.impact_killcam.model_view.path_end)>3.0,"Impact view has an entry-to-interior projectile path")
+	battle.impact_killcam.model_view._process(.6)
+	check(battle.impact_killcam.model_view.projectile.position.distance_to(battle.impact_killcam.model_view.path_start)>0.1,"Impact projectile animates along its path")
 	check(is_equal_approx(float(battle.impact_killcam.model_view.model.find_child("TurretPivot",true,false).rotation.y),.25),"X-ray turret follows the target's actual traverse")
 	check(battle.impact_killcam.title.text.contains("B1 T-34-85") and battle.impact_killcam.title.text.contains("R1 Panther G"),"Impact report names its actual shooter and target")
 	check(battle.impact_killcam.offset_left>=battle.vehicle_status_panel.offset_right and battle.impact_killcam.offset_right<870 and battle.impact_killcam.offset_bottom<battle.demo_controls.offset_top,"Impact report clears status, telemetry and control guide")
@@ -136,7 +139,7 @@ func run():
 	battle.impact_killcam._process(4.1)
 	check(not battle.impact_killcam.visible,"Impact report expires within five seconds")
 	battle.update_vehicle_status()
-	check(battle.vehicle_status_panel.visible and (battle.vehicle_status_text.text.contains("breech") or battle.vehicle_status_text.text.contains("казённик")),"Own-vehicle status shows cumulative module damage")
+	check(battle.vehicle_status_panel.visible and battle.vehicle_status_map.vehicle==vehicle and (battle.vehicle_status_detail.text.contains("breech") or battle.vehicle_status_detail.text.contains("казённик")),"Own-vehicle 2D status shows cumulative module damage")
 	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;vehicle.manual_aim=false;vehicle.manual_hull_aim=false;vehicle.turret_rate=0.0;vehicle.gun_rate=0.0;vehicle.yaw_rate=0.0;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_demo_hud();await capture("battle-1280x720")
@@ -174,7 +177,7 @@ func run():
 	check(battle.demo_intro_left==0.0 and int(vehicle.metrics.shots)==shots_before,"First routed Open Day click only dismisses intro")
 	Input.parse_input_event(lmb);Input.parse_input_event(lmb_release)
 	for _tick in 4:await physics_frame
-	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Next brief routed Open Day click fires exactly one round")
+	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Next brief routed Open Day click fires exactly one round (before=%d, after=%d, reason=%s, alive=%s, pending=%s)" % [shots_before,int(vehicle.metrics.shots),vehicle.weapon_block_reason(),str(vehicle.alive),str(battle.mouse_fire_pending)])
 	battle.queue_free();await process_frame
 	print("OPEN DAY VALIDATION failures=",failures)
 	quit(0 if failures==0 else 1)

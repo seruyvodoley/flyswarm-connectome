@@ -84,10 +84,11 @@ func run():
 	check(app.battle.camera_mode==0,"Autonomous battle defaults to Battlefield camera")
 	check(not app.battle.vehicle_status_panel.visible and not app.battle.should_show_impact(app.battle.vehicles[0],app.battle.vehicles[8]),"Observer mode has no per-vehicle damage overlays")
 	app.battle.camera_mode=1;app.battle.update_vehicle_status()
-	check(app.battle.vehicle_status_panel.visible and app.battle.should_show_impact(app.battle.vehicles[0],app.battle.vehicles[8]) and not app.battle.should_show_impact(app.battle.vehicles[1],app.battle.vehicles[8]),"Only the selected shooter receives the correct enemy hit report")
+	check(app.battle.vehicle_status_panel.visible and app.battle.vehicle_status_map.vehicle==app.battle.vehicles[0] and app.battle.should_show_impact(app.battle.vehicles[0],app.battle.vehicles[8]) and not app.battle.should_show_impact(app.battle.vehicles[1],app.battle.vehicles[8]),"Only the selected shooter receives the correct enemy hit report and 2D own-tank map")
+	check(app.battle.impact_killcam.offset_bottom<app.battle.previous_vehicle_button.offset_top,"Battle impact camera clears tank-switch controls")
 	app.battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1","target_name":"R1 Panther G","vehicle_id":"panther_g","impact":{}})
 	app.battle.select_vehicle(1);app.battle.update_vehicle_status()
-	check(not app.battle.impact_killcam.visible and app.battle.vehicle_status_text.text.contains(app.battle.vehicles[1].cfg.display_name),"Switching tanks clears old impact and shows new tank status")
+	check(not app.battle.impact_killcam.visible and app.battle.vehicle_status_text.text.contains(app.battle.vehicles[1].cfg.display_name) and app.battle.vehicle_status_map.vehicle==app.battle.vehicles[1],"Switching tanks clears old impact and shows new tank schematic")
 	app.battle.camera_mode=0;await process_frame
 	check(is_instance_valid(app.battle.camera_button),"Camera UI button")
 	check(is_instance_valid(app.battle.comm_toggle),"Communication UI button")
@@ -99,6 +100,8 @@ func run():
 		app.battle.cycle_camera();await process_frame
 		check(app.battle.camera_mode==mode,"Camera cycle")
 		check(app.battle.camera.projection==(Camera3D.PROJECTION_ORTHOGONAL if mode==0 else Camera3D.PROJECTION_PERSPECTIVE),"Projection transition")
+		app.battle.update_vehicle_status()
+		check(app.battle.vehicle_status_panel.visible==(mode in [1,2]),"Damage schematic obeys every camera mode")
 	for mode in [1,2,3,0]:
 		app.battle.cycle_comms();check(app.battle.comm_view==mode,"Comms cycle")
 	app.battle.ingest_communication(null)

@@ -17,6 +17,7 @@ const Vehicle=preload("res://scripts/vehicle.gd")
 const Bridge=preload("res://scripts/bridge.gd")
 const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
 const ImpactKillcam=preload("res://scripts/impact_killcam.gd")
+const VehicleDamageStatus=preload("res://scripts/vehicle_damage_status.gd")
 const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
 const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
 const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
@@ -103,6 +104,8 @@ var demo_camera_before_scope=1
 var impact_killcam: Control
 var vehicle_status_panel: PanelContainer
 var vehicle_status_text: Label
+var vehicle_status_detail: Label
+var vehicle_status_map: Control
 
 # ============================================================
 # TEST RANGE KILLCAM / HIT FEEDBACK
@@ -476,13 +479,13 @@ func _ready():
 	vehicle_status_panel=PanelContainer.new()
 	vehicle_status_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	vehicle_status_panel.offset_left=20
-	vehicle_status_panel.offset_right=390
-	vehicle_status_panel.offset_top=-250
-	vehicle_status_panel.offset_bottom=-92 if is_demo else -20
+	vehicle_status_panel.offset_right=340
+	vehicle_status_panel.offset_top=-390 if is_demo else -270
+	vehicle_status_panel.offset_bottom=-125 if is_demo else -20
 	vehicle_status_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var status_style=StyleBoxFlat.new()
-	status_style.bg_color=Color(.025,.035,.04,.88)
-	status_style.border_color=Color(.55,.62,.56,.9)
+	status_style.bg_color=Color(.025,.075,.07,.62)
+	status_style.border_color=Color(.55,.72,.59,.8)
 	status_style.set_border_width_all(1)
 	status_style.content_margin_left=12
 	status_style.content_margin_right=12
@@ -493,7 +496,19 @@ func _ready():
 	vehicle_status_text.add_theme_font_size_override("font_size",12)
 	vehicle_status_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	vehicle_status_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	vehicle_status_panel.add_child(vehicle_status_text)
+	var status_column=VBoxContainer.new()
+	status_column.add_theme_constant_override("separation",2)
+	vehicle_status_panel.add_child(status_column)
+	status_column.add_child(vehicle_status_text)
+	vehicle_status_map=VehicleDamageStatus.new()
+	vehicle_status_map.custom_minimum_size=Vector2(300,164)
+	vehicle_status_map.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	status_column.add_child(vehicle_status_map)
+	vehicle_status_detail=Label.new()
+	vehicle_status_detail.add_theme_font_size_override("font_size",11)
+	vehicle_status_detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	vehicle_status_detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	status_column.add_child(vehicle_status_detail)
 	vehicle_status_panel.visible=false
 	canvas.add_child(vehicle_status_panel)
 
@@ -678,13 +693,15 @@ func update_vehicle_status():
 		var module_name=status_module_name(str(key),russian)
 		if not bool(v.modules[key]):disabled.append(module_name)
 		elif float(v.module_damage.get(key,0.0))>0.0:damaged.append(module_name)
-	lines.append(("ВЫВЕДЕНЫ: " if russian else "DISABLED: ")+(" · ".join(disabled) if not disabled.is_empty() else "—"))
-	lines.append(("ПОВРЕЖДЕНЫ: " if russian else "DAMAGED: ")+(" · ".join(damaged) if not damaged.is_empty() else "—"))
+	var detail=("ВЫВЕДЕНЫ: " if russian else "DISABLED: ")+(" · ".join(disabled) if not disabled.is_empty() else "—")
+	if not damaged.is_empty():detail+="\n"+("ПОВРЕЖДЕНЫ: " if russian else "DAMAGED: ")+" · ".join(damaged)
 	var weapon_state=v.weapon_block_reason()
 	if weapon_state.is_empty():weapon_state="ГОТОВО" if russian else "READY"
 	elif russian:weapon_state={"destroyed":"уничтожен","gunner":"наводчик выбыл","breech":"казённик сломан","ammo":"нет снарядов","reload":"перезарядка"}.get(weapon_state,weapon_state)
 	lines.append(("ОРУДИЕ: " if russian else "GUN: ")+weapon_state.to_upper())
 	vehicle_status_text.text="\n".join(lines)
+	vehicle_status_detail.text=detail
+	vehicle_status_map.show_vehicle(v)
 
 func status_module_name(key: String,russian: bool) -> String:
 	if not russian:return key.replace("_"," ")

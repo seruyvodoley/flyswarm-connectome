@@ -69,6 +69,17 @@ target's actual turret angle; hits on existing wrecks do not replay the previous
 damage report. The Test Range destruction explanation uses the recorded lethal
 reason, including crew losses outside the driver/gunner/commander trio.
 
+In the shared battle view, a selected tank has a top-down 2D damage schematic:
+green marks are intact, amber marks are damaged, and red marks are disabled.
+Crew positions use circles and mechanical modules use squares. The hit view
+shows only shots from that selected tank, loads the struck vehicle's own mesh,
+and replays the recorded entry point and projectile direction through the
+armour. Bright markers identify modules touched by that shot; branch lines
+illustrate the fragment cone toward those modules, rather than individual
+simulated fragments. Both overlays are hidden in overhead and free camera
+modes. The hit view closes after four seconds and sits above tank-switch
+controls.
+
 The PettingZoo MARL Laboratory runs a separate analytical training environment
 with scalar vehicle health and abstract shot damage. Its battle visualizations
 must not be interpreted as measurements of the 3D armour/module solver. Replays

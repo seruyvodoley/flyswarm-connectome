@@ -21,6 +21,19 @@ func wait_battle() -> bool:
 
 	return false
 
+func command_for_key(battle,keycode: Key) -> Array:
+	var event=InputEventKey.new()
+	event.physical_keycode=keycode
+	event.pressed=true
+	Input.parse_input_event(event)
+	await process_frame
+	var command=battle.manual_commands()
+	var release=event.duplicate()
+	release.pressed=false
+	Input.parse_input_event(release)
+	await process_frame
+	return command
+
 
 func run():
 	app=root.get_node("AppState")
@@ -57,6 +70,39 @@ func run():
 	)
 
 	var target=battle.vehicles[8]
+	battle.camera_mode=1
+	battle.update_vehicle_status()
+	check(battle.vehicle_status_panel.visible and battle.vehicle_status_map.vehicle==battle.vehicles[battle.selected],"Range shows the selected tank's 2D module map")
+	check(battle.impact_killcam.offset_bottom<battle.previous_vehicle_button.offset_top and battle.impact_killcam.offset_bottom<battle.next_vehicle_button.offset_top,"Impact camera clears tank selection buttons")
+	var forward=await command_for_key(battle,KEY_W);var reverse=await command_for_key(battle,KEY_S)
+	check(forward[0]>0.0 and reverse[0]<0.0,"Range forward and reverse controls work")
+	var left=await command_for_key(battle,KEY_A);var right=await command_for_key(battle,KEY_D)
+	check(left[2]<0.0 and right[2]>0.0,"Range left and right hull steering work")
+	var traverse_left=await command_for_key(battle,KEY_Q);var traverse_right=await command_for_key(battle,KEY_E)
+	check(traverse_left[3]<0.0 and traverse_right[3]>0.0,"Range turret left and right controls work")
+	var lower=await command_for_key(battle,KEY_F);var raise=await command_for_key(battle,KEY_R)
+	check(lower[4]<0.0 and raise[4]>0.0,"Range gun depression and elevation work")
+	var keyboard_fire=await command_for_key(battle,KEY_SPACE)
+	check(keyboard_fire[5]>0.0,"Range keyboard fire works alongside LMB")
+	var range_tank=battle.vehicles[0]
+	var old_turret_target=range_tank.turret_angle
+	var old_gun_target=range_tank.gun_angle
+	var right_button=InputEventMouseButton.new()
+	right_button.button_index=MOUSE_BUTTON_RIGHT
+	right_button.pressed=true
+	right_button.position=Vector2(640,360)
+	Input.parse_input_event(right_button)
+	await process_frame
+	var mouse_motion=InputEventMouseMotion.new()
+	mouse_motion.position=Vector2(670,340)
+	mouse_motion.relative=Vector2(30,-20)
+	Input.parse_input_event(mouse_motion)
+	await process_frame
+	check(range_tank.manual_turret_target>old_turret_target and range_tank.manual_gun_target>old_gun_target,"Range RMB drag aims turret right and gun up")
+	var right_release=right_button.duplicate()
+	right_release.pressed=false
+	Input.parse_input_event(right_release)
+	await process_frame
 
 	check(
 		target.alive,

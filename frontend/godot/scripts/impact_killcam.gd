@@ -1,9 +1,16 @@
 extends PanelContainer
+const ImpactPathOverlay=preload("res://scripts/impact_path_overlay.gd")
 
 class ImpactModelView extends SubViewportContainer:
 	var viewport: SubViewport
 	var stage: Node3D
 	var model: Node3D
+	var camera: Camera3D
+	var projectile: MeshInstance3D
+	var overlay: Control
+	var path_start=Vector3.ZERO
+	var path_end=Vector3.ZERO
+	var shot_elapsed=0.0
 
 	func _ready():
 		stretch=true
@@ -15,9 +22,9 @@ class ImpactModelView extends SubViewportContainer:
 		add_child(viewport)
 		stage=Node3D.new()
 		viewport.add_child(stage)
-		var camera=Camera3D.new()
-		camera.position=Vector3(4.5,4.2,6.0)
-		camera.fov=35
+		camera=Camera3D.new()
+		camera.position=Vector3(4.5,4.2,8.0)
+		camera.fov=43
 		stage.add_child(camera)
 		camera.look_at(Vector3(0,.75,0))
 		var light=DirectionalLight3D.new()
@@ -28,6 +35,17 @@ class ImpactModelView extends SubViewportContainer:
 		fill.position=Vector3(-3,2,2)
 		fill.light_energy=.7
 		stage.add_child(fill)
+		overlay=ImpactPathOverlay.new()
+		overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		add_child(overlay)
+
+	func _process(delta: float):
+		if projectile!=null and is_instance_valid(projectile):
+			shot_elapsed=minf(1.0,shot_elapsed+delta/1.2)
+			projectile.position=path_start.lerp(path_end,shot_elapsed)
+			overlay.progress=shot_elapsed
+			overlay.queue_redraw()
 
 	func show_event(event: Dictionary):
 		for child in stage.get_children():
@@ -41,32 +59,59 @@ class ImpactModelView extends SubViewportContainer:
 		model.rotation.y=deg_to_rad(-26)
 		_apply_xray(model)
 		stage.add_child(model)
+		projectile=null
+		overlay.active=false
 		var turret=model.find_child("TurretPivot",true,false)
 		if turret is Node3D:turret.rotation.y=float(event.get("turret_angle",0.0))
 		var impact: Dictionary=event.get("impact",{})
 		var centers: Dictionary=event.get("module_positions",{})
 		var broken: Array=event.get("destroyed_modules",impact.get("destroyed_modules",[]))
-		var damaged: Array=event.get("damaged_modules",impact.get("damaged",[]))
+		var damaged: Array=impact.get("damaged",[])
+		var disabled: Array=impact.get("disabled",[])
 		for key in centers:
 			var p=centers[key]
 			if not p is Array or p.size()<3:continue
 			var point=Vector3(float(p[0]),float(p[1]),float(p[2]))
-			if broken.has(key):
-				_add_marker(point,.16,Color(1.0,.12,.07,1.0))
+			if disabled.has(key):
+				_add_marker(point,.19,Color(1.0,.12,.07,1.0))
+			elif broken.has(key):
+				_add_marker(point,.12,Color(.7,.2,.16,.8))
 			elif damaged.has(key):
-				_add_marker(point,.12,Color(1.0,.65,.08,1.0))
+				_add_marker(point,.15,Color(1.0,.65,.08,1.0))
 		var hit=impact.get("point_local",[])
 		var incoming=impact.get("incoming_local",[])
 		if hit is Array and hit.size()>=3 and incoming is Array and incoming.size()>=3:
 			var origin=Vector3(float(hit[0]),float(hit[1]),float(hit[2]))
 			var direction=Vector3(float(incoming[0]),float(incoming[1]),float(incoming[2])).normalized()
-			_add_marker(origin,.105,Color(1.0,.95,.6,1.0))
-			_add_beam(origin-direction*.8,origin+direction*.12,Color(1.0,.36,.08,1.0))
+			var penetrated=bool(impact.get("penetrated",false))
+			path_start=origin-direction*1.8
+			path_end=origin+direction*(2.4 if penetrated else .08)
+			shot_elapsed=0.0
+			_add_marker(origin,.16,Color(1.0,.95,.6,1.0))
+			_add_beam(path_start,origin,Color(1.0,.38,.10,.92))
+			if penetrated:
+				_add_beam(origin,path_end,Color(1.0,.76,.18,.9))
+				for key in damaged:
+					if not centers.has(key):continue
+					var xyz=centers[key]
+					if xyz is Array and xyz.size()>=3:
+						_add_beam(origin+direction*.15,Vector3(float(xyz[0]),float(xyz[1]),float(xyz[2])),Color(1.0,.38,.12,.65))
+			projectile=_add_marker(path_start,.11,Color(1.0,.96,.55,1.0))
+			var view=(-direction+Vector3(0,.43,0)).normalized()
+			var side=view.cross(Vector3.UP).normalized()
+			camera.position=model.to_global(Vector3(0,.8,0)+view*6.8+side*5.8)
+			camera.look_at(model.to_global(Vector3(0,.9,0)))
+			var hit_modules={}
+			for key in damaged:
+				if not centers.has(key):continue
+				var xyz=centers[key]
+				if xyz is Array and xyz.size()>=3:hit_modules[key]=Vector3(float(xyz[0]),float(xyz[1]),float(xyz[2]))
+			overlay.set_impact(model,camera,Vector2(viewport.size),path_start,origin,path_end,hit_modules)
 		model.rotation.y=deg_to_rad(-26)
 
 	func _apply_xray(root: Node3D):
 		var ghost=StandardMaterial3D.new()
-		ghost.albedo_color=Color(.27,.72,.79,.28)
+		ghost.albedo_color=Color(.65,.91,.86,.51)
 		ghost.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
 		ghost.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
 		ghost.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED
@@ -74,7 +119,7 @@ class ImpactModelView extends SubViewportContainer:
 		for node in root.find_children("*","MeshInstance3D",true,false):
 			(node as MeshInstance3D).material_override=ghost
 
-	func _add_marker(point: Vector3,radius: float,colour: Color):
+	func _add_marker(point: Vector3,radius: float,colour: Color) -> MeshInstance3D:
 		var marker=MeshInstance3D.new()
 		marker.name="DamageMarker"
 		var sphere=SphereMesh.new()
@@ -89,6 +134,7 @@ class ImpactModelView extends SubViewportContainer:
 		material.emission=colour
 		marker.material_override=material
 		model.add_child(marker)
+		return marker
 
 	func _add_beam(from: Vector3,to: Vector3,colour: Color):
 		var delta=to-from
@@ -96,8 +142,8 @@ class ImpactModelView extends SubViewportContainer:
 		var beam=MeshInstance3D.new()
 		beam.name="ImpactPath"
 		var cylinder=CylinderMesh.new()
-		cylinder.top_radius=.025
-		cylinder.bottom_radius=.025
+		cylinder.top_radius=.055
+		cylinder.bottom_radius=.055
 		cylinder.height=delta.length()
 		beam.mesh=cylinder
 		beam.position=(from+to)*.5
@@ -106,6 +152,7 @@ class ImpactModelView extends SubViewportContainer:
 		material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.emission_enabled=true
 		material.emission=colour
+		material.emission_energy_multiplier=2.0
 		beam.material_override=material
 		model.add_child(beam)
 		beam.look_at(model.to_global(to),Vector3.UP)
@@ -122,18 +169,18 @@ func _ready():
 	set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	offset_left=-610
 	offset_right=-20
-	offset_top=-340
-	offset_bottom=-20
-	custom_minimum_size=Vector2(590,320)
+	offset_top=-465
+	offset_bottom=-95
+	custom_minimum_size=Vector2(590,370)
 	size=custom_minimum_size
 	var battle=get_parent().get_parent() if get_parent()!=null and get_parent().get_parent()!=null else null
 	if battle!=null and bool(battle.get("is_demo")):
 		set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 		offset_left=410
 		offset_right=780
-		offset_top=-335
-		offset_bottom=-95
-		custom_minimum_size=Vector2(370,240)
+		offset_top=-390
+		offset_bottom=-130
+		custom_minimum_size=Vector2(370,260)
 		size=custom_minimum_size
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var style=StyleBoxFlat.new()
@@ -156,11 +203,11 @@ func _ready():
 	title.add_theme_color_override("font_color",Color("ead58f"))
 	column.add_child(title)
 	model_view=ImpactModelView.new()
-	model_view.custom_minimum_size=Vector2(350,155) if battle!=null and bool(battle.get("is_demo")) else Vector2(560,235)
+	model_view.custom_minimum_size=Vector2(350,145) if battle!=null and bool(battle.get("is_demo")) else Vector2(560,235)
 	model_view.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	column.add_child(model_view)
 	body=Label.new()
-	body.add_theme_font_size_override("font_size",10)
+	body.add_theme_font_size_override("font_size",11)
 	body.add_theme_color_override("font_color",Color("edf0e8"))
 	body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(body)
@@ -193,13 +240,13 @@ func show_impact(event: Dictionary):
 	elif bool(impact.get("ricochet",false)):result="РИКОШЕТ" if russian else "RICOCHET"
 	elif russian:result="НЕ ПРОБИЛО"
 	var state="ТЕХНИКА УНИЧТОЖЕНА" if russian and outcome=="lethal" else ("VEHICLE DESTROYED" if outcome=="lethal" else ("КРИТИЧЕСКИЙ УРОН" if russian and outcome=="critical" else ("CRITICAL DAMAGE" if outcome=="critical" else "")))
-	var damaged=event.get("damaged_modules",impact.get("damaged",[]))
-	var disabled=event.get("destroyed_modules",impact.get("destroyed_modules",[]))
+	var damaged=impact.get("damaged",[])
+	var disabled=impact.get("disabled",[])
 	var casualties="%s / %s" % [str(impact.get("crew_alive","—")),str(impact.get("crew_total","—"))]
 	var modules=" · ".join(PackedStringArray(damaged.map(func(v):return str(v).replace("_"," ")))) if damaged is Array else ""
 	var disabled_text=" · ".join(PackedStringArray(disabled.map(func(v):return str(v).replace("_"," ")))) if disabled is Array else ""
 	var damage_label=("повреждены" if russian else "damaged")+": "+(modules if not modules.is_empty() else ("—" if russian else "—"))
 	var disabled_label=("выведены" if russian else "disabled")+": "+(disabled_text if not disabled_text.is_empty() else "—")
-	body.text="%s · %s · %s\n%s: %.0f / %.0f mm · %s\n%s %d · %s · %s · экипаж / crew %s" % [vehicle_name,shell_name,result,"Пробитие" if russian else "Penetration",float(impact.get("capability",0.0)),float(impact.get("effective",0.0)),state,"ВЫСТРЕЛ" if russian else "SHOT",int(event.get("shot_count",1)),damage_label,disabled_label,casualties]
+	body.text="%s · %s\n%s %s · %.0f / %.0f mm\n%s\n%s\n%s · %s %s" % [shell_name,result,"БРОНЯ" if russian else "ARMOUR",str(impact.get("zone","?")),float(impact.get("capability",0.0)),float(impact.get("effective",0.0)),damage_label,disabled_label,state if not state.is_empty() else vehicle_name,"ЭКИПАЖ" if russian else "CREW",casualties]
 	model_view.show_event(event)
 	show()

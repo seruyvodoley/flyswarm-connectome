@@ -169,6 +169,12 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     backend_dist = output / "FlySwarmBackend"
     if not args.reuse_backend or not (backend_dist / "FlySwarmBackend").is_file():
         backend_dist = build_backend(python, build_root, output)
+    # The frozen catalog resolves checked-in vehicle and ammunition JSON next
+    # to the onedir executable. Include these small public definitions, but
+    # never copy local research data or results into the app.
+    backend_data = backend_dist / "data"
+    shutil.rmtree(backend_data, ignore_errors=True)
+    shutil.copytree(ROOT / "data", backend_data, ignore=shutil.ignore_patterns("local", "._*"))
     stage_root = Path(tempfile.mkdtemp(prefix="flyswarm-godot-stage-"))
     try:
         project = stage_root / "godot"

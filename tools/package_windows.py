@@ -61,6 +61,8 @@ def main() -> None:
     backend_exe = backend_out / "FlySwarmBackend/FlySwarmBackend.exe"
     if not backend_exe.is_file():
         raise RuntimeError(f"PyInstaller backend missing: {backend_exe}")
+    shutil.copytree(ROOT / "data", backend_out / "FlySwarmBackend/data",
+                    ignore=shutil.ignore_patterns("local", "._*"))
 
     packaged = out / "FlySwarm"
     shutil.copytree(ROOT / "src", packaged / "Resources/support/src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))

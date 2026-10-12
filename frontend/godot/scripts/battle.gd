@@ -97,6 +97,7 @@ var demo_brain_visible=true
 var demo_hud_clock=0.0
 var demo_sniper_mode=false
 var aim_prediction_timer=0.0
+var mouse_fire_pending=false
 var demo_camera_before_scope=1
 var impact_killcam: Control
 
@@ -875,12 +876,13 @@ func _physics_process(delta):
 		if is_range:
 			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
 		if is_demo:
-			if v.agent_id==0:v.cmd=demo_mouse_commands(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+			if v.agent_id==0:v.cmd=demo_mouse_commands(mouse_fire_pending or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
 			v.cmd[2]=0
 		v.step(delta)
+	mouse_fire_pending=false
 	if is_range:
 		vehicles[0].target=8
 		vehicles[0].target_range=vehicles[0].position.distance_to(vehicles[8].position)
@@ -1965,6 +1967,9 @@ func _process(dt):
 		get_viewport().get_texture().get_image().save_png(screenshot_path)
 		screenshot_path=""
 func _unhandled_input(event):
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+		if (is_demo or is_range) and camera_mode in [1,2] and not paused and not (is_range and range_killcam_active):
+			mouse_fire_pending=true
 	if is_demo and event is InputEventMouseButton and event.pressed:
 		if event.button_index==MOUSE_BUTTON_RIGHT:
 			demo_toggle_sniper_scope()
@@ -2738,7 +2743,7 @@ func manual_commands() -> Array:
 	var turn=float(Input.is_physical_key_pressed(KEY_E))-float(Input.is_physical_key_pressed(KEY_Q))
 	var elevate=float(Input.is_physical_key_pressed(KEY_R))-float(Input.is_physical_key_pressed(KEY_F))
 	if absf(turn)+absf(elevate)>0.0:vehicles[0].manual_aim=false
-	var fire=float(Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+	var fire=float(mouse_fire_pending or Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	if session_config!=null and session_config.range_mode in ["free","mobility"]:fire=0
 	return [drive,0,steer,turn,elevate,fire]
 func save_replay():

@@ -125,6 +125,17 @@ func run():
 	battle.paused=true
 	check(battle.frame-before_frame>=24 and battle.frame-before_frame<=26 and absf((battle.sim_time-before_sim)-float(battle.frame-before_frame)*.02)<.001,"Open Day physics keeps advancing under zero-order hold (steps=%d, sim=%.3f)" % [battle.frame-before_frame,battle.sim_time-before_sim])
 	check(test_bridge.repeated_command_steps==battle.frame-before_frame and test_bridge.responses_received==1,"Held motor commands do not fabricate fresh neural responses (repeats=%d, physics=%d, responses=%d)" % [test_bridge.repeated_command_steps,battle.frame-before_frame,test_bridge.responses_received])
+	# A real press can begin and end between fixed physics ticks. It must still
+	# produce one player shot, including when that first press dismisses the intro.
+	vehicle.modules.gunner=true;vehicle.modules.breech=true;vehicle.ammo_left=20;vehicle.reload_left=0.0
+	vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun
+	battle.requires_brain=false;battle.paused=false;battle.demo_intro_left=3.0;battle.mouse_fire_pending=false
+	var shots_before=int(vehicle.metrics.shots)
+	var lmb=InputEventMouseButton.new();lmb.button_index=MOUSE_BUTTON_LEFT;lmb.pressed=true
+	battle._unhandled_input(lmb)
+	check(battle.demo_intro_left==0.0 and battle.mouse_fire_pending,"First Open Day click skips intro and queues a shot")
+	battle._physics_process(.02)
+	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Queued Open Day click fires exactly one round")
 	battle.queue_free();await process_frame
 	print("OPEN DAY VALIDATION failures=",failures)
 	quit(0 if failures==0 else 1)

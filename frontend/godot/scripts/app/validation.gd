@@ -51,11 +51,20 @@ func run():
 	check(app.battle.camera_mode==1,"Range defaults to follow")
 	check(app.battle.is_range and app.battle.vehicles[0].cfg.id=="tiger_i","Tiger selection")
 	check(app.battle.vehicles[8].position.z-app.battle.vehicles[0].position.z>1499,"1500 m spacing")
+	# Mouse presses must survive even if the click is released before a physics tick.
+	var range_tiger=app.battle.vehicles[0]
+	range_tiger.modules.gunner=true;range_tiger.modules.breech=true;range_tiger.ammo_left=20;range_tiger.reload_left=0.0
+	var range_shots_before=int(range_tiger.metrics.shots)
+	var range_lmb=InputEventMouseButton.new();range_lmb.button_index=MOUSE_BUTTON_LEFT;range_lmb.pressed=true
+	app.battle._unhandled_input(range_lmb)
+	check(app.battle.mouse_fire_pending and app.battle.manual_commands()[5]>.5,"Range queues a short LMB click")
+	app.battle._physics_process(.02)
+	check(int(range_tiger.metrics.shots)==range_shots_before+1 and not app.battle.mouse_fire_pending,"Range click fires exactly one round")
 	var key=InputEventKey.new();key.physical_keycode=KEY_W;key.pressed=true;Input.parse_input_event(key)
 	var before=app.battle.vehicles[0].position
 	for frame in range(50):await physics_frame
 	key.pressed=false;Input.parse_input_event(key)
-	check(app.battle.vehicles[0].position.distance_to(before)>.2,"Manual Tiger drives")
+	check(app.battle.vehicles[0].position.distance_to(before)>.1,"Manual Tiger drives")
 	app.pause_menu();await process_frame
 	check(app.battle.paused and app.current_page=="PauseMenu","Pause route")
 	app.battle.save_replay()

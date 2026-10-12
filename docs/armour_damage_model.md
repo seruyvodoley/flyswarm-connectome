@@ -32,13 +32,23 @@ function.
 The battle HUD uses the same reticle in third-person and gunner views. It hides
 the reticle in overhead and free-camera views. It distinguishes a ready gun
 from reloading, empty ammunition, a disabled breech, and an incapacitated gunner.
-In Open Day and Test Range, only a shot fired by the player at an opposing tank
-opens the hit report; incoming hits cannot be mistaken for damage dealt. Each
-such impact opens a compact damage report with the actual 3D vehicle, a translucent
+Only a shot fired by the currently selected tank at an opposing tank opens
+the hit report in any battle mode; incoming hits and other agents' shots cannot
+be mistaken for damage dealt. The report identifies the shooter and target,
+uses the target's own 3D model, and closes after four seconds or when the
+selected tank or camera changes. Each such impact opens a compact report with a translucent
 X-ray-style shell, the incoming path, and colored module markers: amber for
 damaged and red for disabled. The report lists cumulative module damage and
 crew remaining. The final Open Day result retains the same shot history and
 damage state.
+
+A separate lower-left status panel follows the selected tank. It lists the
+surviving crew, ammunition, weapon readiness, disabled modules, and cumulative
+partial damage. Both the status panel and impact report are hidden in overhead
+and free-camera views. Open Day mouse movement aims the turret and gun in the
+same horizontal/vertical direction as the pointer; middle-button dragging
+turns the hull, right-click switches the gunner scope, and left-click fires.
+The click that dismisses the opening card does not also fire a shell.
 
 ## Mode audit
 

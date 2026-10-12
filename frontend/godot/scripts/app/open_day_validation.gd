@@ -79,15 +79,35 @@ func run():
 	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Second RMB returns to the previous camera")
 	battle.camera_mode=2
 	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
-	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun and vehicle.manual_turret_target<original_turret and vehicle.manual_gun_target>original_gun,"Mouse aim changes target angles without teleporting the turret or gun")
+	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun and vehicle.manual_turret_target>original_turret and vehicle.manual_gun_target>original_gun,"Mouse right/up aims turret right and gun up without teleporting")
 	vehicle.cmd=battle.demo_command(false)
 	vehicle.step(.1)
-	check(vehicle.turret_angle<original_turret and vehicle.turret_angle>vehicle.manual_turret_target and vehicle.gun_angle>original_gun and vehicle.gun_angle<vehicle.manual_gun_target,"Turret and gun advance toward the target at bounded speed")
+	check(vehicle.turret_angle>original_turret and vehicle.turret_angle<vehicle.manual_turret_target and vehicle.gun_angle>original_gun and vehicle.gun_angle<vehicle.manual_gun_target,"Turret and gun advance toward right/up target at bounded speed")
+	battle._process(.1)
+	check((-battle.camera.global_basis.z).x>0.0,"Third-person camera follows the right-turning turret")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(30,0),true)
-	check(vehicle.rotation.y==original_yaw and vehicle.manual_hull_target<original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Middle drag changes only the desired hull heading")
+	check(vehicle.rotation.y==original_yaw and vehicle.manual_hull_target>original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Middle drag right changes only the desired hull heading")
 	vehicle.step(.1)
-	check(vehicle.rotation.y<original_yaw and vehicle.rotation.y>vehicle.manual_hull_target,"Hull slews toward requested heading without teleporting")
+	check(vehicle.rotation.y>original_yaw and vehicle.rotation.y<vehicle.manual_hull_target,"Hull slews right toward requested heading without teleporting")
+	vehicle.manual_turret_target=vehicle.turret_angle;vehicle.manual_gun_target=vehicle.gun_angle
+	battle.demo_apply_mouse_motion(Vector2(-80,40),false)
+	check(vehicle.manual_turret_target<vehicle.turret_angle and vehicle.manual_gun_target<vehicle.gun_angle,"Mouse left/down aims turret left and gun down")
+	battle.camera_mode=1
+	var middle=InputEventMouseButton.new();middle.button_index=MOUSE_BUTTON_MIDDLE;middle.pressed=true;middle.position=Vector2(640,360)
+	var hull_target_before=vehicle.manual_hull_target
+	Input.parse_input_event(middle);await process_frame
+	var drag=InputEventMouseMotion.new();drag.position=Vector2(660,360);drag.relative=Vector2(20,0)
+	Input.parse_input_event(drag);await process_frame
+	var middle_release=middle.duplicate();middle_release.pressed=false;Input.parse_input_event(middle_release);await process_frame
+	check(vehicle.manual_hull_target>hull_target_before,"Routed middle-button drag turns the hull right")
+	var routed_right=InputEventMouseButton.new();routed_right.button_index=MOUSE_BUTTON_RIGHT;routed_right.pressed=true;routed_right.position=Vector2(640,360)
+	Input.parse_input_event(routed_right);await process_frame
+	check(battle.demo_sniper_mode and battle.camera_mode==2,"Routed right-click opens gunner scope")
+	var routed_right_release=routed_right.duplicate();routed_right_release.pressed=false;Input.parse_input_event(routed_right_release);await process_frame
+	Input.parse_input_event(routed_right);await process_frame
+	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Second routed right-click leaves gunner scope")
+	Input.parse_input_event(routed_right_release);await process_frame
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_camera_button();battle.demo_set_sniper_mode(true);await process_frame
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
 	battle._process(.13)
@@ -95,14 +115,28 @@ func run():
 	check(battle.gunner_reticle.aim_screen_position.distance_to(battle.camera.unproject_position(predicted_aim))<.1,"Sight centre follows the predicted ballistic impact point")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
 	await capture("battle-gunner-scope-1280x720")
-	battle.impact_killcam.show_impact({"vehicle":"T-34-85","vehicle_id":"t34_85","turret_angle":.25,"shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
+	battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1 T-34-85","target_name":"R1 Panther G","vehicle":"Panther G","vehicle_id":"panther_g","turret_angle":.25,"shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Impact report shows cumulative crew and module damage")
 	check(battle.impact_killcam.model_view.model!=null and not battle.impact_killcam.model_view.model.find_children("*","MeshInstance3D",true,false).is_empty(),"Impact report renders a 3D tank model for its X-ray damage view")
+	check(str(battle.impact_killcam.model_view.model.scene_file_path).contains("panther_g"),"Impact report renders the actual target type")
+	battle.impact_killcam.model_view.show_event({"vehicle_id":"tiger_i","impact":{}})
+	check(str(battle.impact_killcam.model_view.model.scene_file_path).contains("tiger_i"),"A different victim replaces the X-ray tank model")
+	battle.impact_killcam.model_view.show_event({"vehicle_id":"panther_g","turret_angle":.25,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"impact":{"point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.model_view.model.find_child("DamageMarker",true,false)!=null and battle.impact_killcam.model_view.model.find_child("ImpactPath",true,false)!=null,"X-ray markers and shell path follow the rotated tank model")
 	check(is_equal_approx(float(battle.impact_killcam.model_view.model.find_child("TurretPivot",true,false).rotation.y),.25),"X-ray turret follows the target's actual traverse")
-	check(battle.impact_killcam.title.text=="ОТЧЁТ О ПОПАДАНИИ" or battle.impact_killcam.title.text=="IMPACT REPORT","Impact report uses a neutral title")
-	check(battle.impact_killcam.offset_right<400 and battle.impact_killcam.offset_bottom<battle.demo_controls.offset_top,"Impact report is placed away from telemetry and above the control guide")
+	check(battle.impact_killcam.title.text.contains("B1 T-34-85") and battle.impact_killcam.title.text.contains("R1 Panther G"),"Impact report names its actual shooter and target")
+	check(battle.impact_killcam.offset_left>=battle.vehicle_status_panel.offset_right and battle.impact_killcam.offset_right<870 and battle.impact_killcam.offset_bottom<battle.demo_controls.offset_top,"Impact report clears status, telemetry and control guide")
+	vehicle.module_damage["breech"]=.5;battle.update_vehicle_status()
 	await capture("battle-impact-killcam-1280x720")
+	battle.vehicle_status_panel.visible=true;battle.camera_mode=0;battle._process(.02)
+	check(not battle.impact_killcam.visible and not battle.vehicle_status_panel.visible,"Overview hides impact and own-vehicle status")
+	battle.camera_mode=3;battle.update_vehicle_status()
+	check(not battle.vehicle_status_panel.visible and not battle.should_show_impact(battle.vehicles[0],battle.vehicles[8]),"Free camera has neither own-vehicle status nor impact report")
+	battle.camera_mode=1;battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1","target_name":"R1","vehicle_id":"t34_85","impact":{}})
+	battle.impact_killcam._process(4.1)
+	check(not battle.impact_killcam.visible,"Impact report expires within five seconds")
+	battle.update_vehicle_status()
+	check(battle.vehicle_status_panel.visible and (battle.vehicle_status_text.text.contains("breech") or battle.vehicle_status_text.text.contains("казённик")),"Own-vehicle status shows cumulative module damage")
 	battle.demo_set_sniper_mode(false);vehicle.rotation.y=original_yaw;vehicle.turret_angle=original_turret;vehicle.gun_angle=original_gun;vehicle.manual_aim=false;vehicle.manual_hull_aim=false;vehicle.turret_rate=0.0;vehicle.gun_rate=0.0;vehicle.yaw_rate=0.0;battle.camera_mode=1;battle.paused=true
 	check(is_instance_valid(battle.demo_brain_panel) and battle.hud.visible==false,"Presentation HUD replaces research HUD")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_demo_hud();await capture("battle-1280x720")
@@ -137,8 +171,10 @@ func run():
 	Input.parse_input_event(lmb)
 	var lmb_release=lmb.duplicate();lmb_release.pressed=false;Input.parse_input_event(lmb_release)
 	for _tick in 4:await physics_frame
-	check(battle.demo_intro_left==0.0,"First routed Open Day click skips intro")
-	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Brief routed Open Day click fires exactly one round")
+	check(battle.demo_intro_left==0.0 and int(vehicle.metrics.shots)==shots_before,"First routed Open Day click only dismisses intro")
+	Input.parse_input_event(lmb);Input.parse_input_event(lmb_release)
+	for _tick in 4:await physics_frame
+	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Next brief routed Open Day click fires exactly one round")
 	battle.queue_free();await process_frame
 	print("OPEN DAY VALIDATION failures=",failures)
 	quit(0 if failures==0 else 1)

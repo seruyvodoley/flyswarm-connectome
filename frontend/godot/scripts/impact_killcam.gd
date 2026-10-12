@@ -114,6 +114,9 @@ class ImpactModelView extends SubViewportContainer:
 var title: Label
 var model_view: ImpactModelView
 var body: Label
+var source_id=-1
+var remaining=0.0
+const DISPLAY_SECONDS=4.0
 
 func _ready():
 	set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -126,8 +129,8 @@ func _ready():
 	var battle=get_parent().get_parent() if get_parent()!=null and get_parent().get_parent()!=null else null
 	if battle!=null and bool(battle.get("is_demo")):
 		set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		offset_left=20
-		offset_right=390
+		offset_left=410
+		offset_right=780
 		offset_top=-335
 		offset_bottom=-95
 		custom_minimum_size=Vector2(370,240)
@@ -148,7 +151,8 @@ func _ready():
 	add_child(column)
 	title=Label.new()
 	title.text="DAMAGE REPORT"
-	title.add_theme_font_size_override("font_size",12)
+	title.add_theme_font_size_override("font_size",11)
+	title.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_color_override("font_color",Color("ead58f"))
 	column.add_child(title)
 	model_view=ImpactModelView.new()
@@ -162,13 +166,27 @@ func _ready():
 	column.add_child(body)
 	hide()
 
+func _process(delta: float):
+	if not visible:return
+	remaining=maxf(0.0,remaining-delta)
+	if remaining<=0.0:hide()
+
+func dismiss():
+	remaining=0.0
+	source_id=-1
+	hide()
+
 func show_impact(event: Dictionary):
 	var impact: Dictionary=event.get("impact",{})
 	var russian=str(AppState.settings.language)=="ru"
 	var vehicle_name=str(event.get("vehicle","vehicle"))
+	source_id=int(event.get("source_id",-1))
+	remaining=DISPLAY_SECONDS
+	var source_name=str(event.get("source_name",""))
+	var target_name=str(event.get("target_name",vehicle_name))
 	var shell_name=str(event.get("shell",impact.get("shell","unknown")))
 	var penetrated=bool(impact.get("penetrated",false))
-	title.text="ОТЧЁТ О ПОПАДАНИИ" if russian else "IMPACT REPORT"
+	title.text=("ПОПАДАНИЕ  %s → %s" if russian else "HIT  %s → %s") % [source_name,target_name]
 	var outcome=str(impact.get("outcome",""))
 	var result="STOPPED"
 	if penetrated:result="ПРОБИТИЕ" if russian else "PENETRATED"

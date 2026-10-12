@@ -82,6 +82,13 @@ func run():
 	app.configure("battle");app.session.seconds=.3;app.launch()
 	check(await wait_battle(),"Rule battle starts")
 	check(app.battle.camera_mode==0,"Autonomous battle defaults to Battlefield camera")
+	check(not app.battle.vehicle_status_panel.visible and not app.battle.should_show_impact(app.battle.vehicles[0],app.battle.vehicles[8]),"Observer mode has no per-vehicle damage overlays")
+	app.battle.camera_mode=1;app.battle.update_vehicle_status()
+	check(app.battle.vehicle_status_panel.visible and app.battle.should_show_impact(app.battle.vehicles[0],app.battle.vehicles[8]) and not app.battle.should_show_impact(app.battle.vehicles[1],app.battle.vehicles[8]),"Only the selected shooter receives the correct enemy hit report")
+	app.battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1","target_name":"R1 Panther G","vehicle_id":"panther_g","impact":{}})
+	app.battle.select_vehicle(1);app.battle.update_vehicle_status()
+	check(not app.battle.impact_killcam.visible and app.battle.vehicle_status_text.text.contains(app.battle.vehicles[1].cfg.display_name),"Switching tanks clears old impact and shows new tank status")
+	app.battle.camera_mode=0;await process_frame
 	check(is_instance_valid(app.battle.camera_button),"Camera UI button")
 	check(is_instance_valid(app.battle.comm_toggle),"Communication UI button")
 	await process_frame

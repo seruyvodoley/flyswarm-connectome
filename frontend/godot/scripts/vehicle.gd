@@ -329,8 +329,11 @@ func step(dt: float):
 			stuck_intent_s=0.0
 
 	var traverse_factor=1.0 if modules.turret_drive else .1
-	var turret_max=deg_to_rad(float(cfg.turret_rate_deg_s))*traverse_factor
-	var gun_max=deg_to_rad(float(cfg.gun_rate_deg_s))*traverse_factor
+	# Slightly quicker mouse aiming in Open Day, while keeping mechanical slew
+	# and acceleration instead of snapping either axis to the cursor.
+	var mouse_aim_factor=1.15 if world.is_demo and agent_id==0 and manual_aim else 1.0
+	var turret_max=deg_to_rad(float(cfg.turret_rate_deg_s))*traverse_factor*mouse_aim_factor
+	var gun_max=deg_to_rad(float(cfg.gun_rate_deg_s))*traverse_factor*mouse_aim_factor
 	var desired_turret_rate=0.0
 	var desired_gun_rate=0.0
 	if not modules.gunner:

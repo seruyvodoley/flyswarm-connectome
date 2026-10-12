@@ -98,8 +98,11 @@ var demo_hud_clock=0.0
 var demo_sniper_mode=false
 var aim_prediction_timer=0.0
 var mouse_fire_pending=false
+var middle_drag_active=false
 var demo_camera_before_scope=1
 var impact_killcam: Control
+var vehicle_status_panel: PanelContainer
+var vehicle_status_text: Label
 
 # ============================================================
 # TEST RANGE KILLCAM / HIT FEEDBACK
@@ -470,6 +473,29 @@ func _ready():
 	impact_killcam=ImpactKillcam.new()
 	impact_killcam.visible=false
 	canvas.add_child(impact_killcam)
+	vehicle_status_panel=PanelContainer.new()
+	vehicle_status_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	vehicle_status_panel.offset_left=20
+	vehicle_status_panel.offset_right=390
+	vehicle_status_panel.offset_top=-250
+	vehicle_status_panel.offset_bottom=-92 if is_demo else -20
+	vehicle_status_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var status_style=StyleBoxFlat.new()
+	status_style.bg_color=Color(.025,.035,.04,.88)
+	status_style.border_color=Color(.55,.62,.56,.9)
+	status_style.set_border_width_all(1)
+	status_style.content_margin_left=12
+	status_style.content_margin_right=12
+	status_style.content_margin_top=10
+	status_style.content_margin_bottom=10
+	vehicle_status_panel.add_theme_stylebox_override("panel",status_style)
+	vehicle_status_text=Label.new()
+	vehicle_status_text.add_theme_font_size_override("font_size",12)
+	vehicle_status_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	vehicle_status_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	vehicle_status_panel.add_child(vehicle_status_text)
+	vehicle_status_panel.visible=false
+	canvas.add_child(vehicle_status_panel)
 
 	range_killcam_path=MeshInstance3D.new()
 	range_killcam_path.visible=false
@@ -630,6 +656,40 @@ func demo_health(vehicle) -> float:
 	for value in vehicle.modules.values():working+=1 if value else 0
 	return float(working)/float(total)
 
+func update_vehicle_status():
+	if not is_instance_valid(vehicle_status_panel):return
+	vehicle_status_panel.visible=camera_mode in [1,2] and not range_killcam_active and selected>=0 and selected<vehicles.size()
+	if not vehicle_status_panel.visible:return
+	var v=vehicles[selected]
+	var russian=str(AppState.settings.language)=="ru"
+	var crew_keys=["driver","gunner","commander","loader","radio_operator"]
+	var crew_total=0
+	var crew_alive=0
+	for key in crew_keys:
+		if v.modules.has(key):
+			crew_total+=1
+			if bool(v.modules[key]):crew_alive+=1
+	var lines=PackedStringArray()
+	lines.append("%s · %s" % [agent_label(selected),str(v.cfg.display_name)])
+	lines.append(("УНИЧТОЖЕН" if russian else "DESTROYED") if not v.alive else (("ЭКИПАЖ %d/%d · БК %d" if russian else "CREW %d/%d · AMMO %d") % [crew_alive,crew_total,v.ammo_left]))
+	var damaged=PackedStringArray()
+	var disabled=PackedStringArray()
+	for key in v.modules:
+		var module_name=status_module_name(str(key),russian)
+		if not bool(v.modules[key]):disabled.append(module_name)
+		elif float(v.module_damage.get(key,0.0))>0.0:damaged.append(module_name)
+	lines.append(("ВЫВЕДЕНЫ: " if russian else "DISABLED: ")+(" · ".join(disabled) if not disabled.is_empty() else "—"))
+	lines.append(("ПОВРЕЖДЕНЫ: " if russian else "DAMAGED: ")+(" · ".join(damaged) if not damaged.is_empty() else "—"))
+	var weapon_state=v.weapon_block_reason()
+	if weapon_state.is_empty():weapon_state="ГОТОВО" if russian else "READY"
+	elif russian:weapon_state={"destroyed":"уничтожен","gunner":"наводчик выбыл","breech":"казённик сломан","ammo":"нет снарядов","reload":"перезарядка"}.get(weapon_state,weapon_state)
+	lines.append(("ОРУДИЕ: " if russian else "GUN: ")+weapon_state.to_upper())
+	vehicle_status_text.text="\n".join(lines)
+
+func status_module_name(key: String,russian: bool) -> String:
+	if not russian:return key.replace("_"," ")
+	return {"driver":"механик-водитель","gunner":"наводчик","commander":"командир","loader":"заряжающий","radio_operator":"радист","ammo_rack":"боеукладка","breech":"казённик","turret_drive":"привод башни","engine":"двигатель","transmission":"трансмиссия","fuel":"топливо","track_left":"левая гусеница","track_right":"правая гусеница"}.get(key,key.replace("_"," "))
+
 func demo_bar(value: float) -> String:
 	var filled=clampi(roundi(clampf(value,0,1)*10),0,10)
 	return "["+"#".repeat(filled)+"-".repeat(10-filled)+"]"
@@ -678,7 +738,7 @@ func update_demo_hud():
 	demo_brain_text.text="\n".join(lines)
 
 func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
-	if not is_demo or vehicles.is_empty() or paused:return
+	if not is_demo or vehicles.is_empty() or paused or camera_mode not in [1,2]:return
 	var vehicle=vehicles[0]
 	if hull_turning:
 		# Mouse sets a desired heading; the tracks and steering mechanism slew
@@ -686,7 +746,7 @@ func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
 		if not vehicle.manual_hull_aim:
 			vehicle.manual_hull_target=vehicle.rotation.y
 			vehicle.manual_hull_aim=true
-		vehicle.manual_hull_target=wrapf(vehicle.manual_hull_target-relative.x*.004,-PI,PI)
+		vehicle.manual_hull_target=wrapf(vehicle.manual_hull_target+relative.x*.004,-PI,PI)
 		return
 	# The reticle follows the actual bore while mouse motion moves only the
 	# desired angle. This leaves visible aim lag in the gunner view.
@@ -695,11 +755,12 @@ func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
 		vehicle.manual_turret_target=vehicle.turret_angle
 		vehicle.manual_gun_target=vehicle.gun_angle
 	var sensitivity=.00085 if camera_mode==2 and demo_sniper_mode else .0032
-	var yaw_delta=-relative.x*sensitivity
+	var yaw_delta=relative.x*sensitivity
 	vehicle.manual_turret_target=wrapf(vehicle.manual_turret_target+yaw_delta,-PI,PI) if vehicle.cfg.turreted else clampf(vehicle.manual_turret_target+yaw_delta,-deg_to_rad(vehicle.cfg.traverse_limit_deg),deg_to_rad(vehicle.cfg.traverse_limit_deg))
 	vehicle.manual_gun_target=clampf(vehicle.manual_gun_target-relative.y*sensitivity,deg_to_rad(vehicle.cfg.elevation_deg[0]),deg_to_rad(vehicle.cfg.elevation_deg[1]))
 
 func demo_set_sniper_mode(enabled: bool):
+	if camera_mode not in [1,2]:return
 	if enabled and not demo_sniper_mode:
 		demo_camera_before_scope=camera_mode if camera_mode!=2 else 1
 		camera_mode=2
@@ -878,7 +939,7 @@ func _physics_process(delta):
 		if is_range:
 			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
 		if is_demo:
-			if v.agent_id==0:v.cmd=demo_mouse_commands(mouse_fire_pending or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+			if v.agent_id==0:v.cmd=demo_mouse_commands(mouse_fire_pending)
 			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
@@ -958,6 +1019,9 @@ func fire(v):
 	effect(p,Color(1,.65,.16),.7,.10)
 	shot_distances.append(v.target_range)
 
+func should_show_impact(shooter,victim) -> bool:
+	return shooter!=null and victim!=null and shooter.team!=victim.team and shooter.agent_id==selected and camera_mode in [1,2] and is_instance_valid(impact_killcam)
+
 func step_shells(dt: float):
 	for i in range(shells.size()-1,-1,-1):
 		var s=shells[i]
@@ -982,11 +1046,11 @@ func step_shells(dt: float):
 					hit.collider.get_meta("zone")
 				)
 				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
-				if shooter!=null and victim.team!=shooter.team and (not (is_demo or is_range) or shooter.agent_id==0) and is_instance_valid(impact_killcam):
+				if should_show_impact(shooter,victim):
 					var cumulative_damaged=[]
 					for module_key in victim.module_damage:
 						if float(victim.module_damage[module_key])>0.0:cumulative_damaged.append(module_key)
-					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"vehicle_id":victim.cfg.id,"turret_angle":victim.turret_angle,"shell":s.ammo.get("id","unknown"),"shot_count":victim.impact_history.size(),"module_positions":victim.impact_module_positions(),"destroyed_modules":victim.last_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged})
+					impact_killcam.show_impact({"impact":victim.last_impact,"source_id":shooter.agent_id,"source_name":agent_label(shooter.agent_id),"target_name":agent_label(victim.agent_id)+" "+str(victim.cfg.display_name),"vehicle":victim.cfg.display_name,"vehicle_id":victim.cfg.id,"turret_angle":victim.turret_angle,"shell":s.ammo.get("id","unknown"),"shot_count":victim.impact_history.size(),"module_positions":victim.impact_module_positions(),"destroyed_modules":victim.last_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged})
 
 				if is_range and victim.agent_id==8 and int(s.owner)==0:
 					on_range_target_impact(
@@ -1835,11 +1899,19 @@ func _process(dt):
 			range_feedback.visible=false
 
 	if is_range and range_killcam_active:
+		if camera_mode in [0,3]:
+			end_range_killcam()
+			return
+		if is_instance_valid(vehicle_status_panel):vehicle_status_panel.visible=false
 		update_range_killcam(dt)
 		return
 
 	var v=vehicles[selected] if not vehicles.is_empty() else null
 	if v==null:return
+	update_vehicle_status()
+	if is_instance_valid(impact_killcam) and impact_killcam.visible and (camera_mode not in [1,2] or impact_killcam.source_id!=selected):
+		impact_killcam.dismiss()
+	if camera_mode in [0,3] and is_instance_valid(range_killcam_panel):range_killcam_panel.visible=false
 	if is_demo:
 		demo_hud_clock+=dt
 		if demo_hud_clock>=.1:demo_hud_clock=0;update_demo_hud()
@@ -1884,10 +1956,11 @@ func _process(dt):
 	elif camera_mode==1:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		camera.fov=62.0
-		var follow=v.position-v.global_basis.z*(13 if is_demo else 16)+Vector3(0,7 if is_demo else 8,0)
+		var demo_heading=v.rotation.y+v.turret_angle
+		var demo_forward=Vector3(sin(demo_heading),0,cos(demo_heading))
+		var follow=v.position-demo_forward*13+Vector3(0,7,0) if is_demo else v.position-v.global_basis.z*16+Vector3(0,8,0)
 		camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,minf(1,dt*4))
-		var look_target=v.position+Vector3(0,2,0)
-		if is_demo and vehicles.size()>8:look_target=look_target.lerp(vehicles[8].position+Vector3(0,2,0),.10)
+		var look_target=v.position+Vector3(0,2,0)+demo_forward*7 if is_demo else v.position+Vector3(0,2,0)
 		camera.look_at(look_target)
 	elif camera_mode==2:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
@@ -2018,8 +2091,6 @@ func _unhandled_input(event):
 			KEY_ESCAPE:
 				if session_config!=null:pause_requested.emit()
 				else:get_tree().quit()
-	if is_demo and event is InputEventMouseMotion:
-		demo_apply_mouse_motion(event.relative,Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE))
 	if is_range and not paused and event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var range_vehicle=vehicles[0]
 		if not range_vehicle.manual_aim:
@@ -2035,10 +2106,18 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
 
 func _input(event):
+	if is_demo and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_MIDDLE:
+		middle_drag_active=event.pressed
+		return
+	if is_demo and event is InputEventMouseMotion:
+		demo_apply_mouse_motion(event.relative,middle_drag_active)
+		return
 	if not (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed):return
 	if is_demo and demo_intro_left>0:
 		demo_intro_left=0.0
 		if is_instance_valid(demo_intro):demo_intro.visible=false
+		get_viewport().set_input_as_handled()
+		return
 	if not (is_demo or is_range) or camera_mode not in [1,2] or paused or (is_range and range_killcam_active):return
 	# Capture before GUI controls can consume a quick click. Interactive buttons
 	# retain their behavior; decorative HUD labels must not swallow playfield fire.
@@ -2056,6 +2135,7 @@ func select_vehicle(index: int):
 		return
 
 	selected=index
+	if is_instance_valid(impact_killcam):impact_killcam.dismiss()
 
 	# Snap follow/gunner camera to the newly selected agent instead of
 	# interpolating from the old vehicle across the whole battlefield.
@@ -2234,6 +2314,8 @@ func size_world_label(label: Label3D, pixels: float, viewport_height: float):
 
 func cycle_camera():
 	camera_mode=(camera_mode+1)%4
+	if camera_mode in [0,3] and is_instance_valid(impact_killcam):impact_killcam.dismiss()
+	if camera_mode in [0,3] and is_instance_valid(range_killcam_panel):range_killcam_panel.visible=false
 	update_camera_button()
 
 func comm_mode_label() -> String:
@@ -2509,7 +2591,7 @@ func start_range_killcam(
 	shell: Dictionary,
 	impact_point: Vector3
 ):
-	if not is_range:
+	if not is_range or camera_mode not in [1,2]:
 		return
 
 	range_target_destroyed=true
@@ -2653,9 +2735,7 @@ func end_range_killcam():
 
 	clear_range_killcam_path()
 
-	# Keep the summary panel visible until the user restores the target.
-	if range_target_destroyed:
-		range_killcam_panel.visible=true
+	range_killcam_panel.visible=false
 
 
 func reset_range_target():

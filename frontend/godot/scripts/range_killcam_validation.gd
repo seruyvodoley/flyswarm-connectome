@@ -126,6 +126,11 @@ func run():
 		not battle.range_killcam_active,
 		"Killcam can be skipped"
 	)
+	check(not battle.range_killcam_panel.visible,"Range impact summary closes with the timed camera")
+	battle.camera_mode=0
+	battle.start_range_killcam(target,shell,target.global_position)
+	check(not battle.range_killcam_active and not battle.range_killcam_panel.visible,"Overview never opens a damage camera")
+	battle.camera_mode=1
 
 	battle.reset_range_target()
 

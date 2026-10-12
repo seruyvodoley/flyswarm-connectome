@@ -219,6 +219,8 @@ func create_objective_ring(
 
 
 func _ready():
+	set_process_input(true)
+	set_process_unhandled_input(true)
 	if session_config!=null:
 		launch_args=session_config.cli_args()
 		debug=AppState.settings.debug or session_config.range_mode in ["armour","modules"]
@@ -1967,6 +1969,9 @@ func _process(dt):
 		get_viewport().get_texture().get_image().save_png(screenshot_path)
 		screenshot_path=""
 func _unhandled_input(event):
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+		if (is_demo or is_range) and camera_mode in [1,2] and not paused and not (is_range and range_killcam_active):
+			mouse_fire_pending=true
 	if is_demo and event is InputEventMouseButton and event.pressed:
 		if event.button_index==MOUSE_BUTTON_RIGHT:
 			demo_toggle_sniper_scope()

@@ -4,6 +4,7 @@ var ammo=0
 var reload_left=0.0
 var scoped=false
 var aim_screen_position=Vector2(-1,-1)
+var has_aim_screen_position=false
 
 func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -17,10 +18,11 @@ func set_weapon_state(new_ammo: int,new_reload: float,new_scoped: bool=false):
 
 func set_aim_screen_position(screen_position: Vector2):
 	aim_screen_position=screen_position
+	has_aim_screen_position=true
 	queue_redraw()
 
 func _draw():
-	var c=aim_screen_position if aim_screen_position.x>=0.0 and aim_screen_position.y>=0.0 else size*.5
+	var c=aim_screen_position if has_aim_screen_position else size*.5
 	var colour=Color("e5ddb5") if scoped else Color(0.88,0.92,0.82,0.92)
 	var shadow=Color(0.02,0.03,0.02,0.82)
 	if scoped:

@@ -62,6 +62,8 @@ func run():
 	result_page.free()
 	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
 	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
+	battle.gunner_reticle.set_aim_screen_position(Vector2(-25.0,420.0))
+	check(battle.gunner_reticle.has_aim_screen_position and battle.gunner_reticle.aim_screen_position.x<0.0,"Sight preserves offscreen impact coordinates instead of snapping to screen centre")
 	battle.camera_mode=0;await process_frame
 	check(not battle.gunner_reticle.visible,"Battlefield observer view hides the gun sight")
 	battle.camera_mode=3;await process_frame

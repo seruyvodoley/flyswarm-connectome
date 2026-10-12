@@ -42,6 +42,7 @@ jobs:
           if (-not $godot) { throw 'Godot executable was not found in the official archive.' }
           "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Invoke-WebRequest "$base/Godot_v4.7.2-stable_export_templates.tpz" -OutFile templates.tpz
+          New-Item -ItemType Directory -Force templates | Out-Null
           New-Item -ItemType Directory -Force "$env:APPDATA\Godot\export_templates\4.7.2.stable" | Out-Null
           tar -xf templates.tpz -C templates
           Copy-Item 'templates\templates\*' "$env:APPDATA\Godot\export_templates\4.7.2.stable" -Recurse -Force

@@ -109,6 +109,10 @@ func main_menu():
 	menu_entry(left,"OPEN DAY DEMO","A fast 1v1: a visitor against a tank controlled by the reconstructed MaleCNS model.",AppState.open_day_menu)
 	menu_entry(left,"AUTONOMOUS BATTLE","Run or observe an 8×8 battle using Rule AI, MaleCNS or a trained adapter.",AppState.configure.bind("battle"))
 	menu_entry(left,"RESEARCH LABORATORY","Run reproducible experiment series across seeds and compare conditions.",AppState.configure.bind("research"))
+	if str(AppState.settings.get("language","en"))=="ru":
+		menu_entry(left,"ЛАБОРАТОРИЯ MARL","Обучите командную политику PPO, сравните её со случайной и просмотрите записанный бой.",AppState.show_page.bind("MarlLaboratory"))
+	else:
+		menu_entry(left,"MARL LABORATORY","Train a PettingZoo team policy, compare it with Random and replay Python-authoritative battles.",AppState.show_page.bind("MarlLaboratory"))
 	menu_entry(left,"READOUT TRAINING","Fit and evaluate an external motor readout from MaleCNS features. Teacher imitation; no reward.",AppState.configure.bind("training"))
 	menu_entry(left,"TEST RANGE","Manually drive and fire to inspect mobility, armour, ballistics and damage.",AppState.configure.bind("range"))
 	menu_entry(left,"REPLAYS","Open recorded simulations without running MaleCNS again.",AppState.show_page.bind("ReplayBrowser"))

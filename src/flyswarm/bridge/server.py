@@ -17,18 +17,19 @@ def load_policy(path):
     return Readout.load(path)
 
 def ppo_features(policy,trace,observation):
-    """Build live PPO input while retaining old 20-D checkpoint compatibility."""
-    base=np.concatenate([
-        np.log1p(np.maximum(0,np.asarray(trace,dtype=float)))/5,
-        np.asarray(observation.get('rl_task',[0.]*14),dtype=float),
-    ])
+    """Build current inputs and retain compatibility with 20/28-value checkpoints."""
+    neural=np.log1p(np.maximum(0,np.asarray(trace,dtype=float)))/5
+    task=np.asarray(observation.get('rl_task',[0.]*14),dtype=float)
+    legacy=np.concatenate([neural,task[:14]])
+    current=np.concatenate([neural,task[:16]])
     expected=int(policy.weights.shape[0]-1)
-    if expected==base.size:
-        return base
-    conditioned=np.concatenate([base,role_features(str(observation['vehicle']))])
-    if expected==conditioned.size:
-        return conditioned
-    raise ValueError(f"PPO observation size mismatch: checkpoint expects {expected}, runtime provides {base.size} legacy or {conditioned.size} role-conditioned features")
+    if expected==current.size:return current
+    if expected==legacy.size:return legacy
+    conditioned=np.concatenate([current,role_features(str(observation['vehicle']))])
+    if expected==conditioned.size:return conditioned
+    legacy_conditioned=np.concatenate([legacy,role_features(str(observation['vehicle']))])
+    if expected==legacy_conditioned.size:return legacy_conditioned
+    raise ValueError(f"PPO observation size mismatch: checkpoint expects {expected}, runtime provides {current.size} current or {legacy.size} legacy features, with role-conditioned variants")
 
 def main():
     p=argparse.ArgumentParser()

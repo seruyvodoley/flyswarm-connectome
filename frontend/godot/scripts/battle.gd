@@ -1256,7 +1256,9 @@ func rl_task_features(vehicle) -> Array:
 		sin(bearing),cos(bearing),delta.length()/1500.0,
 		float(zone.owner),float(zone.progress),
 		tickets[vehicle.team]/300.0,tickets[1-vehicle.team]/300.0,
-		float(assigned)/2.0,1.0 if vehicle.seen else 0.0,1.0
+		float(assigned)/2.0,1.0 if vehicle.seen else 0.0,1.0,
+		vehicle.turret_angle/maxf(0.01,deg_to_rad(float(vehicle.cfg.traverse_limit_deg))),
+		vehicle.gun_angle/maxf(0.01,maxf(absf(deg_to_rad(float(vehicle.cfg.elevation_deg[0]))),absf(deg_to_rad(float(vehicle.cfg.elevation_deg[1])))))
 	]
 
 

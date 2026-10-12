@@ -1,11 +1,10 @@
 """PettingZoo API for repeatable, headless FlySwarm practicals.
 
 The interactive Godot battle remains the authoritative high-fidelity runtime.
-This bounded analytical backend preserves the same 16 agents, six controls,
-simultaneous stepping, domination transitions and ticket/death semantics. It
-is explicitly tagged in ``infos`` so its results cannot be mistaken for a
-MaleCNS/Godot experiment. MaleCNS features may be supplied by a caller; zeros
-mean unavailable and are never fabricated.
+This bounded analytical backend is the authoritative state and reward source
+for MARL episodes. It is explicitly tagged in ``infos`` so its results cannot
+be mistaken for the separate Godot physics battle. MaleCNS features may be
+supplied by a caller; zeros mean unavailable and are never fabricated.
 
 Role/country conditioning is an ENGINEERED policy input. It is never injected
 into MaleCNS and should be interpreted as a controllable research prior rather
@@ -35,7 +34,7 @@ class FlySwarmParallelEnv(ParallelEnv):
         self.vehicle_ids=tuple(vehicle_ids or DEFAULT_COMPOSITION)
         if len(self.vehicle_ids)!=16:raise ValueError("vehicle_ids must contain 16 vehicle ids")
         self.role_conditioning=bool(role_conditioning)
-        self.obs_dim=20+(ROLE_FEATURE_DIM if self.role_conditioning else 0)
+        self.obs_dim=22+(ROLE_FEATURE_DIM if self.role_conditioning else 0)
         self.profiles=[vehicle_profile(v) for v in self.vehicle_ids]
         self._rng=np.random.default_rng();self.agents=[]
     @lru_cache(None)
@@ -46,11 +45,15 @@ class FlySwarmParallelEnv(ParallelEnv):
         self._rng=np.random.default_rng(seed);self.agents=list(self.possible_agents);self.steps=0
         self.pos=np.zeros((16,2),float);self.pos[:8]=[-450,-180];self.pos[8:]=[450,180]
         self.pos[:,1]+=np.linspace(-210,210,8).tolist()*2
-        self.heading=np.r_[np.full(8,np.pi/2),np.full(8,-np.pi/2)]
+        self.pos+=self._rng.uniform(-8.,8.,size=(16,2))
+        self.heading=np.r_[np.full(8,np.pi/2),np.full(8,-np.pi/2)]+self._rng.uniform(-.025,.025,16)
         self.speed=np.zeros(16);self.health=np.ones(16);self.reload=np.zeros(16)
+        self.turret_heading=np.zeros(16);self.gun_elevation=np.zeros(16)
         self.tickets=np.array([300.,300.]);self.zones_owner=np.full(3,-1,int);self.zones_progress=np.zeros(3)
         self.zones=np.array([[-240.,0.],[0.,0.],[240.,0.]])
         self.neural=np.zeros((16,6),np.float32);self.last_components=[{} for _ in range(16)]
+        self.last_events=[];self.last_actions=np.zeros((16,6),np.float32)
+        self.last_rewards={}
         return self._observations(),{a:self._info(i) for i,a in enumerate(self.agents)}
     def set_connectome_features(self,features):
         value=np.asarray(features,np.float32)
@@ -59,12 +62,22 @@ class FlySwarmParallelEnv(ParallelEnv):
     def step(self,actions):
         if not self.agents:raise RuntimeError("step() after episode end")
         previous_tickets=self.tickets.copy();previous_owner=self.zones_owner.copy();previous_progress=self.zones_progress.copy();previous_health=self.health.copy();previous_pos=self.pos.copy()
+        self.last_events=[]
         applied=np.zeros((16,6),float)
         for i,a in enumerate(self.possible_agents):
             action=np.clip(np.asarray(actions.get(a,np.zeros(6)),float),-1,1);applied[i]=action
             if self.health[i]<=0:continue
             spec=self.profiles[i]
             self.heading[i]+=action[2]*float(spec["turn_rate_rad_s"])*self.dt
+            if spec["turreted"]:
+                self.turret_heading[i]+=action[3]*float(spec["turret_rate_rad_s"])*self.dt
+                limit=float(spec["traverse_limit_rad"])
+                self.turret_heading[i]=float(np.clip(self.turret_heading[i],-limit,limit))
+            else:
+                self.turret_heading[i]=0.0
+            self.gun_elevation[i]=float(np.clip(
+                self.gun_elevation[i]+action[4]*float(spec["gun_rate_rad_s"])*self.dt,
+                float(spec["elevation_min_rad"]),float(spec["elevation_max_rad"])))
             self.speed[i]+=(action[0]*float(spec["accel_m_s2"])-max(0.,action[1])*8.-self.speed[i]*.28)*self.dt
             self.speed[i]=np.clip(self.speed[i],-float(spec["reverse_m_s"]),float(spec["max_speed_m_s"]))
             self.pos[i]+=np.array([np.cos(self.heading[i]),np.sin(self.heading[i])])*self.speed[i]*self.dt
@@ -74,8 +87,40 @@ class FlySwarmParallelEnv(ParallelEnv):
                 alive=targets[self.health[targets]>0]
                 if len(alive):
                     distance=np.linalg.norm(self.pos[alive]-self.pos[i],axis=1);target=alive[np.argmin(distance)]
-                    if distance.min()<float(spec["effective_range_m"]):
-                        self.health[target]=max(0.,self.health[target]-float(spec["damage_per_hit"]))
+                    impact_distance=float(distance.min())
+                    target_pos=self.pos[target]
+                    target_bearing=float(np.arctan2(target_pos[1]-self.pos[i,1],target_pos[0]-self.pos[i,0]))
+                    hull_error=float((target_bearing-self.heading[i]+np.pi)%(2*np.pi)-np.pi)
+                    if spec["turreted"]:
+                        traverse=float(spec["traverse_limit_rad"])
+                        turret_error=float((hull_error-self.turret_heading[i]+np.pi)%(2*np.pi)-np.pi)
+                        target_heading_ok=abs(turret_error)<=np.deg2rad(8.)
+                    else:
+                        turret_error=0.0
+                        target_heading_ok=abs(hull_error)<=np.deg2rad(8.)
+                    target_elevation_ok=abs(self.gun_elevation[i])<=np.deg2rad(5.)
+                    before=float(self.health[target])
+                    damage=0.0
+                    hit=bool(impact_distance<float(spec["effective_range_m"])
+                             and target_heading_ok and target_elevation_ok)
+                    if hit:
+                        damage=min(before,float(spec["damage_per_hit"]))
+                        self.health[target]=max(0.,before-damage)
+                    self.last_events.append({
+                        "type":"shot","agent_id":a,"target_id":AGENTS[int(target)],
+                        "distance_m":impact_distance,"hit":hit,"damage":damage,
+                        "aim_error_rad":float(turret_error if spec["turreted"] else hull_error),
+                        "impact_location":"unspecified_by_analytical_backend" if hit else None,
+                    })
+                    if damage>0:
+                        self.last_events.append({
+                            "type":"damage","agent_id":a,"target_id":AGENTS[int(target)],
+                            "damage":damage,"health_before":before,
+                            "health_after":float(self.health[target]),
+                            "impact_location":"unspecified_by_analytical_backend",
+                        })
+                        if self.health[target]<=0:
+                            self.last_events.append({"type":"destroyed","agent_id":a,"target_id":AGENTS[int(target)]})
                     self.reload[i]=float(spec["reload_s"])
         self._objectives()
         self.steps+=1
@@ -103,8 +148,46 @@ class FlySwarmParallelEnv(ParallelEnv):
         terminations={a:done and self.steps<self.max_steps for a in self.possible_agents}
         truncations={a:done and self.steps>=self.max_steps for a in self.possible_agents}
         observations=self._observations()
+        self.last_actions=applied.astype(np.float32)
+        self.last_rewards=dict(rewards)
         if done:self.agents=[]
         return observations,rewards,terminations,truncations,infos
+
+    def snapshot(self,actions=None,rewards=None,kind="frame",run_id=None):
+        """Serialize authoritative state without inventing projectile physics."""
+        actions=actions or {}
+        rewards=rewards or self.last_rewards
+        agents=[]
+        for i,agent_id in enumerate(self.possible_agents):
+            profile=self.profiles[i]
+            action=actions.get(agent_id,self.last_actions[i])
+            agents.append({
+                "agent_id":agent_id,"team":"blue" if i<8 else "red",
+                "vehicle_id":self.vehicle_ids[i],"vehicle_class":profile["vehicle_class"],
+                "position_m":[float(x) for x in self.pos[i]],
+                "heading_rad":float(self.heading[i]),"speed_m_s":float(self.speed[i]),
+                "turret_heading_rad":float(self.turret_heading[i]),"gun_elevation_rad":float(self.gun_elevation[i]),
+                "health":float(self.health[i]),"alive":bool(self.health[i]>0),
+                "reload_s":float(self.reload[i]),
+                "action":[float(x) for x in np.asarray(action).reshape(6)],
+                "reward":float(rewards.get(agent_id,0.0)),
+            })
+        frame={
+            "kind":kind,"tick":int(self.steps),"sim_time_s":float(self.steps*self.dt),
+            "agents":agents,
+            "zones":[{"zone_id":chr(ord("A")+i),"position_m":[float(x) for x in center],
+                      "owner":None if int(self.zones_owner[i])<0 else ("blue" if self.zones_owner[i]==0 else "red"),
+                      "capture_progress":float(self.zones_progress[i])}
+                     for i,center in enumerate(self.zones)],
+            "tickets":{"blue":float(self.tickets[0]),"red":float(self.tickets[1])},
+            "events":list(self.last_events),
+            "state_authority":"FlySwarmParallelEnv",
+        }
+        if run_id is not None:frame["run_id"]=run_id
+        return frame
+
+    def close(self):
+        self.agents=[]
     def _objectives(self):
         for z,center in enumerate(self.zones):
             inside=np.linalg.norm(self.pos-center,axis=1)<65
@@ -153,15 +236,26 @@ class FlySwarmParallelEnv(ParallelEnv):
             proprio=np.array([
                 self.speed[i]/max(1.,float(spec["max_speed_m_s"])),
                 self.reload[i]/max(1.,float(spec["reload_s"])),self.health[i],float(self.health[i]>0)
+                ,self.turret_heading[i]/max(1e-6,float(spec["traverse_limit_rad"])),
+                self.gun_elevation[i]/max(1e-6,abs(float(spec["elevation_min_rad"])),abs(float(spec["elevation_max_rad"])))
             ])
-            task=np.array([np.sin(bearing),np.cos(bearing),np.linalg.norm(delta)/700,owner,self.zones_progress[zone]/100,self.tickets[i//8]/300,self.tickets[1-i//8]/300,zone/2,1.])
+            enemy_ids=np.arange(8,16) if i<8 else np.arange(0,8)
+            alive=enemy_ids[self.health[enemy_ids]>0]
+            if len(alive):
+                nearest=alive[int(np.argmin(np.linalg.norm(self.pos[alive]-self.pos[i],axis=1)))]
+                enemy_delta=self.pos[nearest]-self.pos[i]
+                enemy_bearing=float((np.arctan2(enemy_delta[1],enemy_delta[0])-self.heading[i]-self.turret_heading[i]+np.pi)%(2*np.pi)-np.pi)
+                enemy_distance=float(np.linalg.norm(enemy_delta))
+            else:
+                enemy_bearing=0.;enemy_distance=1000.
+            task=np.array([np.sin(bearing),np.cos(bearing),np.linalg.norm(delta)/700,owner,self.zones_progress[zone]/100,self.tickets[i//8]/300,self.tickets[1-i//8]/300,enemy_bearing/np.pi,enemy_distance/1000.])
             base=np.concatenate([self.neural[i],proprio,task,[1.]]).astype(np.float32)
             out[a]=np.concatenate([base,role_features(self.vehicle_ids[i])]).astype(np.float32) if self.role_conditioning else base
         return out
     def _info(self,i):
         p=self.profiles[i]
         return {
-            "backend":"analytical_training","authoritative_runtime":"Godot","reward_components":dict(self.last_components[i]),
+            "backend":"analytical_training","authoritative_runtime":"FlySwarmParallelEnv","reward_components":dict(self.last_components[i]),
             "tickets":self.tickets.tolist(),"alive":bool(self.health[i]>0),"action_order":ACTION_NAMES,
             "vehicle":self.vehicle_ids[i],"vehicle_class":p["vehicle_class"],"tactical_role":p["tactical_role"],
             "nation":p["nation"],"role_conditioning":self.role_conditioning,

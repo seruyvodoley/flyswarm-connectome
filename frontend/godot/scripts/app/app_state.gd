@@ -21,28 +21,48 @@ var current_page="MainMenu"
 var loading_message="Preparing simulation…"
 var backend_dialog_open=false
 var open_day_mode=false
+var marl_pid=-1
+var marl_output=""
+var marl_replay_path=""
+var marl_progress={}
 func _ready():
 	packaged_app=not OS.has_feature("editor")
 	if packaged_app:
-		bundle_resources=OS.get_executable_path().get_base_dir().path_join("../Resources").simplify_path()
+		bundle_resources=packaged_resources_path()
 		root_path=bundle_resources.path_join("support")
-		python=bundle_resources.path_join("backend/FlySwarmBackend/FlySwarmBackend")
+		python=packaged_backend_path()
 		OS.unset_environment("PYTHONPATH")
 	else:
 		root_path=OS.get_environment("FLYSWARM_ROOT")
 		if root_path=="":root_path=ProjectSettings.globalize_path("res://../..").simplify_path()
 		python=OS.get_environment("FLYSWARM_PYTHON")
-		if python=="":python=root_path.path_join(".venv/bin/python")
+		if python=="":python=developer_python_path()
 		OS.set_environment("PYTHONPATH",root_path.path_join("src"))
 	var file=ConfigFile.new()
 	if file.load("user://settings.cfg")==OK:
 		for key in settings:settings[key]=file.get_value("settings",key,settings[key])
 	if str(settings.dataset_path)=="":
 		settings.dataset_path=OS.get_environment("FLY_DATA")
-		if str(settings.dataset_path)=="":settings.dataset_path=OS.get_environment("HOME").path_join("fly-data")
+		if str(settings.dataset_path)=="":settings.dataset_path=user_home_path().path_join("fly-data")
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	get_tree().auto_accept_quit=false
 	apply_settings()
+func windows_host() -> bool:
+	return OS.get_name()=="Windows"
+func user_home_path() -> String:
+	var home=OS.get_environment("HOME")
+	if home=="":home=OS.get_environment("USERPROFILE")
+	return home
+func developer_python_path() -> String:
+	if windows_host():return root_path.path_join(".venv/Scripts/python.exe")
+	return root_path.path_join(".venv/bin/python")
+func packaged_resources_path() -> String:
+	var executable_dir=OS.get_executable_path().get_base_dir()
+	if OS.get_name()=="macOS":return executable_dir.path_join("../Resources").simplify_path()
+	return executable_dir.path_join("Resources")
+func packaged_backend_path() -> String:
+	var executable="FlySwarmBackend.exe" if windows_host() else "FlySwarmBackend"
+	return bundle_resources.path_join("backend/FlySwarmBackend").path_join(executable)
 func apply_settings():
 	if DisplayServer.get_name()=="headless":return
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if settings.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
@@ -127,6 +147,25 @@ func show_page(page: String):
 	clear_view()
 	view=load("res://scenes/app/"+page+".tscn").instantiate()
 	get_tree().root.add_child(view)
+func run_marl_job(command: String,args: Array=[]):
+	if marl_pid>0 and OS.is_process_running(marl_pid):return
+	var root=results_root().path_join("marl")
+	DirAccess.make_dir_recursive_absolute(root)
+	var stamp=Time.get_datetime_string_from_system().replace(":","-")+"-"+str(Time.get_ticks_msec())
+	marl_output=root.path_join(stamp+"-"+command)
+	DirAccess.make_dir_recursive_absolute(marl_output.get_base_dir())
+	var cli_args=PackedStringArray()
+	if packaged_app:cli_args.append("--marl")
+	else:cli_args.append_array(["-m","flyswarm.marl.cli"])
+	cli_args.append_array(["--output-root",root,"--experiment-dir",marl_output,command])
+	for item in args:cli_args.append(str(item))
+	marl_pid=OS.create_process(python,cli_args)
+	marl_progress={"state":"starting" if marl_pid>0 else "error","command":command}
+	if marl_pid<=0:marl_progress["message"]="Could not start the Python experiment process."
+	show_page("MarlLaboratory")
+func open_marl_replay(path: String):
+	marl_replay_path=path
+	show_page("MarlViewer")
 func configure(mode: String):
 	open_day_mode=false
 	session=Config.new()
@@ -179,6 +218,10 @@ func stop_job():
 func stop_session():
 	generation+=1
 	stop_job()
+	if marl_pid>0 and OS.is_process_running(marl_pid):
+		FileAccess.open(marl_output.path_join("cancel"),FileAccess.WRITE).store_string("cancel")
+		OS.kill(marl_pid)
+	marl_pid=-1
 	stop_backend()
 	if is_instance_valid(battle):
 		if not battle.finished_report and not battle.replay_mode:battle.finish(false)
@@ -326,6 +369,16 @@ func start_job(evaluate=false):
 	backend_state="BUSY"
 	show_page("JobProgress")
 func _process(_dt):
+	if marl_pid>0:
+		var progress=read_json(marl_output.path_join("progress.json"))
+		if not progress.is_empty():marl_progress=progress
+		if not OS.is_process_running(marl_pid):
+			marl_pid=-1
+			var has_result=FileAccess.file_exists(marl_output.path_join("summary.json")) or FileAccess.file_exists(marl_output.path_join("manifest.json"))
+			if str(marl_progress.get("state",""))!="error":marl_progress["state"]="complete" if has_result else "error"
+			if not has_result and not marl_progress.has("message"):marl_progress["message"]="Experiment process exited without writing a result manifest."
+		if current_page=="MarlLaboratory" and is_instance_valid(view) and view.has_method("update_marl_status"):
+			view.update_marl_status(marl_progress,marl_output)
 	if current_page=="JobProgress" and job_path!="":
 		var state=read_json(job_path.path_join("progress.json"))
 		if state.get("state","") in ["complete","cancelled","error"]:

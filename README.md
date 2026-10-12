@@ -57,19 +57,45 @@ surface-материалов; просмотрщик в меню загружа�
 | Research Lab | Сравнение условий связи, физики, смены сторон и переноса политик; отмена задания |
 | Обучение | Сбор примеров, ridge-адаптер, сохранение и проверка на отдельном seed |
 | Повторы | Запись состояний мира и телеметрии, воспроизведение без MaleCNS |
-| MARL API | PettingZoo ParallelEnv для 16 агентов, random baseline и общий PPO/IPPO readout |
+| MARL Laboratory | Random baseline, обучение Stable-Baselines3 PPO, независимая оценка, paired comparison и replay на настоящих моделях |
+| MARL Python CLI | Воспроизводимые PettingZoo-эксперименты без Godot, MaleCNS или dataset; CSV, JSON, график, checkpoint и траектории |
 | Интерфейс | RU/EN, сохранение языка и настроек, пауза, возврат в меню, управление бэкендом |
 
 Расчёт пробития, последствия попаданий и границы исторической точности
 описаны в [модели брони и повреждений](docs/armour_damage_model.md).
+
+MARL-практическая использует отдельную аналитическую PettingZoo-среду. В ней
+Python задаёт состояние и награду, а Godot Viewer воспроизводит сохранённую
+траекторию; обычная физика боя не пересчитывает эти результаты. Для запусков
+из терминала:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m flyswarm.marl.cli baseline --episodes 3
+PYTHONPATH=src .venv/bin/python -m flyswarm.marl.cli train --steps 10000
+PYTHONPATH=src .venv/bin/python -m flyswarm.marl.cli compare results/raw/marl/<training-id>/checkpoint/ppo_team.zip --episodes 5
+```
+
+В Windows PowerShell сначала задайте `$env:PYTHONPATH="src"` и используйте
+`.venv\Scripts\python.exe`. Команды CLI одинаковы в Windows, Linux и macOS.
+Windows x64 export, installer и Python backend проверяются в GitHub Actions;
+графический интерфейс и MaleCNS на физической Windows-машине пока не проверены.
+Сборка описана в [`docs/windows_packaging.md`](docs/windows_packaging.md).
+Подробная методика для студентов и преподавателя:
+[`docs/practicum_marl.md`](docs/practicum_marl.md) и
+[`docs/practicum_marl_teacher.md`](docs/practicum_marl_teacher.md).
+
+Примеры записанного боя: [Random](artifacts/marl/random-battle.png) ·
+[обученная PPO-политика](artifacts/marl/trained-ppo-battle.png). Аналитические
+маркеры показывают зарегистрированные события и не задают точную точку попадания.
 
 Техника: **Panther G, Tiger I, Jagdpanther, T-34-85, IS-2, SU-100, Tiger**.
 
 
 ## Быстрый старт
 
-Проверенная платформа: macOS Apple Silicon. Нужен Godot 4.7.2, установленный
-в `~/Applications/Godot.app` либо `/Applications/Godot.app`.
+Интерактивно проверенная платформа: macOS Apple Silicon. Windows x64 получает
+автоматическую сборку и headless smoke-тест в CI; это не подтверждает ручную
+работу графического интерфейса. Для запуска из исходников нужен Godot 4.7.2.
 
 ```sh
 ./run.sh
@@ -144,7 +170,8 @@ Python: сенсорный кодировщик → два отдельных Fl
 включая базовую стрельбу, задаётся правилами. Исторические размеры, броня и
 физика содержат приближения. Полная историческая валидация моделей не пройдена.
 Недоступные учебные задачи отключены; награда для ridge imitation не определена.
-Звуковое сопровождение и готовое подписанное macOS-приложение не реализованы.
+macOS-приложение подписывается ad-hoc без Developer ID и не нотариализовано;
+при первом запуске Gatekeeper может потребовать ручное разрешение.
 
 ## Проверки и воспроизводимость
 
@@ -182,4 +209,5 @@ docs/            исследования, источники, валидаци�
 [PettingZoo и MARL](docs/marl.md) ·
 [Приближения](docs/known_approximations.md) ·
 [Источники моделей](docs/references/pass03_audit.md) ·
-[Подготовка macOS-сборки](docs/macos_packaging.md)
+[Подготовка macOS-сборки](docs/macos_packaging.md) ·
+[Сборка Windows x64](docs/windows_packaging.md)

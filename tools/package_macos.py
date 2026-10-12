@@ -73,7 +73,7 @@ def remove_macos_metadata(root: Path) -> None:
 
 
 def add_third_party_licenses(destination: Path) -> None:
-    packages = ["flybrain", "numpy", "scipy", "numba", "llvmlite", "pettingzoo", "gymnasium"]
+    packages = ["flybrain", "numpy", "scipy", "numba", "llvmlite", "pettingzoo", "gymnasium", "stable-baselines3", "torch"]
     sections: list[str] = []
     for package in packages:
         distribution = importlib.metadata.distribution(package)
@@ -105,10 +105,12 @@ def build_backend(python: Path, build_root: Path, output: Path) -> Path:
         "--name", "FlySwarmBackend", "--distpath", str(output), "--workpath", str(work),
         "--specpath", str(specs), "--paths", str(ROOT / "src"),
         "--collect-all", "flybrain", "--collect-all", "pettingzoo", "--collect-all", "gymnasium",
+        "--collect-all", "stable_baselines3", "--collect-all", "torch", "--collect-all", "matplotlib",
         "--collect-binaries", "llvmlite",
-        "--exclude-module", "matplotlib", "--exclude-module", "pygame",
+        "--exclude-module", "pygame",
         "--collect-binaries", "scipy", "--hidden-import", "flybrain.brain",
-        "--hidden-import", "flybrain.data", str(ROOT / "tools/packaged_backend.py"),
+        "--hidden-import", "flybrain.data", "--hidden-import", "flyswarm.marl.cli",
+        str(ROOT / "tools/packaged_backend.py"),
     ]
     env = dict(os.environ)
     env["PYTHONPATH"] = str(ROOT / "src")
@@ -117,6 +119,13 @@ def build_backend(python: Path, build_root: Path, output: Path) -> Path:
     executable = dist / "FlySwarmBackend"
     if not executable.is_file():
         raise RuntimeError(f"PyInstaller executable missing: {executable}")
+    # Torch ships over a gigabyte of C/C++ headers for compiling custom
+    # extensions. FlySwarm uses the precompiled CPU runtime and never builds
+    # extensions inside the app; omit headers but retain runtime libraries
+    # and their licenses to keep the installer practical.
+    torch_headers = dist / "_internal/torch/include"
+    if torch_headers.is_dir():
+        shutil.rmtree(torch_headers)
     return dist
 
 

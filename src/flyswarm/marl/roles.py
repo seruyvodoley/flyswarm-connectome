@@ -41,6 +41,12 @@ def vehicle_profile(identifier: str) -> dict:
         "max_speed_m_s":float(params["max_speed_kph"])/3.6,
         "reverse_m_s":float(params.get("reverse_kph",4.0))/3.6,
         "turn_rate_rad_s":np.deg2rad(float(params.get("turn_rate_deg_s",25.0))),
+        "turreted":bool(params.get("turreted",True)),
+        "turret_rate_rad_s":np.deg2rad(float(params.get("turret_rate_deg_s",8.0))),
+        "gun_rate_rad_s":np.deg2rad(float(params.get("gun_rate_deg_s",2.8))),
+        "traverse_limit_rad":np.deg2rad(float(params.get("traverse_limit_deg",180.0))),
+        "elevation_min_rad":np.deg2rad(float(params.get("elevation_deg",[-10,20])[0])),
+        "elevation_max_rad":np.deg2rad(float(params.get("elevation_deg",[-10,20])[1])),
         "reload_s":float(params["reload_s"]),
         "accel_m_s2":float(np.clip((float(params["engine_kw"])*1000.0/max(1.0,float(params["mass_kg"]))) * .42, 2.0, 6.5)),
     })

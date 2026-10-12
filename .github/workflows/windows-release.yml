@@ -81,12 +81,21 @@ jobs:
           & $backend --marl --output-root $smoke compare $checkpoint --episodes 1 --seed 31 --max-steps 16
           if ($LASTEXITCODE -ne 0) { throw 'Installed paired comparison smoke failed.' }
 
-      - name: Upload Windows build artifact
+      - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FlySwarm-Windows-x64
+          name: FlySwarm-Windows-x64-installer
           path: |
             build/windows/FlySwarm-*-windows-x64-setup.exe
+            build/windows/SHA256SUMS-windows.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Windows portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlySwarm-Windows-x64-portable
+          path: |
             build/windows/FlySwarm-*-windows-x64.zip
             build/windows/SHA256SUMS-windows.txt
           if-no-files-found: error

@@ -15,6 +15,9 @@ func run():
 		var y=-4.905*flight*flight
 		check(y<0 and flight>0,"gravity/time")
 		print("BALLISTICS vacuum check range=",distance," time=",flight," drop=",y)
+	var no_drag={"drag_per_m":0.0}
+	var step=Combat.advance_projectile(Vector3.ZERO,Vector3.FORWARD*100.0,no_drag,.1)
+	check(step.position.distance_to(Vector3(0,-.04905,-10))<.001,"shared shell integration preserves gravity and forward travel")
 	var frontal=Combat.impact(ammo,100,Vector3.FORWARD,Vector3.BACK,{"thickness_mm":80})
 	check(frontal.penetrated,"normal impact should penetrate")
 	var oblique=Combat.impact(ammo,100,Vector3.FORWARD,Vector3(1,0,.1),{"thickness_mm":80})
@@ -41,6 +44,7 @@ func run():
 	# End-to-end shot: the imported barrel, projectile ray, armor collider,
 	# penetration calculation and internal module must agree.
 	a.cfg.gun_data.dispersion_mrad=0.0
+	var predicted=Combat.predict_impact(scene.get_world_3d().direct_space_state,a.muzzle.global_position,a.muzzle.global_basis.z,a.cfg.ammo_data,a.excluded())
 	scene.fire(a)
 	for shot_frame in range(30):
 		if scene.shells.is_empty():break
@@ -48,6 +52,7 @@ func run():
 	check(scene.shells.is_empty(),"projectile reaches opposing vehicle")
 	check(bool(b.last_impact.get("penetrated",false)),"Panther round penetrates T-34/85 mantlet at 100 m")
 	check(str(b.last_impact.get("outcome",""))=="critical" and not b.modules.breech,"penetration disables breech")
+	check(b.to_global(Vector3(b.last_impact.point_local[0],b.last_impact.point_local[1],b.last_impact.point_local[2])).distance_to(predicted)<.25,"reticle prediction matches the actual projectile impact")
 	b.reset_destroyed_state()
 	check(b.modules.breech and is_zero_approx(float(b.module_damage.breech)),"range reset restores module health")
 	var side_round={"ammo":Catalog.read_json("ammunition/pak43_ap.json"),"distance":100.0,"velocity":b.global_basis.x*1000.0,"owner":0}

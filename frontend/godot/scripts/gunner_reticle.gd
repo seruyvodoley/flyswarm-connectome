@@ -3,6 +3,7 @@ extends Control
 var ammo=0
 var reload_left=0.0
 var scoped=false
+var aim_screen_position=Vector2(-1,-1)
 
 func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -14,15 +15,20 @@ func set_weapon_state(new_ammo: int,new_reload: float,new_scoped: bool=false):
 	scoped=new_scoped
 	queue_redraw()
 
+func set_aim_screen_position(screen_position: Vector2):
+	aim_screen_position=screen_position
+	queue_redraw()
+
 func _draw():
-	var c=size*.5
+	var c=aim_screen_position if aim_screen_position.x>=0.0 and aim_screen_position.y>=0.0 else size*.5
 	var colour=Color("e5ddb5") if scoped else Color(0.88,0.92,0.82,0.92)
 	var shadow=Color(0.02,0.03,0.02,0.82)
 	if scoped:
 		# Calibrated optic overlay: graduated marks and a strong bezel stay
 		# readable against both sky and terrain.
-		draw_arc(c,265.0,0.0,TAU,128,Color(0.01,0.02,0.02,.9),11.0,true)
-		draw_arc(c,257.0,0.0,TAU,128,colour,2.0,true)
+		var radius=minf(265.0,minf(size.x,size.y)*.38)
+		draw_arc(c,radius,0.0,TAU,128,Color(0.01,0.02,0.02,.9),11.0,true)
+		draw_arc(c,radius-8.0,0.0,TAU,128,colour,2.0,true)
 		for sign_value in [-1,1]:
 			for mark in range(1,13):
 				var offset=Vector2(sign_value*float(mark)*18.0,0)

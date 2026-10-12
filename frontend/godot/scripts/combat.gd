@@ -8,6 +8,27 @@ static func penetration(ammo: Dictionary, distance_m: float) -> float:
 			return lerpf(curve[i-1][1],curve[i][1],(distance_m-curve[i-1][0])/(curve[i][0]-curve[i-1][0]))
 	return float(curve[-1][1])
 
+static func advance_projectile(position: Vector3, velocity: Vector3, ammo: Dictionary, dt: float) -> Dictionary:
+	var next_velocity=velocity+Vector3.DOWN*9.81*dt
+	next_velocity*=exp(-float(ammo.get("drag_per_m",0.0))*next_velocity.length()*dt)
+	return {"position":position+(velocity+next_velocity)*.5*dt,"velocity":next_velocity}
+
+static func predict_impact(space: PhysicsDirectSpaceState3D, origin: Vector3, direction: Vector3, ammo: Dictionary, excluded: Array[RID], max_time: float=8.0) -> Vector3:
+	var position=origin
+	var velocity=direction.normalized()*float(ammo.muzzle_velocity_m_s)
+	var elapsed=0.0
+	var dt=1.0/30.0
+	while elapsed<max_time and elapsed<8.0 and position.distance_to(origin)<2500.0:
+		var step=minf(dt,max_time-elapsed)
+		var state=advance_projectile(position,velocity,ammo,step)
+		var query=PhysicsRayQueryParameters3D.create(position,state.position,5,excluded)
+		var hit=space.intersect_ray(query)
+		if not hit.is_empty():return hit.position
+		position=state.position
+		velocity=state.velocity
+		elapsed+=step
+	return position
+
 static func impact(ammo: Dictionary, distance_m: float, direction: Vector3, normal: Vector3, plate: Dictionary) -> Dictionary:
 	var cosine=clampf(-direction.normalized().dot(normal.normalized()),0,1)
 	var angle=rad_to_deg(acos(cosine))

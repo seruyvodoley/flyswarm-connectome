@@ -11,6 +11,7 @@ var report_cache={}
 var progress_clock=0.0
 
 const Catalog=preload("res://scripts/catalog.gd")
+const Combat=preload("res://scripts/combat.gd")
 const Terrain=preload("res://scripts/terrain.gd")
 const Vehicle=preload("res://scripts/vehicle.gd")
 const Bridge=preload("res://scripts/bridge.gd")
@@ -95,6 +96,7 @@ var demo_brain_text: Label
 var demo_brain_visible=true
 var demo_hud_clock=0.0
 var demo_sniper_mode=false
+var aim_prediction_timer=0.0
 var demo_camera_before_scope=1
 var impact_killcam: Control
 
@@ -703,7 +705,7 @@ func demo_set_sniper_mode(enabled: bool):
 	demo_sniper_mode=enabled
 	last_camera_mode=-1
 	update_camera_button()
-	if is_instance_valid(gunner_reticle):gunner_reticle.visible=true
+	if is_instance_valid(gunner_reticle):gunner_reticle.visible=camera_mode in [1,2]
 	if is_instance_valid(gunner_reticle):gunner_reticle.queue_redraw()
 
 func demo_toggle_sniper_scope():
@@ -957,9 +959,9 @@ func step_shells(dt: float):
 		var s=shells[i]
 		var from=s.position
 		var old_velocity=s.velocity
-		s.velocity+=Vector3.DOWN*9.81*dt
-		s.velocity*=exp(-float(s.ammo.drag_per_m)*s.velocity.length()*dt)
-		var to=from+(old_velocity+s.velocity)*.5*dt
+		var motion=Combat.advance_projectile(from,old_velocity,s.ammo,dt)
+		s.velocity=motion.velocity
+		var to=motion.position
 		s.distance+=from.distance_to(to)
 		s.age+=dt
 		var q=PhysicsRayQueryParameters3D.create(from,to,5,vehicles[s.owner].excluded())
@@ -1837,7 +1839,9 @@ func _process(dt):
 	if is_demo:
 		demo_hud_clock+=dt
 		if demo_hud_clock>=.1:demo_hud_clock=0;update_demo_hud()
-	gunner_reticle.visible=true
+	# One gun sight is shared by every battle scenario and appears in third
+	# person, gunner and sniper views only.
+	gunner_reticle.visible=camera_mode in [1,2]
 	gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left,is_demo and demo_sniper_mode)
 	sensor_debug.visible=debug
 	if debug:
@@ -1899,6 +1903,13 @@ func _process(dt):
 		camera.position+=movement*dt*100
 	observer_environment.fog_enabled=camera_mode!=0
 	last_camera_mode=camera_mode
+	if gunner_reticle.visible:
+		aim_prediction_timer-=dt
+		if aim_prediction_timer<=0.0:
+			aim_prediction_timer=.12
+			var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
+			if not camera.is_position_behind(predicted):
+				gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
 	update_identification_labels()
 	var connection=AppState.tr_text("BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL")
 	if requires_brain:

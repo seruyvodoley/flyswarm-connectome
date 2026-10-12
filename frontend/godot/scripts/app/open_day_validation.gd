@@ -1,4 +1,5 @@
 extends SceneTree
+const Combat=preload("res://scripts/combat.gd")
 var app
 var failures=0
 var screenshot_dir=""
@@ -61,6 +62,12 @@ func run():
 	result_page.free()
 	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
 	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
+	battle.camera_mode=0;await process_frame
+	check(not battle.gunner_reticle.visible,"Battlefield observer view hides the gun sight")
+	battle.camera_mode=3;await process_frame
+	check(not battle.gunner_reticle.visible,"Free tactical view hides the gun sight")
+	battle.camera_mode=1;await process_frame
+	check(battle.gunner_reticle.visible,"Shared gun sight is visible in third-person battle view")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
 	battle.paused=false;battle.camera_mode=1
 	var right_click=InputEventMouseButton.new();right_click.button_index=MOUSE_BUTTON_RIGHT;right_click.pressed=true
@@ -81,6 +88,9 @@ func run():
 	check(vehicle.rotation.y<original_yaw and vehicle.rotation.y>vehicle.manual_hull_target,"Hull slews toward requested heading without teleporting")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_camera_button();battle.demo_set_sniper_mode(true);await process_frame
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
+	battle._process(.13)
+	var predicted_aim=Combat.predict_impact(battle.get_world_3d().direct_space_state,vehicle.muzzle.global_position,vehicle.muzzle.global_basis.z,vehicle.cfg.ammo_data,vehicle.excluded())
+	check(battle.gunner_reticle.aim_screen_position.distance_to(battle.camera.unproject_position(predicted_aim))<.1,"Sight centre follows the predicted ballistic impact point")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
 	await capture("battle-gunner-scope-1280x720")
 	battle.impact_killcam.show_impact({"vehicle":"T-34-85","vehicle_id":"t34_85","shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})

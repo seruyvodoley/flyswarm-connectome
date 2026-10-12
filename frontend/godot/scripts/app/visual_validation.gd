@@ -23,8 +23,9 @@ func run():
 		await capture("overhead-"+str(size.x))
 	for mode in [1,2,3,0]:
 		app.battle.cycle_camera()
+		await process_frame
 		await capture("camera-"+str(mode))
-		check(app.battle.gunner_reticle.visible,"Shared Open Day reticle remains visible in every camera mode")
+		check(app.battle.gunner_reticle.visible==(app.battle.camera_mode in [1,2]),"Shared battle reticle appears only in third-person, gunner and sniper camera modes")
 	app.battle.audio_mode="team_audio"
 	app.battle.replay_mode=true
 	app.battle.ingest_communication({"sample":1,"events":[{"sender":0,"receiver":1,"raw":2.0,"received":.1,"distance_m":20.0},{"sender":8,"receiver":9,"raw":1.0,"received":.06,"distance_m":20.0}]})

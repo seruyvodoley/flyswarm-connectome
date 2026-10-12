@@ -55,11 +55,19 @@ func run():
 	var range_tiger=app.battle.vehicles[0]
 	range_tiger.modules.gunner=true;range_tiger.modules.breech=true;range_tiger.ammo_left=20;range_tiger.reload_left=0.0
 	var range_shots_before=int(range_tiger.metrics.shots)
-	var range_lmb=InputEventMouseButton.new();range_lmb.button_index=MOUSE_BUTTON_LEFT;range_lmb.pressed=true
-	app.battle._input(range_lmb)
-	check(app.battle.mouse_fire_pending and app.battle.manual_commands()[5]>.5,"Range queues a short LMB click")
-	app.battle._physics_process(.02)
-	check(int(range_tiger.metrics.shots)==range_shots_before+1 and not app.battle.mouse_fire_pending,"Range click fires exactly one round")
+	var range_lmb=InputEventMouseButton.new();range_lmb.button_index=MOUSE_BUTTON_LEFT;range_lmb.pressed=true;range_lmb.position=Vector2(640,360)
+	Input.parse_input_event(range_lmb)
+	var range_lmb_release=range_lmb.duplicate();range_lmb_release.pressed=false;Input.parse_input_event(range_lmb_release)
+	for _tick in 4:await physics_frame
+	check(int(range_tiger.metrics.shots)==range_shots_before+1 and not app.battle.mouse_fire_pending,"A brief routed LMB click fires exactly one range round")
+	range_tiger.reload_left=0.0;range_tiger.modules.breech=false
+	var ammo_before_blocked=range_tiger.ammo_left
+	Input.parse_input_event(range_lmb.duplicate())
+	Input.parse_input_event(range_lmb_release.duplicate())
+	for _tick in 4:await physics_frame
+	check(int(range_tiger.metrics.shots)==range_shots_before+1 and range_tiger.ammo_left==ammo_before_blocked,"A disabled breech prevents firing without spending ammunition")
+	check(range_tiger.weapon_block_reason()=="breech" and app.battle.gunner_reticle.block_message() in ["BREECH DISABLED","КАЗЁННИК СЛОМАН"],"The sight explains why a damaged gun cannot fire")
+	range_tiger.modules.breech=true
 	var key=InputEventKey.new();key.physical_keycode=KEY_W;key.pressed=true;Input.parse_input_event(key)
 	var before=app.battle.vehicles[0].position
 	for frame in range(50):await physics_frame

@@ -974,7 +974,7 @@ func step_shells(dt: float):
 			effect_burst(hit.position+hit.normal*.15,10,.7)
 			var victim=hit.collider.get_meta("vehicle") if hit.collider.has_meta("vehicle") else null
 
-			if victim!=null:
+			if victim!=null and victim.alive:
 				victim.hit(
 					s,
 					hit.position,
@@ -982,11 +982,11 @@ func step_shells(dt: float):
 					hit.collider.get_meta("zone")
 				)
 				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
-				if shooter!=null and victim.team!=shooter.team and is_instance_valid(impact_killcam):
+				if shooter!=null and victim.team!=shooter.team and (not (is_demo or is_range) or shooter.agent_id==0) and is_instance_valid(impact_killcam):
 					var cumulative_damaged=[]
 					for module_key in victim.module_damage:
 						if float(victim.module_damage[module_key])>0.0:cumulative_damaged.append(module_key)
-					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"vehicle_id":victim.cfg.id,"shell":s.ammo.get("id","unknown"),"shot_count":victim.impact_history.size(),"module_positions":victim.impact_module_positions(),"destroyed_modules":victim.last_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged})
+					impact_killcam.show_impact({"impact":victim.last_impact,"vehicle":victim.cfg.display_name,"vehicle_id":victim.cfg.id,"turret_angle":victim.turret_angle,"shell":s.ammo.get("id","unknown"),"shot_count":victim.impact_history.size(),"module_positions":victim.impact_module_positions(),"destroyed_modules":victim.last_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged})
 
 				if is_range and victim.agent_id==8 and int(s.owner)==0:
 					on_range_target_impact(
@@ -1846,7 +1846,7 @@ func _process(dt):
 	# One gun sight is shared by every battle scenario and appears in third
 	# person, gunner and sniper views only.
 	gunner_reticle.visible=camera_mode in [1,2]
-	gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left,is_demo and demo_sniper_mode)
+	gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left,is_demo and demo_sniper_mode,v.weapon_block_reason())
 	sensor_debug.visible=debug
 	if debug:
 		var mesh=ImmediateMesh.new()
@@ -1960,6 +1960,8 @@ func _process(dt):
 		camera_name(),
 		(str(v.modules)+"\n"+str(v.last_impact)) if debug else ""
 	])
+	if (is_demo or is_range) and not gunner_reticle.block_message().is_empty():
+		detail.text+="\n"+("ОГОНЬ: " if str(AppState.settings.language)=="ru" else "FIRE: ")+gunner_reticle.block_message()
 	if is_range:
 		detail.text+="\n"+AppState.tr_text("MANUAL · WASD drive · Q/E turret · R/F elevation · Space/LMB fire · ESC menu")
 		if debug:detail.text+="\n"+AppState.tr_text("TARGET IMPACT: ")+str(vehicles[8].last_impact)
@@ -2412,14 +2414,9 @@ func show_range_feedback(message: String, duration: float=1.8):
 
 
 func range_kill_reason(target) -> String:
-	if not bool(target.modules.get("ammo_rack", true)):
+	if str(target.last_impact.get("kill_reason",""))=="ammo_rack":
 		return AppState.tr_text("Ammo rack detonation")
-
-	var driver_down = not bool(target.modules.get("driver", true))
-	var gunner_down = not bool(target.modules.get("gunner", true))
-	var commander_down = not bool(target.modules.get("commander", true))
-
-	if driver_down and gunner_down and commander_down:
+	if str(target.last_impact.get("kill_reason",""))=="crew_knockout":
 		return AppState.tr_text("Crew incapacitated")
 
 	return AppState.tr_text("Critical internal damage")

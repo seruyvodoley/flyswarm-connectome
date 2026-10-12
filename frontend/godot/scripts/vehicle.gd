@@ -368,7 +368,7 @@ func step(dt: float):
 	var side_slope=(world.terrain.height_at(position.x+cos(rotation.y)*2,position.z-sin(rotation.y)*2)-world.terrain.height_at(position.x,position.z))/2
 	model.rotation.z=lerpf(model.rotation.z,atan(side_slope),dt*5)
 	for wheel in wheels: wheel.rotate_x(speed*dt/.45)
-	if cmd[5]>.5 and reload_left<=0 and ammo_left>0 and modules.breech and modules.gunner:
+	if cmd[5]>.5 and weapon_block_reason()=="":
 		world.fire(self)
 		gun.position-=Vector3(0,0,.22)
 		reload_left=float(cfg.reload_s)*(1 if modules.loader else 2.5)
@@ -379,6 +379,14 @@ func step(dt: float):
 	if speed<-.1:metrics.reverse_s+=dt
 	if seen:metrics.target_visible_s+=dt
 	if target>=0 and absf(yaw_rate)>.02:metrics.chassis_aim_s+=dt
+
+func weapon_block_reason() -> String:
+	if not alive:return "destroyed"
+	if not bool(modules.get("gunner",true)):return "gunner"
+	if not bool(modules.get("breech",true)):return "breech"
+	if ammo_left<=0:return "ammo"
+	if reload_left>0.0:return "reload"
+	return ""
 
 func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	if not alive:return

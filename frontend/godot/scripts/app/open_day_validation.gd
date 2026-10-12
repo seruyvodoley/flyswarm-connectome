@@ -95,9 +95,11 @@ func run():
 	check(battle.gunner_reticle.aim_screen_position.distance_to(battle.camera.unproject_position(predicted_aim))<.1,"Sight centre follows the predicted ballistic impact point")
 	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
 	await capture("battle-gunner-scope-1280x720")
-	battle.impact_killcam.show_impact({"vehicle":"T-34-85","vehicle_id":"t34_85","shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
+	battle.impact_killcam.show_impact({"vehicle":"T-34-85","vehicle_id":"t34_85","turret_angle":.25,"shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Impact report shows cumulative crew and module damage")
 	check(battle.impact_killcam.model_view.model!=null and not battle.impact_killcam.model_view.model.find_children("*","MeshInstance3D",true,false).is_empty(),"Impact report renders a 3D tank model for its X-ray damage view")
+	check(battle.impact_killcam.model_view.model.find_child("DamageMarker",true,false)!=null and battle.impact_killcam.model_view.model.find_child("ImpactPath",true,false)!=null,"X-ray markers and shell path follow the rotated tank model")
+	check(is_equal_approx(float(battle.impact_killcam.model_view.model.find_child("TurretPivot",true,false).rotation.y),.25),"X-ray turret follows the target's actual traverse")
 	check(battle.impact_killcam.title.text=="ОТЧЁТ О ПОПАДАНИИ" or battle.impact_killcam.title.text=="IMPACT REPORT","Impact report uses a neutral title")
 	check(battle.impact_killcam.offset_right<400 and battle.impact_killcam.offset_bottom<battle.demo_controls.offset_top,"Impact report is placed away from telemetry and above the control guide")
 	await capture("battle-impact-killcam-1280x720")
@@ -132,10 +134,11 @@ func run():
 	battle.requires_brain=false;battle.paused=false;battle.demo_intro_left=3.0;battle.mouse_fire_pending=false
 	var shots_before=int(vehicle.metrics.shots)
 	var lmb=InputEventMouseButton.new();lmb.button_index=MOUSE_BUTTON_LEFT;lmb.pressed=true;lmb.position=battle.get_viewport().get_visible_rect().size*.5
-	battle._input(lmb)
-	check(battle.demo_intro_left==0.0 and battle.mouse_fire_pending,"First Open Day click skips intro and queues a shot")
-	battle._physics_process(.02)
-	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Queued Open Day click fires exactly one round")
+	Input.parse_input_event(lmb)
+	var lmb_release=lmb.duplicate();lmb_release.pressed=false;Input.parse_input_event(lmb_release)
+	for _tick in 4:await physics_frame
+	check(battle.demo_intro_left==0.0,"First routed Open Day click skips intro")
+	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Brief routed Open Day click fires exactly one round")
 	battle.queue_free();await process_frame
 	print("OPEN DAY VALIDATION failures=",failures)
 	quit(0 if failures==0 else 1)

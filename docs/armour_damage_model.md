@@ -29,12 +29,42 @@ breech and one crew member, then another crew member, before the fatal hit.
 Lesser module failures leave the vehicle alive but impair the corresponding
 function.
 
-The battle HUD uses the same reticle in every camera mode. Each enemy impact
-opens a compact damage report with the actual 3D vehicle, a translucent
+The battle HUD uses the same reticle in third-person and gunner views. It hides
+the reticle in overhead and free-camera views. It distinguishes a ready gun
+from reloading, empty ammunition, a disabled breech, and an incapacitated gunner.
+In Open Day and Test Range, only a shot fired by the player at an opposing tank
+opens the hit report; incoming hits cannot be mistaken for damage dealt. Each
+such impact opens a compact damage report with the actual 3D vehicle, a translucent
 X-ray-style shell, the incoming path, and colored module markers: amber for
 damaged and red for disabled. The report lists cumulative module damage and
 crew remaining. The final Open Day result retains the same shot history and
 damage state.
+
+## Mode audit
+
+Open Day and Test Range send mouse fire through the same `Vehicle.step` gate as
+the autonomous battle's AI actions. A short click is retained across the next
+physics tick. Firing requires an alive vehicle, available ammunition, a loaded
+gun, a functioning breech, and a living gunner. A blocked shot consumes neither
+ammunition nor reload time. Damage from every actual projectile hit persists in
+`module_damage`; no crew member or module silently recovers. Range target reset
+is an explicit exception that restores the target for another trial.
+
+The 3D battle, Open Day, and Test Range use the same projectile, armour,
+fragment-cone, module and crew logic. A penetrating shot may miss internal
+modules, damage one or more modules, or destroy the vehicle when the ammunition
+rack is disabled or no more than one crew member survives. A non-penetration or
+ricochet leaves internal modules unchanged. The X-ray report follows the
+target's actual turret angle; hits on existing wrecks do not replay the previous
+damage report. The Test Range destruction explanation uses the recorded lethal
+reason, including crew losses outside the driver/gunner/commander trio.
+
+The PettingZoo MARL Laboratory runs a separate analytical training environment
+with scalar vehicle health and abstract shot damage. Its battle visualizations
+must not be interpreted as measurements of the 3D armour/module solver. Replays
+restore recorded positions and module states but do not re-simulate projectile
+collisions or reconstruct every transient hit-camera event. Crew substitution,
+repairs, fire propagation and individual fragment trajectories are not modeled.
 
 ## Historical scope and limitations
 

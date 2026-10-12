@@ -76,6 +76,7 @@ class ImpactModelView extends SubViewportContainer:
 
 	func _add_marker(point: Vector3,radius: float,colour: Color):
 		var marker=MeshInstance3D.new()
+		marker.name="DamageMarker"
 		var sphere=SphereMesh.new()
 		sphere.radius=radius
 		sphere.height=radius*2.0
@@ -87,12 +88,13 @@ class ImpactModelView extends SubViewportContainer:
 		material.emission_enabled=true
 		material.emission=colour
 		marker.material_override=material
-		stage.add_child(marker)
+		model.add_child(marker)
 
 	func _add_beam(from: Vector3,to: Vector3,colour: Color):
 		var delta=to-from
 		if delta.length()<.001:return
 		var beam=MeshInstance3D.new()
+		beam.name="ImpactPath"
 		var cylinder=CylinderMesh.new()
 		cylinder.top_radius=.025
 		cylinder.bottom_radius=.025
@@ -105,8 +107,8 @@ class ImpactModelView extends SubViewportContainer:
 		material.emission_enabled=true
 		material.emission=colour
 		beam.material_override=material
-		stage.add_child(beam)
-		beam.look_at(to,Vector3.UP)
+		model.add_child(beam)
+		beam.look_at(model.to_global(to),Vector3.UP)
 		beam.rotate_object_local(Vector3.RIGHT,PI/2)
 
 var title: Label

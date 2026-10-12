@@ -3,6 +3,7 @@ extends Control
 var ammo=0
 var reload_left=0.0
 var scoped=false
+var weapon_block=""
 var aim_screen_position=Vector2(-1,-1)
 var has_aim_screen_position=false
 
@@ -10,11 +11,21 @@ func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-func set_weapon_state(new_ammo: int,new_reload: float,new_scoped: bool=false):
+func set_weapon_state(new_ammo: int,new_reload: float,new_scoped: bool=false,new_block: String=""):
 	ammo=new_ammo
 	reload_left=new_reload
 	scoped=new_scoped
+	weapon_block=new_block
 	queue_redraw()
+
+func block_message() -> String:
+	var russian=str(AppState.settings.language)=="ru"
+	match weapon_block:
+		"destroyed":return "ТАНК УНИЧТОЖЕН" if russian else "TANK DESTROYED"
+		"gunner":return "НАВОДЧИК ВЫБЫЛ" if russian else "GUNNER DOWN"
+		"breech":return "КАЗЁННИК СЛОМАН" if russian else "BREECH DISABLED"
+		"ammo":return "НЕТ СНАРЯДОВ" if russian else "OUT OF AMMO"
+	return ""
 
 func set_aim_screen_position(screen_position: Vector2):
 	aim_screen_position=screen_position
@@ -57,6 +68,8 @@ func _draw():
 				draw_line(c+Vector2(d,-5)+offset,c+Vector2(d,5)+offset,ink,1.5)
 				draw_line(c+Vector2(-5,-d)+offset,c+Vector2(5,-d)+offset,ink,1.5)
 				draw_line(c+Vector2(-5,d)+offset,c+Vector2(5,d)+offset,ink,1.5)
-	var state="READY" if reload_left<=0.0 else "RELOAD %.1f s" % reload_left
+	var state=block_message()
+	if state.is_empty():state="READY" if reload_left<=0.0 else "RELOAD %.1f s" % reload_left
 	if scoped:state="SNIPER · "+state
-	draw_string(ThemeDB.fallback_font,c+Vector2(-120,190),"%s   ·   AMMO %d" % [state,ammo],HORIZONTAL_ALIGNMENT_CENTER,240,16,colour)
+	var state_colour=Color("ff8068") if not weapon_block.is_empty() and weapon_block!="reload" else colour
+	draw_string(ThemeDB.fallback_font,c+Vector2(-155,190),"%s   ·   AMMO %d" % [state,ammo],HORIZONTAL_ALIGNMENT_CENTER,310,16,state_colour)

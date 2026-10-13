@@ -45,10 +45,16 @@ damage state.
 A separate lower-left status panel follows the selected tank. It lists the
 surviving crew, ammunition, weapon readiness, disabled modules, and cumulative
 partial damage. Both the status panel and impact report are hidden in overhead
-and free-camera views. Open Day mouse movement aims the turret and gun in the
-same horizontal/vertical direction as the pointer; middle-button dragging
-turns the hull, right-click switches the gunner scope, and left-click fires.
-The click that dismisses the opening card does not also fire a shell.
+and free-camera views. Open Day projects the pointer into the 3D scene, solves
+a low-arc ballistic aim point, and slews the turret and gun toward it while the
+camera follows the hull. Left-click fires; holding right-click smoothly zooms
+the third-person camera and releasing it restores the normal view. The player's
+tank moves under a separate automatic navigation controller. In Open Day only,
+penetrating hits reduce six player or three opponent health points; they do not
+disable crew or mobility modules. The opponent has an eight-second safe opening
+and a twelve-second demo-only reload. Historical Battle and every other mode retain
+the module and crew damage model above. The click that dismisses the opening
+card does not also fire a shell.
 
 ## Mode audit
 

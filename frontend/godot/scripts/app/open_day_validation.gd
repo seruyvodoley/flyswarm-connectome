@@ -47,6 +47,7 @@ func run():
 	battle.paused=true
 	check(battle.is_demo,"Demo runtime enabled")
 	check(battle.alive_count(0)==1 and battle.alive_count(1)==1,"Demo is isolated 1v1")
+	check(battle.vehicles[0].demo_health==6 and battle.vehicles[8].demo_health==3,"Open Day has isolated six-point player and three-point opponent durability")
 	var only_active_models=0
 	for i in battle.vehicles.size():
 		if battle.vehicles[i].model.get_child_count()>0:only_active_models+=1
@@ -56,11 +57,20 @@ func run():
 	var idle_command=battle.demo_command(false);var firing_command=battle.demo_command(true)
 	check(idle_command[0]>.5 and idle_command.slice(1,5)==[0.0,0.0,0.0,0.0],"Open Day drives forward without autonomous hull or turret steering")
 	check(firing_command[5]==1.0 and battle.demo_mouse_commands(true)[5]==1.0,"Left mouse button maps to fire action")
+	check(battle.demo_mouse_commands(false)[0]>=.36,"Player autopilot keeps the tank moving while independently steering toward the engagement")
+	var fly=battle.vehicles[8];var fly_cmd=battle.apply_demo_tactical_aux(fly,[0.0,0.0,0.0,0.0,0.0,0.0])
+	check(fly_cmd[0]>=.36 and is_finite(float(fly_cmd[2])),"MaleCNS navigation assistance prevents the low-throttle stop while retaining a bounded steering command")
+	var player=battle.vehicles[0];var saved_penetration=player.cfg.ammo_data.penetration_mm.duplicate(true)
+	player.cfg.ammo_data.penetration_mm=[[0.0,10000.0],[3000.0,10000.0]]
+	var health_before=fly.demo_health;var modules_before=fly.modules.duplicate(true)
+	fly.hit({"ammo":player.cfg.ammo_data,"distance":30.0,"velocity":Vector3(0,0,-1000),"owner":0},fly.global_position+Vector3(0,1,1),Vector3(0,0,1),"upper_front")
+	check(fly.demo_health==health_before-1 and fly.last_impact.get("outcome")=="demo_hit" and fly.modules==modules_before,"Penetrating Open Day hit reduces only arcade health and cannot disable crew or modules")
+	player.cfg.ammo_data.penetration_mm=saved_penetration
 	var result_page=load("res://scripts/app/open_day_page.gd").new()
 	check(result_page.result_outcome(true,true)=="draw","Surviving vehicles are never scored as a win")
 	check(result_page.result_outcome(true,false)=="human" and result_page.result_outcome(false,true)=="fly" and result_page.result_outcome(false,false)=="draw","A winner requires destruction of the opposing vehicle")
 	result_page.free()
-	check(battle.camera_button.visible and is_instance_valid(battle.demo_controls),"Mouse-accessible camera selector and control guide are visible")
+	check(not battle.camera_button.visible and is_instance_valid(battle.demo_controls) and (battle.demo_controls.text.contains("LMB") or battle.demo_controls.text.contains("ЛКМ")) and (battle.demo_controls.text.contains("RMB") or battle.demo_controls.text.contains("ПКМ")),"Open Day uses the simple mouse-only guide without a camera selector")
 	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
 	battle.gunner_reticle.set_aim_screen_position(Vector2(-25.0,420.0))
 	check(battle.gunner_reticle.has_aim_screen_position and battle.gunner_reticle.aim_screen_position.x<0.0,"Sight preserves offscreen impact coordinates instead of snapping to screen centre")
@@ -74,25 +84,21 @@ func run():
 	battle.paused=false;battle.camera_mode=1
 	var right_click=InputEventMouseButton.new();right_click.button_index=MOUSE_BUTTON_RIGHT;right_click.pressed=true
 	battle._unhandled_input(right_click)
-	check(battle.demo_sniper_mode and battle.camera_mode==2,"RMB enters gunner scope directly from third-person view")
+	check(battle.demo_sniper_mode and battle.camera_mode==1,"RMB temporarily zooms while retaining the third-person camera")
 	battle._unhandled_input(right_click)
-	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Second RMB returns to the previous camera")
-	battle.camera_mode=2
-	battle.demo_apply_mouse_motion(Vector2(80,-40),false)
-	check(vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun and vehicle.manual_turret_target>original_turret and vehicle.manual_gun_target>original_gun,"Mouse right/up aims turret right and gun up without teleporting")
+	check(battle.demo_sniper_mode,"Holding RMB keeps the zoom active until release")
+	right_click.pressed=false;battle._unhandled_input(right_click)
+	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Releasing RMB smoothly returns to the third-person view")
+	battle.demo_apply_mouse_motion(Vector2(900,360),false)
+	check(vehicle.manual_aim and battle.gunner_reticle.aim_screen_position==Vector2(900,360) and vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun,"Screen cursor positions the reticle and sets smooth turret/gun targets")
 	vehicle.cmd=battle.demo_command(false)
 	vehicle.step(.1)
-	check(vehicle.turret_angle>original_turret and vehicle.turret_angle<vehicle.manual_turret_target and vehicle.gun_angle>original_gun and vehicle.gun_angle<vehicle.manual_gun_target,"Turret and gun advance toward right/up target at bounded speed")
+	check(absf(vehicle.manual_turret_target-vehicle.turret_angle)<absf(original_turret-vehicle.manual_turret_target) and absf(vehicle.manual_gun_target-vehicle.gun_angle)<absf(original_gun-vehicle.manual_gun_target),"Turret and gun slew toward the selected cursor target at bounded speed")
 	battle._process(.1)
-	check((-battle.camera.global_basis.z).x>0.0,"Third-person camera follows the right-turning turret")
+	check(absf((-battle.camera.global_basis.z).x)<.99,"Third-person camera remains stable independently of turret traverse")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
-	battle.demo_apply_mouse_motion(Vector2(30,0),true)
-	check(vehicle.rotation.y==original_yaw and vehicle.manual_hull_target>original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Middle drag right changes only the desired hull heading")
-	vehicle.step(.1)
-	check(vehicle.rotation.y>original_yaw and vehicle.rotation.y<vehicle.manual_hull_target,"Hull slews right toward requested heading without teleporting")
-	vehicle.manual_turret_target=vehicle.turret_angle;vehicle.manual_gun_target=vehicle.gun_angle
-	battle.demo_apply_mouse_motion(Vector2(-80,40),false)
-	check(vehicle.manual_turret_target<vehicle.turret_angle and vehicle.manual_gun_target<vehicle.gun_angle,"Mouse left/down aims turret left and gun down")
+	battle.demo_apply_mouse_motion(Vector2(360,360),false)
+	check(vehicle.manual_hull_target==original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Mouse aiming never steers the hull")
 	battle.camera_mode=1
 	var middle=InputEventMouseButton.new();middle.button_index=MOUSE_BUTTON_MIDDLE;middle.pressed=true;middle.position=Vector2(640,360)
 	var hull_target_before=vehicle.manual_hull_target
@@ -100,21 +106,18 @@ func run():
 	var drag=InputEventMouseMotion.new();drag.position=Vector2(660,360);drag.relative=Vector2(20,0)
 	Input.parse_input_event(drag);await process_frame
 	var middle_release=middle.duplicate();middle_release.pressed=false;Input.parse_input_event(middle_release);await process_frame
-	check(vehicle.manual_hull_target>hull_target_before,"Routed middle-button drag turns the hull right")
+	check(vehicle.manual_hull_target==hull_target_before,"Middle-button input has no Open Day control binding")
 	var routed_right=InputEventMouseButton.new();routed_right.button_index=MOUSE_BUTTON_RIGHT;routed_right.pressed=true;routed_right.position=Vector2(640,360)
 	Input.parse_input_event(routed_right);await process_frame
-	check(battle.demo_sniper_mode and battle.camera_mode==2,"Routed right-click opens gunner scope")
+	check(battle.demo_sniper_mode and battle.camera_mode==1,"Routed right-button press enables momentary zoom")
 	var routed_right_release=routed_right.duplicate();routed_right_release.pressed=false;Input.parse_input_event(routed_right_release);await process_frame
-	Input.parse_input_event(routed_right);await process_frame
-	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Second routed right-click leaves gunner scope")
-	Input.parse_input_event(routed_right_release);await process_frame
+	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Routed right-button release returns to normal zoom")
 	battle.demo_intro_left=0;battle.demo_intro.visible=false;battle.update_camera_button();battle.demo_set_sniper_mode(true);await process_frame
-	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov<30.0,"Gunner view shows the reticle, sniper grid and optical zoom")
+	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov>30.0 and battle.camera.fov<62.0,"Third-person reticle remains visible during moderate optical zoom")
 	battle._process(.13)
 	var predicted_aim=Combat.predict_impact(battle.get_world_3d().direct_space_state,vehicle.muzzle.global_position,vehicle.muzzle.global_basis.z,vehicle.cfg.ammo_data,vehicle.excluded())
-	check(battle.gunner_reticle.aim_screen_position.distance_to(battle.camera.unproject_position(predicted_aim))<.1,"Sight centre follows the predicted ballistic impact point")
-	check(battle.camera_button.text.contains(battle.camera_name()),"Camera selector names the current first-person view")
-	await capture("battle-gunner-scope-1280x720")
+	check(battle.gunner_reticle.aim_screen_position.x>=0.0 and battle.gunner_reticle.aim_screen_position.y>=0.0,"Open Day keeps the reticle at the active cursor position")
+	await capture("battle-mouse-zoom-1280x720")
 	battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1 T-34-85","target_name":"R1 Panther G","vehicle":"Panther G","vehicle_id":"panther_g","turret_angle":.25,"shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Impact report shows cumulative crew and module damage")
 	check(battle.impact_killcam.model_view.model!=null and not battle.impact_killcam.model_view.model.find_children("*","MeshInstance3D",true,false).is_empty(),"Impact report renders a 3D tank model for its X-ray damage view")

@@ -174,7 +174,8 @@ func _ready():
 	custom_minimum_size=Vector2(590,370)
 	size=custom_minimum_size
 	var battle=get_parent().get_parent() if get_parent()!=null and get_parent().get_parent()!=null else null
-	if battle!=null and bool(battle.get("is_demo")):
+	var demo_layout=battle!=null and battle.get("is_demo")==true
+	if demo_layout:
 		set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 		offset_left=410
 		offset_right=780
@@ -203,7 +204,7 @@ func _ready():
 	title.add_theme_color_override("font_color",Color("ead58f"))
 	column.add_child(title)
 	model_view=ImpactModelView.new()
-	model_view.custom_minimum_size=Vector2(350,145) if battle!=null and bool(battle.get("is_demo")) else Vector2(560,235)
+	model_view.custom_minimum_size=Vector2(350,145) if demo_layout else Vector2(560,235)
 	model_view.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	column.add_child(model_view)
 	body=Label.new()

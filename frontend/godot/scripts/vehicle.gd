@@ -20,6 +20,8 @@ var manual_hull_aim=false
 var reload_left=0.0
 var ammo_left=0
 var alive=true
+var demo_health=4
+var demo_health_max=4
 var target=-1
 var target_range=0.0
 var aim_error=0.0
@@ -55,6 +57,9 @@ func setup(config: Dictionary, index: int, battle):
 	team=int(index/8)
 	world=battle
 	ammo_left=int(cfg.ammo_count)
+	if world.is_demo and index in [0,8]:
+		demo_health_max=6 if index==0 else 3
+		demo_health=demo_health_max
 	collision_layer=2
 	collision_mask=3
 	floor_snap_length=2.5
@@ -263,12 +268,13 @@ func step(dt: float):
 		var hull_stop_rate=sqrt(2.0*hull_accel*absf(hull_error))
 		steer=clampf(signf(hull_error)*minf(hull_max,hull_stop_rate)/maxf(.01,hull_max),-1.0,1.0)
 		if absf(hull_error)<.001 and absf(yaw_rate)<.002:steer=0.0
-	var mechanically_mobile=bool(modules.engine and modules.track_left and modules.track_right)
+	var demo_protected=world.is_demo and agent_id in [0,8]
+	var mechanically_mobile=demo_protected or bool(modules.engine and modules.track_left and modules.track_right)
 	if not mechanically_mobile:
 		throttle=0;steer=0;speed=0
 		stuck_intent_s=0.0
 		recovery_left_s=0.0
-	if not modules.driver: throttle*=.2;steer*=.2
+	if not modules.driver and not demo_protected: throttle*=.2;steer*=.2
 
 	# Deterministic anti-deadlock manoeuvre. It does not choose objectives or
 	# targets; it only frees a mechanically mobile tank that has been ordered
@@ -286,7 +292,7 @@ func step(dt: float):
 	contact_state=world.tracks.contact(self,dt)
 	drive_throttle=move_toward(drive_throttle,throttle,dt/maxf(.05,float(cfg.throttle_response_s)))
 	var power_acc=minf(minf(minf(float(cfg.traction),contact_state.grip)*9.81,float(cfg.engine_kw)*1000*.7/(float(cfg.mass_kg)*maxf(2,absf(speed)))),float(cfg.drive_accel_m_s2))
-	if not modules.transmission: power_acc*=.2
+	if not modules.transmission and not demo_protected: power_acc*=.2
 	var accel=drive_throttle*power_acc-slope*9.81
 	if absf(speed)>.05: accel-=signf(speed)*float(contact_state.resistance)*9.81
 	if absf(throttle)<.01 or cmd[1]>.5: speed=move_toward(speed,0,float(cfg.brake_m_s2)*dt)
@@ -374,7 +380,7 @@ func step(dt: float):
 	if cmd[5]>.5 and weapon_block_reason()=="":
 		world.fire(self)
 		gun.position-=Vector3(0,0,.22)
-		reload_left=float(cfg.reload_s)*(1 if modules.loader else 2.5)
+		reload_left=(12.0 if world.is_demo and agent_id==8 else (3.0 if world.is_demo and agent_id==0 else float(cfg.reload_s)*(1 if modules.loader else 2.5)))
 		ammo_left-=1
 		metrics.shots+=1
 	metrics.distance_travelled+=moved
@@ -385,6 +391,10 @@ func step(dt: float):
 
 func weapon_block_reason() -> String:
 	if not alive:return "destroyed"
+	if world.is_demo and agent_id in [0,8]:
+		if ammo_left<=0:return "ammo"
+		if reload_left>0.0:return "reload"
+		return ""
 	if not bool(modules.get("gunner",true)):return "gunner"
 	if not bool(modules.get("breech",true)):return "breech"
 	if ammo_left<=0:return "ammo"
@@ -410,6 +420,20 @@ func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 		_record_impact(shell)
 		return
 	world.vehicles[shell.owner].metrics.penetrations+=1
+	if world.is_demo and agent_id in [0,8]:
+		# Open Day uses penetrations as hit points, keeping the real shell/armour
+		# calculation while preventing one crew or module hit from ending play.
+		demo_health=maxi(0,demo_health-1)
+		last_impact.damaged=["hull"]
+		last_impact.disabled=[]
+		last_impact.outcome="lethal" if demo_health==0 else "demo_hit"
+		last_impact.demo_health=demo_health
+		last_impact.demo_health_max=demo_health_max
+		if demo_health==0:
+			last_impact.kill_reason="demo_hull"
+			destroy_vehicle(int(shell.owner))
+		_record_impact(shell)
+		return
 	var start=local_start
 	var direction=local_direction.normalized()
 	var disabled=[]

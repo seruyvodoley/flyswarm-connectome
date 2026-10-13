@@ -6,6 +6,7 @@ var scoped=false
 var weapon_block=""
 var aim_screen_position=Vector2(-1,-1)
 var has_aim_screen_position=false
+var aim_ready=false
 
 func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -32,9 +33,13 @@ func set_aim_screen_position(screen_position: Vector2):
 	has_aim_screen_position=true
 	queue_redraw()
 
+func set_aim_ready(ready: bool):
+	aim_ready=ready
+	queue_redraw()
+
 func _draw():
 	var c=aim_screen_position if has_aim_screen_position else size*.5
-	var colour=Color("e5ddb5") if scoped else Color(0.88,0.92,0.82,0.92)
+	var colour=Color("8ff0a4") if aim_ready else (Color("e5ddb5") if scoped else Color(0.88,0.92,0.82,0.92))
 	var shadow=Color(0.02,0.03,0.02,0.82)
 	if scoped:
 		# Calibrated optic overlay: graduated marks and a strong bezel stay

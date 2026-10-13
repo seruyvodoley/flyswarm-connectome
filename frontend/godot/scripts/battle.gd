@@ -100,6 +100,9 @@ var demo_sniper_mode=false
 var aim_prediction_timer=0.0
 var mouse_fire_pending=false
 var middle_drag_active=false
+var demo_nav_samples=0
+var demo_nav_intervention_sum=0.0
+var demo_last_feedback=""
 var demo_camera_before_scope=1
 var impact_killcam: Control
 var vehicle_status_panel: PanelContainer
@@ -245,7 +248,7 @@ func _ready():
 	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
 	if is_demo:
 		scenario.size_m=420
-		scenario.spawn_z=82
+		scenario.spawn_z=100
 		scenario.spawn_spacing=0
 		scenario.time_limit_s=90
 	scenario.seed=int(option("--seed",str(scenario.seed)))
@@ -366,7 +369,7 @@ func _ready():
 				for plate in tank.armour_bodies:plate.collision_layer=0
 		if is_demo:
 			if i in [0,8]:
-				var demo_z=-82 if i==0 else 82
+				var demo_z=-100 if i==0 else 100
 				tank.position=Vector3(0,terrain.height_at(0,demo_z)+.1,demo_z)
 				tank.rotation.y=0 if i==0 else PI
 			else:
@@ -653,9 +656,9 @@ func _ready():
 
 func setup_demo_ui(canvas: CanvasLayer):
 	selected=0;camera_mode=1;last_camera_mode=-1;demo_intro_left=4.0;demo_sniper_mode=false
-	hud.visible=false;detail.visible=true;camera_button.visible=true;camera_button.offset_left=-630;camera_button.offset_right=-430;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=false;update_camera_button()
+	hud.visible=false;detail.visible=true;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=true;update_camera_button()
 	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
-	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.text="MOUSE: TURRET + ELEVATION · MIDDLE DRAG: HULL\nLMB: FIRE · RMB: SNIPER SCOPE · AUTO-FORWARD" if str(AppState.settings.language)!="ru" else "МЫШЬ: БАШНЯ + УВН · СРЕДНЯЯ КНОПКА: КОРПУС\nЛКМ: ОГОНЬ · ПКМ: ОПТИКА · ТАНК ЕДЕТ ВПЕРЁД";demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls)
+	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.text="MOVE CURSOR: AIM · LMB: FIRE · HOLD RMB: ZOOM\nTANK DRIVES AND POSITIONS ITSELF" if str(AppState.settings.language)!="ru" else "ДВИГАЙТЕ КУРСОР: ПРИЦЕЛИВАНИЕ · ЛКМ: ВЫСТРЕЛ · УДЕРЖИВАЙТЕ ПКМ: ПРИБЛИЖЕНИЕ\nТАНК САМ ДВИЖЕТСЯ И МЕНЯЕТ ПОЗИЦИЮ";demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls)
 	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
 	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
 	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
@@ -727,7 +730,7 @@ func demo_intro_copy(key: String) -> String:
 func update_demo_hud():
 	if not is_instance_valid(demo_status) or vehicles.size()<9:return
 	var player=vehicles[0];var fly=vehicles[8];var remaining=maxf(0,time_limit-sim_time)
-	demo_status.text=AppState.tr_format("demo.hud",[demo_bar(demo_health(player)),demo_bar(demo_health(fly)),int(remaining)/60,int(remaining)%60])
+	demo_status.text=AppState.tr_format("demo.hud",[demo_bar(float(player.demo_health)/float(player.demo_health_max)),demo_bar(float(fly.demo_health)/float(fly.demo_health_max)),int(remaining)/60,int(remaining)%60])
 	var trace=fly.dn.duplicate() if fly.dn is Array else []
 	while trace.size()<6:trace.append(0.0)
 	var control=control_layers[8] if control_layers.size()==16 else {}
@@ -739,6 +742,9 @@ func update_demo_hud():
 		lines.append("%-8s %s %s%.2f" % [signal_names[index],demo_signal_bar(value),polarity,absf(value)])
 	var action=control.get("final_action",fly.cmd)
 	while action.size()<6:action.append(0.0)
+	var intent=control.get("neural_intent",control.get("raw_neural_action",[]))
+	var decoded=control.get("decoded_commands",control.get("decoder_action",[]))
+	var navigation=control.get("navigation_assistance",[])
 	var movement=maxf(absf(float(action[0])),maxf(absf(float(action[1])),absf(float(action[2]))))
 	var aiming=maxf(absf(float(action[3])),absf(float(action[4])))
 	var firing=float(action[5])
@@ -747,6 +753,11 @@ func update_demo_hud():
 	lines.append("%s  %s" % [AppState.tr_text("MOVE"),demo_signal_bar(movement)])
 	lines.append("%s    %s" % [AppState.tr_text("AIM"),demo_signal_bar(aiming)])
 	lines.append("%s   %s" % [AppState.tr_text("FIRE"),AppState.tr_text("LIVE" if firing>.15 else "IDLE")])
+	if intent.size()>=3 and decoded.size()>=3 and navigation.size()>=3:
+		lines.append("RAW T %.2f S %.2f · DEC T %.2f S %.2f" % [float(intent[0]),float(intent[2]),float(decoded[0]),float(decoded[2])])
+		lines.append("NAV Δ T %.2f S %.2f" % [float(navigation[0]),float(navigation[2])])
+	var nav_share=100.0*demo_nav_intervention_sum/maxf(1.0,float(demo_nav_samples)*6.0)
+	lines.append("NAV ASSIST · %.0f%%" % nav_share)
 	var command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else -1.0
 	if command_age_ms>=0:
 		lines.append("%s: %.1f ms · #%d · age %.0f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0)),bridge.responses_received,command_age_ms])
@@ -754,61 +765,81 @@ func update_demo_hud():
 		lines.append("%s: waiting for first MaleCNS response" % AppState.tr_text("Tick"))
 	demo_brain_text.text="\n".join(lines)
 
-func demo_apply_mouse_motion(relative: Vector2,hull_turning: bool=false):
-	if not is_demo or vehicles.is_empty() or paused or camera_mode not in [1,2]:return
+func demo_apply_mouse_motion(cursor: Vector2,_hull_turning: bool=false):
+	if not is_demo or vehicles.is_empty() or paused or camera_mode!=1:return
 	var vehicle=vehicles[0]
-	if hull_turning:
-		# Mouse sets a desired heading; the tracks and steering mechanism slew
-		# the hull toward it in Vehicle.step instead of teleporting its angle.
-		if not vehicle.manual_hull_aim:
-			vehicle.manual_hull_target=vehicle.rotation.y
-			vehicle.manual_hull_aim=true
-		vehicle.manual_hull_target=wrapf(vehicle.manual_hull_target+relative.x*.004,-PI,PI)
-		return
-	# The reticle follows the actual bore while mouse motion moves only the
-	# desired angle. This leaves visible aim lag in the gunner view.
+	if is_instance_valid(gunner_reticle):gunner_reticle.set_aim_screen_position(cursor)
 	if not vehicle.manual_aim:
 		vehicle.manual_aim=true
-		vehicle.manual_turret_target=vehicle.turret_angle
-		vehicle.manual_gun_target=vehicle.gun_angle
-	var sensitivity=.00085 if camera_mode==2 and demo_sniper_mode else .0032
-	var yaw_delta=relative.x*sensitivity
-	vehicle.manual_turret_target=wrapf(vehicle.manual_turret_target+yaw_delta,-PI,PI) if vehicle.cfg.turreted else clampf(vehicle.manual_turret_target+yaw_delta,-deg_to_rad(vehicle.cfg.traverse_limit_deg),deg_to_rad(vehicle.cfg.traverse_limit_deg))
-	vehicle.manual_gun_target=clampf(vehicle.manual_gun_target-relative.y*sensitivity,deg_to_rad(vehicle.cfg.elevation_deg[0]),deg_to_rad(vehicle.cfg.elevation_deg[1]))
+	var origin=camera.project_ray_origin(cursor)
+	var ray=camera.project_ray_normal(cursor)
+	var query=PhysicsRayQueryParameters3D.create(origin,origin+ray*240.0,7,vehicle.excluded())
+	var hit=get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Vector3
+	if not hit.is_empty():
+		target=hit.position
+	else:
+		var floor_y=terrain.height_at(vehicle.position.x,vehicle.position.z)+1.0
+		var denominator=ray.y
+		var ray_distance=(floor_y-origin.y)/denominator if absf(denominator)>.04 else 110.0
+		target=origin+ray*clampf(ray_distance,25.0,180.0)
+	var muzzle=vehicle.muzzle.global_position
+	var offset=target-muzzle
+	var horizontal=Vector2(offset.x,offset.z).length()
+	if horizontal<2.0:
+		target=muzzle+ray*70.0;offset=target-muzzle;horizontal=maxf(2.0,Vector2(offset.x,offset.z).length())
+	var world_yaw=atan2(offset.x,offset.z)
+	var relative_yaw=wrapf(world_yaw-vehicle.rotation.y,-PI,PI)
+	var traverse=deg_to_rad(float(vehicle.cfg.traverse_limit_deg))
+	vehicle.manual_turret_target=wrapf(relative_yaw,-PI,PI) if vehicle.cfg.turreted else clampf(relative_yaw,-traverse,traverse)
+	var muzzle_speed=float(vehicle.cfg.ammo_data.muzzle_velocity_m_s)
+	var dy=offset.y
+	var gravity=9.81
+	var discriminant=muzzle_speed**4-gravity*(gravity*horizontal*horizontal+2.0*dy*muzzle_speed*muzzle_speed)
+	var elevation=atan2(dy,horizontal)
+	if discriminant>=0.0:
+		elevation=atan((muzzle_speed*muzzle_speed-sqrt(discriminant))/(gravity*horizontal))
+	vehicle.manual_gun_target=clampf(elevation,deg_to_rad(float(vehicle.cfg.elevation_deg[0])),deg_to_rad(float(vehicle.cfg.elevation_deg[1])))
 
 func demo_set_sniper_mode(enabled: bool):
-	if camera_mode not in [1,2]:return
-	if enabled and not demo_sniper_mode:
-		demo_camera_before_scope=camera_mode if camera_mode!=2 else 1
-		camera_mode=2
-	elif not enabled and demo_sniper_mode:
-		camera_mode=demo_camera_before_scope if demo_camera_before_scope!=2 else 1
+	if not is_demo:return
 	demo_sniper_mode=enabled
-	last_camera_mode=-1
-	update_camera_button()
-	if is_instance_valid(gunner_reticle):gunner_reticle.visible=camera_mode in [1,2]
+	if is_instance_valid(gunner_reticle):gunner_reticle.visible=true
 	if is_instance_valid(gunner_reticle):gunner_reticle.queue_redraw()
 
 func demo_toggle_sniper_scope():
 	demo_set_sniper_mode(not demo_sniper_mode)
 
 func demo_command(fire_pressed: bool=false) -> Array:
-	return [0.62,0.0,0.0,0.0,0.0,1.0 if fire_pressed else 0.0]
+	return [0.56,0.0,0.0,0.0,0.0,1.0 if fire_pressed else 0.0]
+
+func demo_player_command(fire_pressed: bool=false) -> Array:
+	var vehicle=vehicles[0]
+	var opponent=vehicles[8]
+	var delta=opponent.global_position-vehicle.global_position;delta.y=0
+	var desired=atan2(delta.x,delta.z)
+	if delta.length()<48.0:desired+=.35 if int(sim_time/16.0)%2==0 else -.35
+	var edge=Vector2(vehicle.position.x,vehicle.position.z)
+	if edge.length()>terrain.extent-30.0:desired=atan2(-vehicle.position.x,-vehicle.position.z)
+	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
+	return [0.48,0.0,clampf(error*1.15,-.72,.72),0.0,0.0,1.0 if fire_pressed else 0.0]
 
 func demo_mouse_commands(fire_pressed: bool) -> Array:
-	return demo_command(fire_pressed)
+	return demo_player_command(fire_pressed)
 
 func apply_demo_tactical_aux(vehicle,source: Array) -> Array:
-	# ENGINEERED and explicitly displayed in the demo panel. MaleCNS receives
-	# normal visual inputs; arena geometry and tank controls stay outside it.
+	# Navigation is a low-level assist layered over the real decoded CNS command.
 	var command=source.duplicate()
 	while command.size()<6:command.append(0.0)
 	if not vehicle.alive or not vehicles[0].alive:return [0,0,0,0,0,0]
 	var delta=vehicles[0].global_position-vehicle.global_position;delta.y=0
-	var desired=atan2(delta.x,delta.z);var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
-	if delta.length()>65:
-		command[0]=maxf(float(command[0]),.72);command[2]=lerpf(float(command[2]),clampf(error*1.7,-1,1),.72)
-	else:command[0]=clampf(float(command[0]),0,.25)
+	var desired=atan2(delta.x,delta.z)
+	if delta.length()<58.0:desired+=.48 if int(vehicle.world.sim_time/14.0)%2==0 else -.48
+	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
+	var nav_steer=clampf(error*1.25,-.82,.82)
+	var neural_throttle=float(command[0]);var neural_steer=float(command[2])
+	command[0]=maxf(neural_throttle,.36)
+	command[2]=clampf(neural_steer*.65+nav_steer*.35,-1.0,1.0)
 	return command
 
 func has_los(a,b) -> bool:
@@ -921,8 +952,17 @@ func _physics_process(delta):
 			if is_demo and i==8 and bridge.last_valid_commands.size()==16 and is_malecns_controller(vehicles[i]):
 				var before_tactical=command.duplicate()
 				command=apply_demo_tactical_aux(vehicles[i],command)
-				layer["objective_aux_action"]=[]
-				for j in range(6):layer["objective_aux_action"].append(command[j]-before_tactical[j])
+				layer["neural_intent"]=layer.get("raw_neural_action",layer.get("neural_intent",[]))
+				var decoded_layer=layer.get("decoder_action",null)
+				layer["decoded_commands"]=decoded_layer if decoded_layer is Array else before_tactical.duplicate()
+				layer["navigation_assistance"]=[]
+				var intervention=0.0
+				for j in range(6):
+					var amount=command[j]-before_tactical[j]
+					layer["navigation_assistance"].append(amount)
+					intervention+=absf(amount)
+				demo_nav_samples+=1
+				demo_nav_intervention_sum+=intervention
 			elif is_malecns_controller(vehicles[i]):
 				var before_objective=command.duplicate()
 				command=apply_malecns_objective_aux(
@@ -957,6 +997,7 @@ func _physics_process(delta):
 			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
 		if is_demo:
 			if v.agent_id==0:v.cmd=demo_mouse_commands(mouse_fire_pending)
+			elif v.agent_id==8 and sim_time<8.0:v.cmd[5]=0.0
 			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
@@ -1788,6 +1829,10 @@ func finish(notify_result=true):
 	report.neural_response_timeouts=bridge.timeout_count
 	report.backend_disconnects=bridge.disconnect_count
 	report.last_valid_command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else null
+	if is_demo:
+		report.demo_navigation_samples=demo_nav_samples
+		report.demo_navigation_intervention_mean=demo_nav_intervention_sum/maxf(1.0,float(demo_nav_samples)*6.0)
+		report.demo_no_silent_fallback=true
 	report.male_cns_tick_ms=sample_statistics(bridge.tick_ms_samples)
 	report.ipc_latency_ms=sample_statistics(bridge.latency_ms_samples)
 	report.shot_distances=shot_distances
@@ -1846,10 +1891,10 @@ func _process(dt):
 		if demo_intro_left>3.0:demo_intro.text=demo_intro_copy("NERVOUS SYSTEM MODEL CONNECTED")
 		elif demo_intro_left>2.0:
 			if str(AppState.settings.language)=="ru":
-				demo_intro.text="ТВОЙ ТАНК: %s\nМЫШЬ — БАШНЯ И УВН · СРЕДНЯЯ КНОПКА — ПОВОРОТ КОРПУСА\nЛКМ — ОГОНЬ · ПКМ — ОПТИКА · ТАНК ВСЕГДА ДВИЖЕТСЯ ВПЕРЁД" % vehicles[0].cfg.display_name
+				demo_intro.text="ТВОЙ ТАНК: %s\nКУРСОР — НАВЕДЕНИЕ · ЛКМ — ВЫСТРЕЛ · УДЕРЖИВАЙ ПКМ — ПРИБЛИЖЕНИЕ\nТАНК САМ ДВИЖЕТСЯ И МЕНЯЕТ ПОЗИЦИЮ" % vehicles[0].cfg.display_name
 			else:
 				var intro_format=AppState.tr_text("demo.intro.vehicle")
-				if intro_format=="demo.intro.vehicle":intro_format="Your tank: %s\nMouse: turret and elevation · Middle drag: hull turn\nLMB fire · RMB scope · tank keeps moving forward"
+				if intro_format=="demo.intro.vehicle":intro_format="Your tank: %s\nMove cursor to aim · LMB fire · hold RMB to zoom\nYour tank drives and repositions by itself"
 				demo_intro.text=intro_format % [vehicles[0].cfg.display_name]
 		elif demo_intro_left>1.0:demo_intro.text=demo_intro_copy("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
 		else:demo_intro.text=demo_intro_copy("FIGHT")
@@ -1972,16 +2017,17 @@ func _process(dt):
 		camera.rotation=Vector3(-PI/2,0,0)
 	elif camera_mode==1:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
-		camera.fov=62.0
-		var demo_heading=v.rotation.y+v.turret_angle
+		var target_fov=42.0 if is_demo and demo_sniper_mode else 62.0
+		camera.fov=move_toward(camera.fov,target_fov,45.0*dt) if is_demo else 62.0
+		var demo_heading=v.rotation.y if is_demo else v.rotation.y+v.turret_angle
 		var demo_forward=Vector3(sin(demo_heading),0,cos(demo_heading))
-		var follow=v.position-demo_forward*13+Vector3(0,7,0) if is_demo else v.position-v.global_basis.z*16+Vector3(0,8,0)
+		var follow=v.position-demo_forward*(15.0 if is_demo else 16.0)+Vector3(0,8 if is_demo else 8,0)
 		camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,minf(1,dt*4))
-		var look_target=v.position+Vector3(0,2,0)+demo_forward*7 if is_demo else v.position+Vector3(0,2,0)
+		var look_target=v.position+Vector3(0,2,0)+demo_forward*(20 if is_demo else 0)
 		camera.look_at(look_target)
 	elif camera_mode==2:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
-		camera.fov=25.0 if is_demo and demo_sniper_mode else 62.0
+		camera.fov=62.0
 		camera.position=v.muzzle.global_position+Vector3(0,.4,0)
 		var a=v.rotation.y+v.turret_angle
 		camera.look_at(camera.position+Vector3(sin(a)*cos(v.gun_angle),sin(v.gun_angle),cos(a)*cos(v.gun_angle))*100)
@@ -2001,9 +2047,16 @@ func _process(dt):
 		aim_prediction_timer-=dt
 		if aim_prediction_timer<=0.0:
 			aim_prediction_timer=.12
-			var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
-			if not camera.is_position_behind(predicted):
-				gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
+			if is_demo:
+				var cursor=get_viewport().get_mouse_position()
+				if not demo_sniper_mode:gunner_reticle.set_aim_screen_position(cursor)
+				var aligned=absf(wrapf(v.manual_turret_target-v.turret_angle,-PI,PI))<deg_to_rad(.8) and absf(v.manual_gun_target-v.gun_angle)<deg_to_rad(.6)
+				gunner_reticle.set_aim_ready(aligned and v.reload_left<=0.0)
+			else:
+				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
+				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
+	if is_demo and not paused and demo_intro_left<=0.0 and vehicles.size()>0:
+		demo_apply_mouse_motion(Vector2.ZERO)
 	update_identification_labels()
 	var connection=AppState.tr_text("BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL")
 	if requires_brain:
@@ -2064,13 +2117,8 @@ func _unhandled_input(event):
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
 		if (is_demo or is_range) and camera_mode in [1,2] and not paused and not (is_range and range_killcam_active):
 			mouse_fire_pending=true
-	if is_demo and event is InputEventMouseButton and event.pressed:
-		if event.button_index==MOUSE_BUTTON_RIGHT:
-			demo_toggle_sniper_scope()
-		elif event.button_index==MOUSE_BUTTON_WHEEL_UP:
-			camera_mode=2 if camera_mode!=2 else 1;last_camera_mode=-1;update_camera_button()
-		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
-			camera_mode=1 if camera_mode!=1 else 2;last_camera_mode=-1;update_camera_button()
+	if is_demo and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT:
+		demo_set_sniper_mode(event.pressed)
 	if event is InputEventMouseButton and event.pressed and camera_mode==0:
 		if event.button_index==MOUSE_BUTTON_LEFT:
 			select_vehicle_from_screen(
@@ -2123,11 +2171,8 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
 
 func _input(event):
-	if is_demo and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_MIDDLE:
-		middle_drag_active=event.pressed
-		return
 	if is_demo and event is InputEventMouseMotion:
-		demo_apply_mouse_motion(event.relative,middle_drag_active)
+		demo_apply_mouse_motion(event.position,false)
 		return
 	if not (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed):return
 	if is_demo and demo_intro_left>0:

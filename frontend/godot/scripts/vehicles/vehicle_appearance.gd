@@ -3,13 +3,17 @@ extends RefCounted
 
 const LIVERY_SHADER = preload("res://shaders/vehicle_livery.gdshader")
 
+# Visual approximations for the 1944-45 theatre, NOT sampled or certified RAL/4BO
+# standards.  See docs/vehicle_art_reference_audit.md for evidence and limitations.
+# 0 = wartime Soviet single-colour green, 1 = field-applied German three-colour
+# bands, 2 = late-1944 German spotted three-colour (Hinterhalt-inspired).
 const PROFILES = {
-	"t34_85": {"base": Color("3c4b2c"), "secondary": Color("485638"), "tertiary": Color("66513b"), "style": 0, "wear": 0.30},
-	"panther_g": {"base": Color("b5a06a"), "secondary": Color("526346"), "tertiary": Color("76503a"), "style": 1, "wear": 0.23},
-	"tiger_i": {"base": Color("b49c62"), "secondary": Color("66704a"), "tertiary": Color("72523a"), "style": 2, "wear": 0.42},
-	"is2_1944": {"base": Color("34462c"), "secondary": Color("425536"), "tertiary": Color("62503a"), "style": 0, "wear": 0.34},
-	"jagdpanther": {"base": Color("b6a16e"), "secondary": Color("59694b"), "tertiary": Color("76503c"), "style": 1, "wear": 0.30},
-	"su100": {"base": Color("3b4b2f"), "secondary": Color("48563a"), "tertiary": Color("635039"), "style": 0, "wear": 0.28},
+	"t34_85":   {"base": Color("424c32"), "secondary": Color("424c32"), "tertiary": Color("424c32"), "style": 0, "scale": 1.0, "wear": 0.25},
+	"panther_g": {"base": Color("aa9a72"), "secondary": Color("4d5b45"), "tertiary": Color("785541"), "style": 2, "scale": 0.85, "wear": 0.25},
+	"tiger_i":  {"base": Color("ac9c73"), "secondary": Color("566347"), "tertiary": Color("74523d"), "style": 1, "scale": 1.1, "wear": 0.30},
+	"is2_1944": {"base": Color("3d4931"), "secondary": Color("3d4931"), "tertiary": Color("3d4931"), "style": 0, "scale": 1.0, "wear": 0.27},
+	"jagdpanther":{"base": Color("af9d74"), "secondary": Color("4e5941"), "tertiary": Color("75513c"), "style": 1, "scale": 0.90, "wear": 0.29},
+	"su100":    {"base": Color("404c33"), "secondary": Color("404c33"), "tertiary": Color("404c33"), "style": 0, "scale": 1.0, "wear": 0.29},
 }
 
 static func apply(model: Node3D, vehicle_id: String, destroyed: bool = false) -> int:
@@ -30,11 +34,20 @@ static func apply(model: Node3D, vehicle_id: String, destroyed: bool = false) ->
 				source = instance_source
 			if source is StandardMaterial3D and source.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 				continue
+			# Do not paint road wheels as dark track steel: this was a major
+			# source of visually flat running gear in the original livery.
 			var name := source.resource_name.to_lower() if source else ""
+			var part := mesh_instance.name.to_lower()
 			var kind := 0
-			if name.contains("recess") or name.contains("rubber"):
-				kind = 2 if name.contains("recess") else 1
-			elif name.contains("track") or name.contains("wheel"):
+			if name.contains("recess") or part.contains("recess") or part.contains("bore"):
+				kind = 2
+			elif name.contains("rubber") or part.contains("tyre") or part.contains("tire"):
+				kind = 4
+			elif part.contains("track") or part.contains("shoe") or part.contains("guidehorn") or part.contains("crossrib") or part.contains("drive tooth"):
+				kind = 1
+			elif part.contains("wheel") or part.contains("hub") or part.contains("sprocket") or part.contains("idler"):
+				kind = 3
+			elif name.contains("track"):
 				kind = 1
 			var material := ShaderMaterial.new()
 			material.shader = LIVERY_SHADER
@@ -57,6 +70,7 @@ static func apply(model: Node3D, vehicle_id: String, destroyed: bool = false) ->
 			material.set_shader_parameter("paint_secondary", profile.secondary)
 			material.set_shader_parameter("paint_tertiary", profile.tertiary)
 			material.set_shader_parameter("pattern_style", profile.style)
+			material.set_shader_parameter("pattern_scale", profile.scale)
 			material.set_shader_parameter("material_kind", kind)
 			material.set_shader_parameter("weathering", profile.wear)
 			material.set_shader_parameter("charred", destroyed)

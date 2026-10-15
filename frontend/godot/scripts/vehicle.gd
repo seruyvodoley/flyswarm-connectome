@@ -302,7 +302,9 @@ func step(dt: float):
 	var limit=float(cfg.max_speed_kph if road else cfg.cross_country_kph)/3.6
 	speed=clampf(speed,-float(cfg.reverse_kph)/3.6,limit)
 	speed*=1-absf(steer)*float(cfg.steering_loss)*dt
-	var pivot=1.0 if cfg.neutral_steering else clampf(absf(speed)/2,.15,1)
+	# Tracked vehicles can counter-rotate their tracks to pivot while stationary.
+	# Preserve historical turning limits once the hull is moving.
+	var pivot=1.0 if cfg.neutral_steering or absf(speed)<.8 else clampf(absf(speed)/2,.15,1)
 	var desired_yaw_rate=steer*deg_to_rad(cfg.turn_rate_deg_s)*pivot/(1+absf(speed)*.08)
 	yaw_rate=move_toward(yaw_rate,desired_yaw_rate,deg_to_rad(float(cfg.hull_yaw_accel_deg_s2))*dt) if mechanically_mobile else 0.0
 	if manual_hull_aim:

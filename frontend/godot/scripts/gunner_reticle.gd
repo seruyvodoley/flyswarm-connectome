@@ -5,6 +5,7 @@ var reload_left=0.0
 var scoped=false
 var weapon_block=""
 var aim_screen_position=Vector2(-1,-1)
+var aim_screen_target=Vector2(-1,-1)
 var has_aim_screen_position=false
 var aim_ready=false
 var camera_center_marker=false
@@ -30,9 +31,18 @@ func block_message() -> String:
 	return ""
 
 func set_aim_screen_position(screen_position: Vector2):
-	aim_screen_position=screen_position
+	aim_screen_target=screen_position
+	if not has_aim_screen_position:
+		aim_screen_position=screen_position
 	has_aim_screen_position=true
-	queue_redraw()
+
+func _process(delta: float):
+	if not has_aim_screen_position:return
+	var response=1.0-exp(-delta*18.0)
+	var next_position=aim_screen_position.lerp(aim_screen_target,response)
+	if next_position.distance_squared_to(aim_screen_position)>.01:
+		aim_screen_position=next_position
+		queue_redraw()
 
 func set_aim_ready(ready: bool):
 	aim_ready=ready

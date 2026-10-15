@@ -120,6 +120,7 @@ var demo_fire_rest=0.0
 var demo_zoom_rest=0.0
 var demo_camera_yaw=0.0
 var demo_camera_pitch=-.12
+var demo_look_smoothed=Vector2.ZERO
 var demo_controller_status: Label
 var impact_killcam: Control
 var vehicle_status_panel: PanelContainer
@@ -784,7 +785,11 @@ func update_demo_controller_input(delta: float) -> void:
 	demo_fire_held=fire_now
 	var look_x=Input.get_action_strength("od_look_right")-Input.get_action_strength("od_look_left")
 	var look_y=Input.get_action_strength("od_look_down")-Input.get_action_strength("od_look_up")
-	var angles=OpenDayController.advance_camera(demo_camera_yaw,demo_camera_pitch,Vector2(look_x,look_y),delta,demo_sniper_mode)
+	var look_target=Vector2(look_x,look_y)
+	# Filter stick noise with a frame-rate-independent response; camera and
+	# reticle then follow one continuous aim target instead of twitching.
+	demo_look_smoothed=demo_look_smoothed.lerp(look_target,1.0-exp(-delta*12.0))
+	var angles=OpenDayController.advance_camera(demo_camera_yaw,demo_camera_pitch,demo_look_smoothed,delta,demo_sniper_mode)
 	demo_camera_yaw=angles.x
 	demo_camera_pitch=angles.y
 
@@ -830,7 +835,8 @@ func demo_male_cns_trace_summary() -> Dictionary:
 
 func update_vehicle_status():
 	if not is_instance_valid(vehicle_status_panel):return
-	vehicle_status_panel.visible=camera_mode in [1,2] and not range_killcam_active and selected>=0 and selected<vehicles.size()
+	var replaced_by_demo_impact=is_demo and is_instance_valid(impact_killcam) and impact_killcam.visible
+	vehicle_status_panel.visible=camera_mode in [1,2] and not range_killcam_active and not replaced_by_demo_impact and selected>=0 and selected<vehicles.size()
 	if not vehicle_status_panel.visible:return
 	var v=vehicles[selected]
 	var russian=str(AppState.settings.language)=="ru"
@@ -2398,7 +2404,7 @@ func _process(dt):
 	if gunner_reticle.visible:
 		aim_prediction_timer-=dt
 		if aim_prediction_timer<=0.0:
-			aim_prediction_timer=.12
+			aim_prediction_timer=1.0/60.0 if is_demo else .12
 			if is_demo:
 				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
 				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))

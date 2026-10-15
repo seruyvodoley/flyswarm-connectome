@@ -176,9 +176,11 @@ func _ready():
 	var battle=get_parent().get_parent() if get_parent()!=null and get_parent().get_parent()!=null else null
 	var demo_layout=battle!=null and battle.get("is_demo")==true
 	if demo_layout:
+		# In Open Day the report temporarily replaces the own-vehicle status card.
+		# Other battle modes keep the original bottom-right placement.
 		set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		offset_left=410
-		offset_right=780
+		offset_left=20
+		offset_right=390
 		offset_top=-390
 		offset_bottom=-130
 		custom_minimum_size=Vector2(370,260)

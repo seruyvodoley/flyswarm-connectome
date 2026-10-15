@@ -1,5 +1,12 @@
 # Release contract
 
+## Permanent Open Day platform release policy
+
+Open Day Windows installers and portable packages must never be published or
+attached to a GitHub Release. Keep Windows CI validation if useful, but do not
+create Windows release assets for Open Day. This is a durable project policy;
+future task prompts do not authorize changing it.
+
 Every completed user-facing application change must pass the relevant tests,
 produce a fresh macOS arm64 application build and installable DMG, smoke-test
 the installed app, create a new matching version/tag, publish a GitHub Release

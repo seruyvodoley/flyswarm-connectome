@@ -56,9 +56,9 @@ func run():
 	check(InputMap.action_get_events("od_fire").size()==1 and InputMap.action_get_events("od_zoom").size()==1,"R2 and L2 use standard Joypad trigger-axis events")
 	check(OpenDayController.shape_vector(Vector2(.1,.08))==Vector2.ZERO,"Radial stick deadzone suppresses small drift")
 	var slow_stick=OpenDayController.drive_command(Vector2(0,-.35),false);var full_stick=OpenDayController.drive_command(Vector2(0,-1),false)
-	check(slow_stick[0]>0.0 and slow_stick[0]<full_stick[0] and is_equal_approx(full_stick[0],1.0),"Analog throttle scales smoothly from partial to full stick")
+	check(slow_stick[0]<0.0 and slow_stick[0]>full_stick[0] and is_equal_approx(full_stick[0],-1.0),"Inverted physical left-stick vertical axis produces forward throttle while preserving analog scaling")
 	var turn_right=OpenDayController.drive_command(Vector2(.8,0),true)
-	check(turn_right[2]>0.0 and turn_right[5]==1.0 and OpenDayController.drive_command(Vector2.ZERO,false)==[0.0,0.0,0.0,0.0,0.0,0.0],"Right steering and one-shot fire are independent of neutral drive input")
+	check(turn_right[2]<0.0 and turn_right[5]==1.0 and OpenDayController.drive_command(Vector2.ZERO,false)==[0.0,0.0,0.0,0.0,0.0,0.0],"Inverted physical left-stick horizontal axis is normalized and one-shot fire remains independent")
 	check(OpenDayController.normalize_trigger(-1.0,-1.0)==0.0 and is_equal_approx(OpenDayController.normalize_trigger(0.56,0.0),0.56) and OpenDayController.normalize_trigger(1.0,-1.0)==1.0,"Trigger normalization supports both -1..1 and 0..1 hardware ranges")
 	var look_right=OpenDayController.advance_camera(0.0,0.0,Vector2(1,0),.1,false);var look_left=OpenDayController.advance_camera(0.0,0.0,Vector2(-1,0),.1,false)
 	var look_up=OpenDayController.advance_camera(0.0,0.0,Vector2(0,-1),.1,false);var look_down=OpenDayController.advance_camera(0.0,0.0,Vector2(0,1),.1,false)
@@ -95,7 +95,7 @@ func run():
 		battle.paused=false;battle.demo_intro_left=0.0
 		Input.action_press("od_move_forward",.72)
 		var analog_drive=battle.demo_gamepad_commands(false)
-		check(analog_drive[0]>0.0 and analog_drive[0]<1.0 and analog_drive[2]==0.0 and not player_vehicle.manual_hull_aim,"DualSense left-stick analog input drives through tank physics without hull autopilot")
+		check(analog_drive[0]<0.0 and analog_drive[0]>-1.0 and analog_drive[2]==0.0 and not player_vehicle.manual_hull_aim,"Inverted physical left-stick input is normalized at the gamepad boundary without hull autopilot")
 		Input.action_release("od_move_forward")
 		Input.action_press("od_look_right",1.0)
 		var original_camera_yaw=battle.demo_camera_yaw
@@ -171,7 +171,7 @@ func run():
 	check(not battle.camera_button.visible and is_instance_valid(battle.demo_controls) and (battle.demo_controls.text.contains("LMB") or battle.demo_controls.text.contains("ЛКМ")) and (battle.demo_controls.text.contains("RMB") or battle.demo_controls.text.contains("ПКМ")),"Mouse fallback controls remain available without a camera selector")
 	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
 	battle.gunner_reticle.set_aim_screen_position(Vector2(-25.0,420.0))
-	check(battle.gunner_reticle.has_aim_screen_position and battle.gunner_reticle.aim_screen_position.x<0.0,"Sight preserves offscreen impact coordinates instead of snapping to screen centre")
+	check(battle.gunner_reticle.has_aim_screen_position and battle.gunner_reticle.aim_screen_target.x<0.0,"Sight preserves offscreen impact coordinates instead of snapping to screen centre")
 	battle.camera_mode=0;await process_frame
 	check(not battle.gunner_reticle.visible,"Battlefield observer view hides the gun sight")
 	battle.camera_mode=3;await process_frame
@@ -255,7 +255,8 @@ func run():
 	check(battle.impact_killcam.model_view.projectile.position.distance_to(battle.impact_killcam.model_view.path_start)>0.1,"Impact projectile animates along its path")
 	check(is_equal_approx(float(battle.impact_killcam.model_view.model.find_child("TurretPivot",true,false).rotation.y),.25),"X-ray turret follows the target's actual traverse")
 	check(battle.impact_killcam.title.text.contains("B1 T-34-85") and battle.impact_killcam.title.text.contains("R1 Panther G"),"Impact report names its actual shooter and target")
-	check(battle.impact_killcam.offset_left>=battle.vehicle_status_panel.offset_right and battle.impact_killcam.offset_right<870 and battle.impact_killcam.offset_bottom<battle.demo_controls.offset_top,"Impact report clears status, telemetry and control guide")
+	battle.update_vehicle_status()
+	check(battle.impact_killcam.anchor_left==battle.vehicle_status_panel.anchor_left and battle.impact_killcam.anchor_bottom==battle.vehicle_status_panel.anchor_bottom and battle.impact_killcam.offset_left==battle.vehicle_status_panel.offset_left and battle.impact_killcam.offset_top==battle.vehicle_status_panel.offset_top and battle.impact_killcam.offset_bottom<battle.demo_controls.offset_top and not battle.vehicle_status_panel.visible,"Open Day impact report temporarily replaces the lower-left vehicle-status card without covering controls")
 	vehicle.module_damage["breech"]=.5;battle.update_vehicle_status()
 	await capture("battle-impact-killcam-1280x720")
 	battle.vehicle_status_panel.visible=true;battle.camera_mode=0;battle._process(.02)

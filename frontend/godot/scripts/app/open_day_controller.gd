@@ -67,7 +67,9 @@ static func shape_vector(value: Vector2, deadzone: float = STICK_DEADZONE) -> Ve
 	return value / magnitude * pow(normalized, 1.2)
 
 static func drive_command(movement: Vector2, fire: bool) -> Array:
-	var shaped := shape_vector(movement)
+	# The DualSense reports the left-stick movement axes in the opposite
+	# direction on the target macOS setup; normalize once at the input boundary.
+	var shaped := shape_vector(-movement)
 	return [-shaped.y, 0.0, shaped.x, 0.0, 0.0, 1.0 if fire else 0.0]
 
 static func advance_camera(yaw: float, pitch: float, look: Vector2, delta: float, scoped: bool) -> Vector2:

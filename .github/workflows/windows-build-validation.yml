@@ -1,4 +1,4 @@
-name: Windows x64 build and release
+name: Windows x64 build validation
 
 on:
   push:
@@ -90,7 +90,6 @@ jobs:
             build/windows/SHA256SUMS-windows.txt
           if-no-files-found: error
           retention-days: 30
-
       - name: Upload Windows portable archive
         uses: actions/upload-artifact@v4
         with:
@@ -100,15 +99,3 @@ jobs:
             build/windows/SHA256SUMS-windows.txt
           if-no-files-found: error
           retention-days: 30
-
-      - name: Add Windows assets to a draft prerelease
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          draft: true
-          prerelease: true
-          files: |
-            build/windows/FlySwarm-*-windows-x64-setup.exe
-            build/windows/FlySwarm-*-windows-x64.zip
-            build/windows/SHA256SUMS-windows.txt

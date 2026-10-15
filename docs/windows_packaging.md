@@ -3,10 +3,10 @@
 The Windows package is built on a Windows x64 GitHub Actions runner. The workflow
 exports the Godot project, builds a relocatable Python onedir runtime with
 PyInstaller, creates an Inno Setup installer, installs it into a clean runner
-directory, then smoke-tests the installed executable and MARL CLI. On a version
-tag it produces downloadable GitHub Actions artifacts and adds the installer,
-portable ZIP and checksums to a draft prerelease. Publish that release only after
-the matching macOS DMG, ZIP and checksum have also been attached and validated.
+directory, then smoke-tests the installed executable and MARL CLI. CI may retain
+temporary GitHub Actions artifacts for validation. Open Day Windows installers
+and portable archives are never attached to a GitHub Release; releases remain
+macOS-only.
 
 The package contains no MaleCNS research dataset. The Windows automated checks
 exercise the application and the self-contained MARL baseline backend. They are

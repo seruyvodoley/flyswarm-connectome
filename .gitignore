@@ -26,6 +26,7 @@ data/local/
 .godot/
 results/replays/
 *.blend1
+assets/models/imported/t34_85/candidates/
 
 # Local application builds
 build/

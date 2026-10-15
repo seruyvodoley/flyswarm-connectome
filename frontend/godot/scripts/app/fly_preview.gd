@@ -66,9 +66,17 @@ func fit_model_to_preview(model: Node3D,target_length: float,orientation: Transf
 
 func _sync_viewport_size() -> void:
 	if not is_instance_valid(viewport):return
+	var target_size=Vector2i(maxi(128,roundi(size.x)),maxi(72,roundi(size.y)))
 	if is_instance_valid(preview_camera) and fit_bounds.size.length()>0.0:
-		var scaled_radius=fit_bounds.size.length()*0.5*3.2/maxf(fit_bounds.size.x,maxf(fit_bounds.size.y,fit_bounds.size.z))
-		var camera_distance=scaled_radius/sin(deg_to_rad(preview_camera.fov*0.5))*.52
+		var scale_factor=3.2/maxf(fit_bounds.size.x,maxf(fit_bounds.size.y,fit_bounds.size.z))
+		var half_width=fit_bounds.size.x*scale_factor*.5
+		var half_height=fit_bounds.size.y*scale_factor*.5
+		var half_depth=fit_bounds.size.z*scale_factor*.5
+		var aspect=maxf(.25,float(target_size.x)/float(target_size.y))
+		var tangent=tan(deg_to_rad(preview_camera.fov*.5))
+		# Fit the model's projected width and height to the actual card shape,
+		# with room for the wing tips and a small perspective safety margin.
+		var camera_distance=(maxf(half_height/tangent,half_width/(tangent*aspect))+half_depth*.55)*1.10
 		preview_camera.position=Vector3(camera_distance*.10,camera_distance*.12,camera_distance)
 		preview_camera.look_at(Vector3.ZERO)
 

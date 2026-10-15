@@ -26,6 +26,7 @@ var marl_pid=-1
 var marl_output=""
 var marl_replay_path=""
 var marl_progress={}
+var menu_stick_latched=false
 func _ready():
 	OpenDayController.configure()
 	packaged_app=not OS.has_feature("editor")
@@ -57,9 +58,7 @@ func _input(_event):
 	if current_page not in ["MainMenu","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
 	var back=Input.is_action_just_pressed("od_back")
 	var confirm=Input.is_action_just_pressed("od_confirm")
-	var direction=0
-	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):direction=-1
-	elif Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):direction=1
+	var direction=menu_navigation_direction()
 	if current_page=="PauseMenu" and Input.is_action_just_pressed("od_pause"):back=true
 	if not back and not confirm and direction==0:return
 	var focus=get_viewport().gui_get_focus_owner()
@@ -81,6 +80,29 @@ func _input(_event):
 		buttons[index].grab_focus()
 	elif confirm:
 		buttons[index].emit_signal("pressed")
+
+func menu_navigation_direction() -> int:
+	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):return -1
+	if Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):return 1
+	var strongest=0.0
+	var direction=0
+	var has_controller=false
+	for device in Input.get_connected_joypads():
+		has_controller=true
+		var horizontal=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_X)
+		var vertical=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_Y)
+		if absf(horizontal)>absf(strongest):
+			strongest=horizontal
+			direction=1 if horizontal>0.0 else -1
+		if absf(vertical)>absf(strongest):
+			strongest=vertical
+			direction=1 if vertical>0.0 else -1
+	if not has_controller or absf(strongest)<.24:
+		menu_stick_latched=false
+		return 0
+	if menu_stick_latched or absf(strongest)<.58:return 0
+	menu_stick_latched=true
+	return direction
 func windows_host() -> bool:
 	return OS.get_name()=="Windows"
 func user_home_path() -> String:
@@ -229,7 +251,9 @@ func configure_demo(vehicle: String="t34_85"):
 	session=Config.new()
 	session.mode="demo"
 	session.map="demo_arena"
-	session.seconds=90
+	session.seconds=120
+	# Vary the deterministic opening movement between new Open Day matches.
+	session.battle_seed=int(Time.get_ticks_usec() & 0x7fffffff)
 	session.blue_controller="rule"
 	session.red_controller="brain"
 	session.audio_mode="no_audio"

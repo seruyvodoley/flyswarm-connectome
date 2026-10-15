@@ -28,7 +28,7 @@ const RU_COPY={
 	"Reconstructed connectome\nDNp09 · DNa02 · DNp01 · wing/song":"Реконструированный коннектом\nDNp09 · DNa02 · DNp01 · wing/song",
 	"The connectome is frozen and does not understand tanks, objectives or tactics.":"Коннектом зафиксирован: он не понимает танки, цели или тактику.","3. ENGINEERED ADAPTER":"3. ИНЖЕНЕРНЫЙ АДАПТЕР","SIGNALS → CONTROLS":"СИГНАЛЫ → КОМАНДЫ",
 	"motor decoder\nmovement auxiliary\naiming and firing helper":"декодер движений\nвспомогательное управление\nпомощь в наведении и стрельбе",
-	"This external layer converts neural activity into safe vehicle controls.":"Внешний слой преобразует активность нейронов в команды управления техникой.","4. VIRTUAL VEHICLE":"4. ВИРТУАЛЬНЫЙ ТАНК",
+	"This external layer converts neural activity into safe vehicle controls.":"Внешний слой преобразует активность нейронов в команды управления техникой.","motor decoder · movement auxiliary\naiming and firing helper":"декодер движений · помощь в манёвре\nнаведении и стрельбе","movement · turning · aiming · firing":"движение · поворот · наведение · стрельба","4. VIRTUAL VEHICLE":"4. ВИРТУАЛЬНЫЙ ТАНК",
 	"movement\nturning\naiming\nfiring":"движение\nповорот\nнаведение\nвыстрел","The existing FlySwarm physics, armour and ballistics remain active.":"Физика FlySwarm, броня и баллистика остаются активны.","BACK":"НАЗАД",
 	"YOU DEFEATED THE FLY":"ТЫ ПОБЕДИЛ МУХУ","THE FLY WON":"МУХА ПОБЕДИЛА","DRAW":"НИЧЬЯ","Neither vehicle was destroyed; no winner was awarded.":"Ни одна машина не уничтожена; победитель не определён.","Yes. A reconstructed model of the Drosophila nervous system just won this round.":"Да. Реконструированная модель нервной системы дрозофилы выиграла этот раунд.",
 	"Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d":"Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d","MaleCNS + external engineered motor/tactical layer":"MaleCNS + внешний инженерный адаптер управления",
@@ -120,20 +120,18 @@ func _update_vehicle_selection() -> void:
 
 func build_how(root: VBoxContainer):
 	label(root,"HOW DOES THE FLY CONTROL A TANK?",34)
-	var flow=HBoxContainer.new();flow.size_flags_vertical=Control.SIZE_EXPAND_FILL;flow.add_theme_constant_override("separation",16);root.add_child(flow)
-	var fly=panel(flow);preview(fly,Vector2(300,240));label(fly,"1. FLY",24);label(fly,"Sensory signals from the virtual world",16)
-	var brain=panel(flow);label(brain,"2. BIOLOGICAL MODEL",14).modulate=Color("c1a573");label(brain,"FIXED MALECNS",28);label(brain,"Reconstructed connectome\nDNp09 · DNa02 · DNp01 · wing/song",17);label(brain,"The connectome is frozen and does not understand tanks, objectives or tactics.",15).modulate=Color("aebcb4")
-	var adapter=panel(flow);label(adapter,"3. ENGINEERED ADAPTER",14).modulate=Color("c1a573");label(adapter,"SIGNALS → CONTROLS",26);label(adapter,"motor decoder\nmovement auxiliary\naiming and firing helper",17);label(adapter,"This external layer converts neural activity into safe vehicle controls.",15).modulate=Color("aebcb4")
-	var tank=panel(flow);label(tank,"4. VIRTUAL VEHICLE",24);label(tank,"movement\nturning\naiming\nfiring",20);label(tank,"The existing FlySwarm physics, armour and ballistics remain active.",15)
+	var flow=GridContainer.new();flow.name="HowItWorksCards";flow.columns=2;flow.size_flags_vertical=Control.SIZE_EXPAND_FILL;flow.size_flags_horizontal=Control.SIZE_EXPAND_FILL;flow.add_theme_constant_override("h_separation",14);flow.add_theme_constant_override("v_separation",12);root.add_child(flow)
+	var fly=panel(flow);preview(fly,Vector2(250,142));label(fly,"1. FLY",22);label(fly,"Sensory signals from the virtual world",15).modulate=Color("aebcb4")
+	var brain=panel(flow);label(brain,"2. BIOLOGICAL MODEL",13).modulate=Color("c1a573");label(brain,"FIXED MALECNS",24);label(brain,"Reconstructed connectome\nDNp09 · DNa02 · DNp01 · wing/song",15);label(brain,"The connectome is frozen and does not understand tanks, objectives or tactics.",13).modulate=Color("aebcb4")
+	var adapter=panel(flow);label(adapter,"3. ENGINEERED ADAPTER",13).modulate=Color("c1a573");label(adapter,"SIGNALS → CONTROLS",23);label(adapter,"motor decoder · movement auxiliary\naiming and firing helper",15);label(adapter,"This external layer converts neural activity into safe vehicle controls.",13).modulate=Color("aebcb4")
+	var tank=panel(flow);label(tank,"4. VIRTUAL VEHICLE",22);label(tank,"movement · turning · aiming · firing",17);label(tank,"The existing FlySwarm physics, armour and ballistics remain active.",13).modulate=Color("aebcb4")
 	var footer=HBoxContainer.new();root.add_child(footer);button(footer,"START DEMO",func():AppState.start_demo("t34_85"));button(footer,"BACK",AppState.open_day_menu)
 
 func build_result(root: VBoxContainer):
 	var report=AppState.last_report;var human_alive=false;var fly_alive=false;var shots=0;var hits=0
-	var fatal_vehicle_name="";var fatal_impact={};var fatal_state={}
 	for state in report.get("vehicles",[]):
 		if int(state.id)==0:human_alive=state.alive;shots=int(state.metrics.shots);hits=int(state.metrics.penetrations)
 		if int(state.id)==8:fly_alive=state.alive
-		if not state.alive and state.impact is Dictionary and not state.impact.is_empty():fatal_vehicle_name=str(state.vehicle);fatal_impact=state.impact;fatal_state=state
 	var outcome=result_outcome(human_alive,fly_alive)
 	var box=panel(root);box.alignment=BoxContainer.ALIGNMENT_CENTER
 	var outcome_text="YOU DEFEATED THE FLY" if outcome=="human" else ("THE FLY WON" if outcome=="fly" else "DRAW")
@@ -146,13 +144,6 @@ func build_result(root: VBoxContainer):
 	label(box,result_stats,18)
 	label(box,"MaleCNS + external engineered motor/tactical layer",14).modulate=Color("aebcb4")
 	var buttons=HBoxContainer.new();box.add_child(buttons);button(buttons,"PLAY AGAIN",AppState.rerun);button(buttons,"HOW IT WORKS",AppState.show_page.bind("HowItWorks"));button(buttons,"OPEN DAY MENU",AppState.open_day_menu)
-	if not fatal_impact.is_empty():
-		var killcam=load("res://scripts/impact_killcam.gd").new()
-		root.get_parent().get_parent().add_child(killcam)
-		var cumulative_damaged=[]
-		for module_key in fatal_state.get("module_damage",{}):
-			if float(fatal_state.module_damage[module_key])>0.0:cumulative_damaged.append(module_key)
-		killcam.show_impact({"impact":fatal_impact,"vehicle":fatal_vehicle_name,"vehicle_id":fatal_state.get("vehicle","t34_85"),"shot_count":fatal_state.get("impact_history",[]).size(),"module_positions":fatal_state.get("module_positions",{}),"destroyed_modules":fatal_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged,"turret_angle":fatal_state.get("turret",0.0),"fatal":true})
 
 func result_outcome(human_alive: bool,fly_alive: bool) -> String:
 	if human_alive and not fly_alive:return "human"
@@ -188,9 +179,7 @@ func handle_controller_navigation() -> bool:
 	if page not in ["OpenDayMain","HowItWorks","DemoResult"]:return false
 	var back=Input.is_action_just_pressed("od_back")
 	var confirm=Input.is_action_just_pressed("od_confirm")
-	var direction=0
-	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):direction=-1
-	elif Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):direction=1
+	var direction=AppState.menu_navigation_direction()
 	if not back and not confirm and direction==0:return false
 	get_viewport().set_input_as_handled()
 	if back:

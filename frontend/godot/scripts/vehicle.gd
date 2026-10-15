@@ -317,7 +317,16 @@ func step(dt: float):
 	else:
 		rotation.y+=yaw_rate*dt
 	velocity=Vector3(sin(rotation.y)*speed,-9.81,cos(rotation.y)*speed)
+	var impact_velocity=Vector3(velocity.x,0.0,velocity.z)
 	move_and_slide()
+	# Route actual CharacterBody3D slide contacts into destructible props. The
+	# section itself rate-limits repeated contacts so resting against a wall does
+	# not slowly destroy it or create damage without a real impact.
+	for collision_index in range(get_slide_collision_count()):
+		var contact=get_slide_collision(collision_index)
+		var collider=contact.get_collider()
+		if is_instance_valid(collider) and collider.has_method("damage_ram"):
+			collider.call("damage_ram",agent_id,float(cfg.mass_kg),impact_velocity,contact.get_position(),contact.get_normal())
 	position.x=clampf(position.x,-world.terrain.extent+8,world.terrain.extent-8)
 	position.z=clampf(position.z,-world.terrain.extent+8,world.terrain.extent-8)
 	var terrain_floor=world.terrain.height_at(position.x,position.z)+.08

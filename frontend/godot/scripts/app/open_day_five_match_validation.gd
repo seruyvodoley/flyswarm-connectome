@@ -4,7 +4,7 @@ var app
 var results=[]
 var failures=0
 var match_count=5
-var match_seconds=90.0
+var match_seconds=120.0
 
 func check(ok: bool,message: String):
 	if not ok:
@@ -17,7 +17,7 @@ func run():
 	var output_override=""
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--matches="):match_count=clampi(int(argument.trim_prefix("--matches=")),1,5)
-		if argument.begins_with("--seconds="):match_seconds=clampf(float(argument.trim_prefix("--seconds=")),20.0,90.0)
+		if argument.begins_with("--seconds="):match_seconds=clampf(float(argument.trim_prefix("--seconds=")),20.0,120.0)
 		if argument.begins_with("--output="):output_override=argument.trim_prefix("--output=")
 	app=root.get_node("AppState")
 	for match_index in range(match_count):

@@ -91,6 +91,11 @@ func _validate_all_liveries() -> void:
 			_fail("Mechanical pivots missing on %s" % id)
 		elif turret.transform != pivots[0] or gun.transform != pivots[1] or muzzle.transform != pivots[2]:
 			_fail("Livery changed a mechanical pivot on %s" % id)
+		if id == "t34_85":
+			if model.find_child("TrackLeft", true, false) == null or model.find_child("TrackRight", true, false) == null:
+				_fail("Separate track loops are missing on the T-34/85 pilot")
+			if model.find_children("WheelGeometry*", "MeshInstance3D", true, false).size() < 12:
+				_fail("Individual T-34/85 wheel rollers are missing")
 		var materials := {}
 		for node in model.find_children("*", "MeshInstance3D", true, false):
 			var mesh := node as MeshInstance3D

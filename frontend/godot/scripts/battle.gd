@@ -20,6 +20,8 @@ const ImpactKillcam=preload("res://scripts/impact_killcam.gd")
 const VehicleDamageStatus=preload("res://scripts/vehicle_damage_status.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
+const FlyBrainPreview=preload("res://scripts/app/fly_brain_preview.gd")
+const DemoHealthHud=preload("res://scripts/app/demo_health_hud.gd")
 const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
 const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
 var terrain
@@ -91,10 +93,11 @@ var objective_neutralizations=[0,0]
 var screenshot_path=""
 var demo_intro_left=0.0
 var demo_intro: Label
-var demo_status: Label
+var demo_status: Control
 var demo_controls: Label
 var demo_brain_panel: PanelContainer
 var demo_brain_text: Label
+var demo_brain_preview: Control
 var demo_brain_visible=true
 var demo_hud_clock=0.0
 var demo_sniper_mode=false
@@ -104,6 +107,7 @@ var demo_aim_vehicle_local_point=Vector3.ZERO
 var demo_fly_target_velocity=Vector3.ZERO
 var demo_fly_target_acceleration=Vector3.ZERO
 var demo_fly_velocity_valid=false
+var demo_opening_flank_sign=1.0
 var aim_prediction_timer=0.0
 var mouse_fire_pending=false
 var middle_drag_active=false
@@ -270,7 +274,7 @@ func _ready():
 		scenario.size_m=420
 		scenario.spawn_z=100
 		scenario.spawn_spacing=0
-		scenario.time_limit_s=90
+		scenario.time_limit_s=120
 	scenario.seed=int(option("--seed",str(scenario.seed)))
 	if is_range:scenario.size_m=2200
 	var replay_manifest={}
@@ -288,6 +292,7 @@ func _ready():
 		scenario.seed=int(replay_manifest.get("map_seed",scenario.seed))
 	time_limit=float(option("--seconds",str(scenario.time_limit_s)))
 	rng.seed=int(option("--battle-seed",str(scenario.seed)))
+	demo_opening_flank_sign=1.0 if (rng.seed & 1)==0 else -1.0
 	tickets=[float(scenario.tickets),float(scenario.tickets)]
 	terrain=Terrain.new()
 	add_child(terrain)
@@ -508,16 +513,18 @@ func _ready():
 	vehicle_status_panel.offset_bottom=-125 if is_demo else -20
 	vehicle_status_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var status_style=StyleBoxFlat.new()
-	status_style.bg_color=Color(.025,.075,.07,.62)
-	status_style.border_color=Color(.55,.72,.59,.8)
+	status_style.bg_color=Color(.045,.065,.06,.82)
+	status_style.border_color=Color(.65,.72,.62,.56)
 	status_style.set_border_width_all(1)
+	status_style.set_corner_radius_all(12)
 	status_style.content_margin_left=12
 	status_style.content_margin_right=12
 	status_style.content_margin_top=10
 	status_style.content_margin_bottom=10
 	vehicle_status_panel.add_theme_stylebox_override("panel",status_style)
 	vehicle_status_text=Label.new()
-	vehicle_status_text.add_theme_font_size_override("font_size",12)
+	vehicle_status_text.add_theme_font_size_override("font_size",14)
+	vehicle_status_text.add_theme_color_override("font_color",Color("f0ead8"))
 	vehicle_status_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	vehicle_status_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var status_column=VBoxContainer.new()
@@ -529,7 +536,8 @@ func _ready():
 	vehicle_status_map.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	status_column.add_child(vehicle_status_map)
 	vehicle_status_detail=Label.new()
-	vehicle_status_detail.add_theme_font_size_override("font_size",11)
+	vehicle_status_detail.add_theme_font_size_override("font_size",12)
+	vehicle_status_detail.add_theme_color_override("font_color",Color("c6d0c5"))
 	vehicle_status_detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	vehicle_status_detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	status_column.add_child(vehicle_status_detail)
@@ -645,7 +653,7 @@ func _ready():
 	if record_path!="":
 		DirAccess.make_dir_recursive_absolute(record_path)
 		if (session_config==null and not has("--no-replay")) or (session_config!=null and session_config.record):recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
-		var manifest={"date":Time.get_datetime_string_from_system(true),"map":scenario.name,"map_seed":scenario.seed,"mode":"NORMALIZED" if normalized else "HISTORICAL","audio":audio_mode,"controller":"backend" if requires_brain else "RULE_BASED_CONTROL","side_swap":has("--swap"),"vehicles":[],"seconds":time_limit}
+		var manifest={"date":Time.get_datetime_string_from_system(true),"map":scenario.name,"map_seed":scenario.seed,"battle_seed":rng.seed,"mode":"NORMALIZED" if normalized else "HISTORICAL","audio":audio_mode,"controller":"backend" if requires_brain else "RULE_BASED_CONTROL","side_swap":has("--swap"),"vehicles":[],"seconds":time_limit}
 		var output=[]
 		OS.execute("git",["-C",ProjectSettings.globalize_path("res://../.."),"rev-parse","HEAD"],output)
 		manifest.git_commit="".join(output).strip_edges()
@@ -681,15 +689,16 @@ func setup_demo_ui(canvas: CanvasLayer):
 	initialize_demo_controller()
 	if not Input.joy_connection_changed.is_connected(_on_demo_joy_connection_changed):Input.joy_connection_changed.connect(_on_demo_joy_connection_changed)
 	hud.visible=false;detail.visible=true;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=true;gunner_reticle.camera_center_marker=true;update_camera_button()
-	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
+	demo_status=DemoHealthHud.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(390,116);demo_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_status)
 	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls);update_demo_control_hint()
 	demo_controller_status=Label.new();demo_controller_status.set_anchors_preset(Control.PRESET_CENTER);demo_controller_status.offset_left=-350;demo_controller_status.offset_right=350;demo_controller_status.offset_top=-75;demo_controller_status.offset_bottom=75;demo_controller_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_controller_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_controller_status.add_theme_font_size_override("font_size",26);demo_controller_status.add_theme_color_override("font_color",Color("ead58f"));demo_controller_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controller_status.add_theme_constant_override("shadow_offset_x",2);demo_controller_status.add_theme_constant_override("shadow_offset_y",2);demo_controller_status.visible=false;demo_controller_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controller_status)
-	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
-	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
-	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
-	var brain_box=VBoxContainer.new();brain_box.add_theme_constant_override("separation",10);demo_brain_panel.add_child(brain_box)
-	var fly_preview=DemoFlyPreview.new();fly_preview.custom_minimum_size=Vector2(340,145);fly_preview.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;brain_box.add_child(fly_preview)
-	demo_brain_text=Label.new();demo_brain_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_brain_text.add_theme_font_size_override("font_size",16);brain_box.add_child(demo_brain_text);canvas.add_child(demo_brain_panel)
+	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-324;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=62;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.add_theme_font_size_override("font_size",13);brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
+	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT);demo_brain_panel.offset_left=-324;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=72;demo_brain_panel.offset_bottom=535
+	var style=StyleBoxFlat.new();style.bg_color=Color(.045,.065,.06,.92);style.border_color=Color(.73,.66,.48,.74);style.set_border_width_all(1);style.set_corner_radius_all(10);style.content_margin_left=12;style.content_margin_right=12;style.content_margin_top=11;style.content_margin_bottom=11;demo_brain_panel.add_theme_stylebox_override("panel",style)
+	var brain_box=VBoxContainer.new();brain_box.add_theme_constant_override("separation",6);demo_brain_panel.add_child(brain_box)
+	demo_brain_preview=FlyBrainPreview.new();demo_brain_preview.custom_minimum_size=Vector2(270,148);demo_brain_preview.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;brain_box.add_child(demo_brain_preview)
+	var brain_caption=Label.new();brain_caption.text="СХЕМАТИЧЕСКАЯ ВИЗУАЛИЗАЦИЯ MALECNS" if str(AppState.settings.language)=="ru" else "SCHEMATIC MALECNS VISUALIZATION";brain_caption.add_theme_font_size_override("font_size",10);brain_caption.add_theme_color_override("font_color",Color("c9cfbf"));brain_box.add_child(brain_caption)
+	demo_brain_text=Label.new();demo_brain_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_brain_text.add_theme_font_size_override("font_size",13);demo_brain_text.add_theme_color_override("font_color",Color("e4e8dc"));brain_box.add_child(demo_brain_text);canvas.add_child(demo_brain_panel)
 	demo_intro=Label.new();demo_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);demo_intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_intro.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_intro.add_theme_font_size_override("font_size",42);demo_intro.add_theme_color_override("font_color",Color("ead58f"));demo_intro.add_theme_color_override("font_shadow_color",Color.BLACK);demo_intro.add_theme_constant_override("shadow_offset_x",3);demo_intro.add_theme_constant_override("shadow_offset_y",3);demo_intro.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_intro)
 	vehicles[8].get_node("Identification").text="🪰 FLY-01"
 
@@ -848,20 +857,25 @@ func update_vehicle_status():
 			crew_total+=1
 			if bool(v.modules[key]):crew_alive+=1
 	var lines=PackedStringArray()
-	lines.append("%s · %s" % [agent_label(selected),str(v.cfg.display_name)])
-	lines.append(("УНИЧТОЖЕН" if russian else "DESTROYED") if not v.alive else (("ЭКИПАЖ %d/%d · БК %d" if russian else "CREW %d/%d · AMMO %d") % [crew_alive,crew_total,v.ammo_left]))
+	lines.append("%s  ·  %s" % [str(v.cfg.display_name),agent_label(selected)])
+	lines.append(("УНИЧТОЖЕН" if russian else "DESTROYED") if not v.alive else (("ЭКИПАЖ  %d/%d     ·     СНАРЯДЫ  %d" if russian else "CREW  %d/%d     ·     SHELLS  %d") % [crew_alive,crew_total,v.ammo_left]))
 	var damaged=PackedStringArray()
 	var disabled=PackedStringArray()
 	for key in v.modules:
 		var module_name=status_module_name(str(key),russian)
 		if not bool(v.modules[key]):disabled.append(module_name)
 		elif float(v.module_damage.get(key,0.0))>0.0:damaged.append(module_name)
-	var detail=("ВЫВЕДЕНЫ: " if russian else "DISABLED: ")+(" · ".join(disabled) if not disabled.is_empty() else "—")
-	if not damaged.is_empty():detail+="\n"+("ПОВРЕЖДЕНЫ: " if russian else "DAMAGED: ")+" · ".join(damaged)
+	var detail=("СОСТОЯНИЕ: " if russian else "STATUS: ")
+	if disabled.is_empty() and damaged.is_empty():detail+=("Техника исправна" if russian else "Vehicle operational")
+	else:
+		if not disabled.is_empty():detail+=("Выведено: " if russian else "Disabled: ")+" · ".join(disabled)
+		if not damaged.is_empty():
+			if not disabled.is_empty():detail+="\n"
+			detail+=("Повреждено: " if russian else "Damaged: ")+" · ".join(damaged)
 	var weapon_state=v.weapon_block_reason()
 	if weapon_state.is_empty():weapon_state="ГОТОВО" if russian else "READY"
 	elif russian:weapon_state={"destroyed":"уничтожен","gunner":"наводчик выбыл","breech":"казённик сломан","ammo":"нет снарядов","reload":"перезарядка"}.get(weapon_state,weapon_state)
-	lines.append(("ОРУДИЕ: " if russian else "GUN: ")+weapon_state.to_upper())
+	lines.append(("ОРУДИЕ  ·  " if russian else "GUN  ·  ")+weapon_state.to_upper())
 	vehicle_status_text.text="\n".join(lines)
 	vehicle_status_detail.text=detail
 	vehicle_status_map.show_vehicle(v)
@@ -870,13 +884,9 @@ func status_module_name(key: String,russian: bool) -> String:
 	if not russian:return key.replace("_"," ")
 	return {"driver":"механик-водитель","gunner":"наводчик","commander":"командир","loader":"заряжающий","radio_operator":"радист","ammo_rack":"боеукладка","breech":"казённик","turret_drive":"привод башни","engine":"двигатель","transmission":"трансмиссия","fuel":"топливо","track_left":"левая гусеница","track_right":"правая гусеница"}.get(key,key.replace("_"," "))
 
-func demo_bar(value: float) -> String:
-	var filled=clampi(roundi(clampf(value,0,1)*10),0,10)
-	return "["+"#".repeat(filled)+"-".repeat(10-filled)+"]"
-
 func demo_signal_bar(value: float) -> String:
-	var filled=clampi(roundi(clampf(absf(value),0,1)*7),0,7)
-	return "#".repeat(filled)+"-".repeat(7-filled)
+	var filled=clampi(roundi(clampf(absf(value),0,1)*6),0,6)
+	return "▰".repeat(filled)+"▱".repeat(6-filled)
 
 func demo_intro_copy(key: String) -> String:
 	if str(AppState.settings.language)=="ru":
@@ -890,12 +900,13 @@ func demo_intro_copy(key: String) -> String:
 func update_demo_hud():
 	if not is_instance_valid(demo_status) or vehicles.size()<9:return
 	var player=vehicles[0];var fly=vehicles[8];var remaining=maxf(0,time_limit-sim_time)
-	demo_status.text=AppState.tr_format("demo.hud",[demo_bar(float(player.demo_health)/float(player.demo_health_max)),demo_bar(float(fly.demo_health)/float(fly.demo_health_max)),int(remaining)/60,int(remaining)%60])
+	demo_status.set_state(float(player.demo_health)/float(player.demo_health_max),float(fly.demo_health)/float(fly.demo_health_max),remaining)
 	var trace=fly.dn.duplicate() if fly.dn is Array else []
 	while trace.size()<6:trace.append(0.0)
 	var control=control_layers[8] if control_layers.size()==16 else {}
 	var signal_names=["DNp09 L","DNp09 R","DNa02 L","DNa02 R","DNp01","Wing"]
-	var lines=PackedStringArray(["MALECNS · "+AppState.tr_text("BIOLOGICAL SIGNALS")])
+	var lines=PackedStringArray(["MALECNS  ·  "+("СИГНАЛЫ В РЕАЛЬНОМ ВРЕМЕНИ" if str(AppState.settings.language)=="ru" else "LIVE SIGNALS")])
+	if is_instance_valid(demo_brain_preview):demo_brain_preview.set_traces(trace)
 	for index in range(6):
 		var value=float(trace[index])
 		var polarity="+" if value>=0 else "−"
@@ -909,22 +920,13 @@ func update_demo_hud():
 	var aiming=maxf(absf(float(action[3])),absf(float(action[4])))
 	var firing=float(action[5])
 	lines.append("")
-	lines.append(AppState.tr_text("ENGINEERED CONTROL"))
-	lines.append("%s  %s" % [AppState.tr_text("MOVE"),demo_signal_bar(movement)])
-	lines.append("%s    %s" % [AppState.tr_text("AIM"),demo_signal_bar(aiming)])
-	lines.append("%s   %s" % [AppState.tr_text("FIRE"),AppState.tr_text("LIVE" if firing>.15 else "IDLE")])
-	if intent.size()>=3 and decoded.size()>=3 and navigation.size()>=3:
-		lines.append("RAW T %.2f S %.2f · DEC T %.2f S %.2f" % [float(intent[0]),float(intent[2]),float(decoded[0]),float(decoded[2])])
-		lines.append("NAV Δ T %.2f S %.2f" % [float(navigation[0]),float(navigation[2])])
-	var nav_assist=control.get("navigation_assistance",[])
-	var gun_assist=control.get("gunnery_assistance",[])
-	if nav_assist.size()>=3:lines.append("NAV Δ T %.2f · S %.2f" % [float(nav_assist[0]),float(nav_assist[2])])
-	if gun_assist.size()>=3:lines.append("AIM Δ T %.2f · E %.2f · FIRE %.2f" % [float(gun_assist[0]),float(gun_assist[1]),float(gun_assist[2])])
-	var command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else -1.0
-	if command_age_ms>=0:
-		lines.append("%s: %.1f ms · #%d · age %.0f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0)),bridge.responses_received,command_age_ms])
-	else:
-		lines.append("%s: waiting for first MaleCNS response" % AppState.tr_text("Tick"))
+	lines.append("БОЕВОЕ ПОВЕДЕНИЕ" if str(AppState.settings.language)=="ru" else "BATTLE BEHAVIOR")
+	lines.append("%s  %s" % ["Движение" if str(AppState.settings.language)=="ru" else "Move",demo_signal_bar(movement)])
+	lines.append("%s  %s" % ["Наведение" if str(AppState.settings.language)=="ru" else "Aim",demo_signal_bar(aiming)])
+	var fire_label=("Выстрел" if firing>.15 else "Ожидание") if str(AppState.settings.language)=="ru" else ("Firing" if firing>.15 else "Ready")
+	lines.append("%s  %s" % ["Огонь" if str(AppState.settings.language)=="ru" else "Fire",fire_label])
+	if AppState.settings.debug and intent.size()>=3 and decoded.size()>=3 and navigation.size()>=3:
+		lines.append("T %.2f · S %.2f   →   T %.2f · S %.2f" % [float(intent[0]),float(intent[2]),float(decoded[0]),float(decoded[2])])
 	demo_brain_text.text="\n".join(lines)
 
 func demo_apply_mouse_motion(cursor: Vector2,_hull_turning: bool=false):
@@ -1031,11 +1033,22 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 	var player=vehicles[0]
 	var delta=player.global_position-vehicle.global_position;delta.y=0
 	var distance=delta.length()
+	# The real sensory model has a forward field of view. The Open Day tactical
+	# layer also checks the full horizontal arc so a close rear approach triggers
+	# a deliberate hull turn and turret response instead of a blind orbit.
+	var target_visible=sim_time>=10.0 and has_los(vehicle,player)
+	if target_visible:
+		vehicle.target=player.agent_id
+		vehicle.seen=true
+		vehicle.target_range=distance
+		var target_delta=player.global_position+Vector3(0,1.6,0)-vehicle.muzzle.global_position
+		vehicle.aim_error=wrapf(atan2(target_delta.x,target_delta.z)-vehicle.rotation.y-vehicle.turret_angle,-PI,PI)
+		vehicle.elevation_error=atan2(target_delta.y,Vector2(target_delta.x,target_delta.z).length())-vehicle.gun_angle
 	var waypoint: Vector3
 	# Circle to a changing standoff point; periodically reverse the flank.
 	var radial=Vector2(vehicle.position.x-player.position.x,vehicle.position.z-player.position.z)
 	if radial.length()<.01:radial=Vector2(0.0,1.0)
-	var flank_sign=1.0 if int(sim_time/12.0)%2==0 else -1.0
+	var flank_sign=demo_opening_flank_sign if int(sim_time/12.0)%2==0 else -demo_opening_flank_sign
 	var flank_angle=flank_sign*deg_to_rad(58.0+18.0*sin(sim_time*.23))
 	var standoff=clampf(48.0+7.0*sin(sim_time*.29),40.0,58.0)
 	var player_to_fly=(vehicle.global_position-player.global_position).normalized()
@@ -1052,6 +1065,11 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 	var desired=atan2(to_waypoint.x,to_waypoint.z)
 	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
 	var nav_steer=clampf(error*1.6,-1.0,1.0)
+	var target_bearing=wrapf(atan2(delta.x,delta.z)-vehicle.rotation.y,-PI,PI)
+	var hull_reorient=target_visible and absf(target_bearing)>deg_to_rad(82.0)
+	if hull_reorient:
+		error=target_bearing
+		nav_steer=clampf(error*2.0,-1.0,1.0)
 	# A short look-ahead ray adds obstacle avoidance without overriding the CNS.
 	var forward=Vector3(sin(vehicle.rotation.y),0.0,cos(vehicle.rotation.y))
 	var ray_start=vehicle.global_position+Vector3(0,1.8,0)
@@ -1060,12 +1078,18 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 	if not obstacle.is_empty():nav_steer=1.0 if int(vehicle.agent_id+sim_time/3.0)%2==0 else -1.0
 	var neural_throttle=float(command[0]);var neural_steer=float(command[2])
 	var approach_throttle=.72 if to_waypoint.length()>20.0 else .42
-	command[0]=maxf(neural_throttle,approach_throttle)
-	command[2]=clampf(neural_steer*.35+nav_steer*.65,-1.0,1.0)
+	if hull_reorient:
+		command[0]=0.0
+		command[1]=1.0
+		command[2]=signf(error)
+	else:
+		command[0]=maxf(neural_throttle,approach_throttle)
+		command[1]=0.0
+		command[2]=clampf(neural_steer*.25+nav_steer*.75,-1.0,1.0)
 	# The CNS keeps influencing motor commands, but a firing impulse alone may
 	# never discharge the gun. Only the ballistic solution below can release it.
 	command[5]=0.0
-	if sim_time>=10.0 and vehicle.seen and vehicle.target==0 and distance<280.0:
+	if target_visible and vehicle.target==0 and distance<280.0:
 		var velocity_delta=maxf(.001,dt)
 		var measured_velocity=player.velocity
 		if demo_fly_velocity_valid:
@@ -1100,7 +1124,7 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 		command[4]=clampf(neural_elevation*.18+clampf(elevation_error*3.6,-1.0,1.0)*.82,-1.0,1.0)
 		if disc>=0.0 and absf(turret_error)<deg_to_rad(.85) and absf(elevation_error)<deg_to_rad(.8) and vehicle.weapon_block_reason()=="":
 			command[5]=1.0
-	elif not vehicle.seen or vehicle.target!=0:
+	elif not target_visible or vehicle.target!=0:
 		demo_fly_velocity_valid=false
 		demo_fly_target_acceleration=Vector3.ZERO
 	return command
@@ -1399,11 +1423,21 @@ func fire(v):
 	vis.look_at(p+dir,Vector3.UP)
 	vis.rotate_object_local(Vector3.RIGHT,-PI/2.0)
 	shells.append({"position":p,"velocity":dir*v.cfg.ammo_data.muzzle_velocity_m_s,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"origin":p,"distance":0.0,"age":0.0,"visual":vis})
+	if v.agent_id==selected and not replay_mode:rumble_gamepad(.12,.22,.10)
+	if is_demo and v.agent_id==8 and is_instance_valid(demo_brain_preview):demo_brain_preview.pulse_event("fire")
 	effect(p,Color(1,.65,.16),.7,.10)
 	shot_distances.append(v.target_range)
 
 func should_show_impact(shooter,victim) -> bool:
-	return shooter!=null and victim!=null and shooter.team!=victim.team and shooter.agent_id==selected and camera_mode in [1,2] and is_instance_valid(impact_killcam)
+	return not finished_report and not ended and shooter!=null and victim!=null and shooter.team!=victim.team and shooter.agent_id==selected and camera_mode in [1,2] and is_instance_valid(impact_killcam)
+
+func rumble_gamepad(weak: float,strong: float,duration: float) -> void:
+	var device=demo_controller_device if is_demo else -1
+	if device<0:
+		var devices=Input.get_connected_joypads()
+		if devices.is_empty():return
+		device=devices[0]
+	if device in Input.get_connected_joypads():Input.start_joy_vibration(device,weak,strong,duration)
 
 func step_shells(dt: float):
 	for i in range(shells.size()-1,-1,-1):
@@ -1419,6 +1453,8 @@ func step_shells(dt: float):
 		var hit=get_world_3d().direct_space_state.intersect_ray(q)
 		if not hit.is_empty():
 			effect_burst(hit.position+hit.normal*.15,10,.7)
+			if hit.collider.has_method("damage_projectile"):
+				hit.collider.call("damage_projectile",s.ammo,s.velocity,hit.normal,hit.position)
 			var victim=hit.collider.get_meta("vehicle") if hit.collider.has_meta("vehicle") else null
 
 			if victim!=null and victim.alive:
@@ -1428,6 +1464,8 @@ func step_shells(dt: float):
 					hit.normal,
 					hit.collider.get_meta("zone")
 				)
+				if victim.agent_id==selected and not replay_mode:rumble_gamepad(.48,.88,.30)
+				if is_demo and victim.agent_id==8 and is_instance_valid(demo_brain_preview):demo_brain_preview.pulse_event("hit")
 				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
 				if should_show_impact(shooter,victim):
 					var cumulative_damaged=[]
@@ -2132,6 +2170,7 @@ func shell_snapshot() -> Array:
 
 func finish(notify_result=true):
 	if finished_report:return
+	if is_instance_valid(impact_killcam):impact_killcam.dismiss()
 	finished_report=true
 	ended=true
 	var wall=(Time.get_ticks_usec()-start_wall)/1000000.0
@@ -2301,7 +2340,7 @@ func _process(dt):
 	var v=vehicles[selected] if not vehicles.is_empty() else null
 	if v==null:return
 	update_vehicle_status()
-	if is_instance_valid(impact_killcam) and impact_killcam.visible and (camera_mode not in [1,2] or impact_killcam.source_id!=selected):
+	if is_instance_valid(impact_killcam) and impact_killcam.visible and (finished_report or ended or camera_mode not in [1,2] or impact_killcam.source_id!=selected):
 		impact_killcam.dismiss()
 	if camera_mode in [0,3] and is_instance_valid(range_killcam_panel):range_killcam_panel.visible=false
 	if is_demo:

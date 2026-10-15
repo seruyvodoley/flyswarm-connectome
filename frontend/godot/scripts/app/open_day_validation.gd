@@ -57,6 +57,19 @@ func run():
 			if page!="Settings":check(not app.view.find_children("*","SubViewportContainer",true,false).is_empty(),"Fly viewport visible: "+page)
 			else:check(app.view.find_child("MaleCNSDatasetPath",true,false)!=null,"Dataset folder setting is available: "+language)
 			if language=="ru":await capture("main-ru" if page=="OpenDayMain" else "how-it-works-ru")
+			if page=="HowItWorks":
+				var cards=app.view.find_child("HowItWorksCards",true,false) as GridContainer
+				check(cards!=null and cards.columns==2 and cards.get_child_count()==4,"How It Works uses four readable cards in a two-column layout")
+				if cards!=null:
+					for card in cards.get_children():
+						check(cards.get_global_rect().encloses(card.get_global_rect()),"How It Works card remains inside the page at "+language)
+	var result_screen=load("res://scripts/app/open_day_page.gd").new()
+	result_screen.page="DemoResult"
+	root.add_child(result_screen)
+	await process_frame
+	check(result_screen.find_children("*","ImpactKillcam",true,false).is_empty(),"Round result screen does not create a hit camera outside active combat")
+	result_screen.queue_free()
+	await process_frame
 	for size in [Vector2i(1280,720),Vector2i(1440,900),Vector2i(1920,1080),Vector2i(2560,1440)]:
 		DisplayServer.window_set_size(size);app.show_page("OpenDayMain");await capture(str(size.x)+"x"+str(size.y))
 		var buttons=app.view.find_children("*","Button",true,false)
@@ -76,6 +89,15 @@ func run():
 		var dpad=InputEventJoypadButton.new();dpad.device=0;dpad.button_index=JoyButton.JOY_BUTTON_DPAD_DOWN;dpad.pressed=true;Input.parse_input_event(dpad);await process_frame
 		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"D-pad advances exactly one focused Open Day menu button")
 		dpad.pressed=false;Input.parse_input_event(dpad);await process_frame
+		how_buttons[0].grab_focus()
+		var nav_stick=InputEventJoypadMotion.new();nav_stick.device=0;nav_stick.axis=JoyAxis.JOY_AXIS_LEFT_Y;nav_stick.axis_value=.72;Input.parse_input_event(nav_stick);await process_frame
+		var first_stick_focus=root.get_viewport().gui_get_focus_owner()
+		nav_stick=InputEventJoypadMotion.new();nav_stick.device=0;nav_stick.axis=JoyAxis.JOY_AXIS_LEFT_Y;nav_stick.axis_value=.78;Input.parse_input_event(nav_stick);await process_frame
+		check(first_stick_focus==how_buttons[1] and root.get_viewport().gui_get_focus_owner()==how_buttons[1],"Holding or gently varying the left stick advances only one menu item")
+		nav_stick.axis_value=0.0;Input.parse_input_event(nav_stick);await process_frame
+		nav_stick.axis_value=.76;Input.parse_input_event(nav_stick);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[0],"Returning the stick to neutral rearms one next menu step")
+		how_buttons[1].grab_focus()
 		var cross=InputEventJoypadButton.new();cross.device=0;cross.button_index=JoyButton.JOY_BUTTON_A;cross.pressed=true;Input.parse_input_event(cross);await process_frame
 		check(app.current_page=="OpenDayMain","Cross confirms one focused menu action without double activation")
 		cross.pressed=false;Input.parse_input_event(cross);await process_frame
@@ -90,7 +112,12 @@ func run():
 	check(OpenDayController.normalize_trigger(-1.0,-1.0)==0.0 and is_equal_approx(OpenDayController.normalize_trigger(0.56,0.0),0.56) and OpenDayController.normalize_trigger(1.0,-1.0)==1.0,"Trigger normalization supports both -1..1 and 0..1 hardware ranges")
 	var look_right=OpenDayController.advance_camera(0.0,0.0,Vector2(1,0),.1,false);var look_left=OpenDayController.advance_camera(0.0,0.0,Vector2(-1,0),.1,false)
 	var look_up=OpenDayController.advance_camera(0.0,0.0,Vector2(0,-1),.1,false);var look_down=OpenDayController.advance_camera(0.0,0.0,Vector2(0,1),.1,false)
-	check(look_right.x>0.0 and look_left.x<0.0 and look_up.y>0.0 and look_down.y<0.0,"Right-stick camera axes have non-inverted horizontal and vertical mapping")
+	check(look_right.x>0.0 and look_left.x<0.0 and look_up.y>0.0 and look_down.y<0.0,"Camera response preserves its standard semantic left/right and up/down directions")
+	var right_axis=InputEventJoypadMotion.new();right_axis.device=0;right_axis.axis=JoyAxis.JOY_AXIS_RIGHT_X;right_axis.axis_value=.75;Input.parse_input_event(right_axis);await process_frame
+	check(Input.get_action_strength("od_look_left")>.7 and Input.get_action_strength("od_look_right")<.1,"Physical right-stick right is mapped to look-left")
+	right_axis.axis_value=-.75;Input.parse_input_event(right_axis);await process_frame
+	check(Input.get_action_strength("od_look_right")>.7 and Input.get_action_strength("od_look_left")<.1,"Physical right-stick left is mapped to look-right")
+	right_axis.axis_value=0.0;Input.parse_input_event(right_axis);await process_frame
 	var scoped_look=OpenDayController.advance_camera(0.0,0.0,Vector2(1,0),.1,true)
 	check(scoped_look.x>0.0 and scoped_look.x<look_right.x and OpenDayController.camera_forward(0.0,0.0).is_equal_approx(Vector3(0,0,1)),"ADS lowers camera sensitivity and camera ray points forward at neutral")
 	app.settings.language=original_language
@@ -111,8 +138,11 @@ func run():
 	pause_event.pressed=false;Input.parse_input_event(pause_event);await process_frame
 	print("OPEN DAY validation: initializing demo arena")
 	app.configure_demo("t34_85")
+	check(is_equal_approx(app.session.seconds,120.0),"Open Day starts with a two-minute battle limit")
 	var battle=load("res://scenes/Battle.tscn").instantiate();battle.session_config=app.session;root.add_child(battle)
 	for _frame in range(8):await process_frame
+	check(is_equal_approx(battle.time_limit,120.0),"The live Open Day battle honors the two-minute limit")
+	check(battle.demo_status.get_script()==load("res://scripts/app/demo_health_hud.gd"),"Open Day uses visual health bars instead of text hash meters")
 	battle.paused=true
 	var connected_controllers=Input.get_connected_joypads()
 	check(battle.demo_gamepad_active==not connected_controllers.is_empty(),"Open Day automatically selects a connected joypad when present")
@@ -207,6 +237,15 @@ func run():
 	battle.camera_mode=1;await process_frame
 	check(battle.gunner_reticle.visible,"Shared gun sight is visible in third-person battle view")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
+	check(battle.demo_opening_flank_sign in [-1.0,1.0],"Fly opening flank is selected from the match seed instead of always starting in the same direction")
+	var fly_vehicle=battle.vehicles[8]
+	var original_vehicle_position=vehicle.position;var original_fly_position=fly_vehicle.position;var original_fly_yaw=fly_vehicle.rotation.y
+	fly_vehicle.position=Vector3(0.0,battle.terrain.height_at(0.0,0.0)+.1,0.0);fly_vehicle.rotation.y=0.0
+	vehicle.position=Vector3(0.0,battle.terrain.height_at(0.0,-32.0)+.1,-32.0)
+	battle.sim_time=11.0
+	var rear_response=battle.apply_demo_tactical_aux(fly_vehicle,[0.0,0.0,0.0,0.0,0.0,0.0],.1)
+	check(fly_vehicle.seen and rear_response[1]>.5 and absf(rear_response[2])>.5 and absf(rear_response[3])>.05,"Fly detects a visible rear approach, pivots its hull and traverses its turret to respond")
+	battle.sim_time=0.0;vehicle.position=original_vehicle_position;fly_vehicle.position=original_fly_position;fly_vehicle.rotation.y=original_fly_yaw;fly_vehicle.target=-1;fly_vehicle.seen=false
 	var battle_source=FileAccess.get_file_as_string("res://scripts/battle.gd")
 	check(battle_source.contains("demo_update_aim_from_world_point(vehicles[0],demo_aim_world_point)") and not battle_source.contains("demo_apply_mouse_motion(get_viewport().get_mouse_position())"),"Per-frame Open Day aim updates reuse a stable world point instead of raycasting from the moving camera")
 	battle.paused=false;battle.camera_mode=1
@@ -334,6 +373,10 @@ func run():
 	Input.parse_input_event(lmb);Input.parse_input_event(lmb_release)
 	for _tick in 4:await physics_frame
 	check(int(vehicle.metrics.shots)==shots_before+1 and not battle.mouse_fire_pending,"Next brief routed Open Day click fires exactly one round (before=%d, after=%d, reason=%s, alive=%s, pending=%s)" % [shots_before,int(vehicle.metrics.shots),vehicle.weapon_block_reason(),str(vehicle.alive),str(battle.mouse_fire_pending)])
+	battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1","target_name":"R1","vehicle_id":"t34_85","impact":{}})
+	battle.finish(false)
+	check(not battle.impact_killcam.visible and not battle.should_show_impact(battle.vehicles[0],battle.vehicles[8]),"Ending a round dismisses its hit camera before the result/menu screen appears")
+	check(battle.demo_brain_panel.offset_right-battle.demo_brain_panel.offset_left==300 and battle.demo_brain_preview.custom_minimum_size.x<=280,"Open Day MaleCNS panel uses the compact layout")
 	battle.queue_free();await process_frame
 	print("OPEN DAY VALIDATION failures=",failures)
 	quit(0 if failures==0 else 1)

@@ -28,6 +28,7 @@ case "$TASK_ACTION" in
  run-tests)
   "$TASK_PYTHON" -m unittest discover -s tests -v
   "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd
+  "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/environment_physics_validation.gd
   "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
   exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd ;;
  run-ballistics-test) exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;

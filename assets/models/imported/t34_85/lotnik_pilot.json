@@ -1,0 +1,32 @@
+{
+  "asset": "T-34/85 low-poly pilot",
+  "source_author": "Lotnik",
+  "source_license": "CC0 1.0",
+  "source_url": "https://opengameart.org/content/t-3485",
+  "source_blend": "Rudy.blend",
+  "mesh_object_count": 41,
+  "triangles": 4113,
+  "added_simplified_wheels": 14,
+  "runtime_mesh_node_count": 55,
+  "runtime_triangles": 4953,
+  "scale": 3.3,
+  "runtime_axes": "right +X, forward +Z in Godot (authored Blender -Y), up +Y in Godot",
+  "nodes": {
+    "hull": "HullPivot",
+    "turret": "TurretPivot",
+    "gun": "GunElevationPivot",
+    "muzzle": "Muzzle",
+    "tracks": [
+      "TrackLeft",
+      "TrackRight"
+    ]
+  },
+  "notes": [
+    "No source geometry was cut or repaired.",
+    "Turret/gun pivots are manually placed from measured source bounds.",
+    "Track loops are separate static meshes; their motion is static.",
+    "Fourteen simple cylindrical rollers were added as separate wheel-animation nodes.",
+    "The source does not establish factory, year, or exact 1944 configuration."
+  ],
+  "runtime_glb_bytes": 256732
+}

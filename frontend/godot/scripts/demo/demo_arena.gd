@@ -14,6 +14,8 @@ const RUIN_ASSET="res://assets/environment/ruins/broken-masonry-wall.glb"
 const WALL_ASSET="res://assets/environment/ruins/stone-cottage-wall.glb"
 const FENCE_ASSET="res://assets/environment/props/cow-pen-fence.glb"
 const RUBBLE_ASSET="res://assets/environment/props/stone-rubble-pile.glb"
+const DestructibleSection=preload("res://scripts/demo/destructible_section.gd")
+const DestructibleTree=preload("res://scripts/demo/destructible_tree.gd")
 
 var terrain_source: Node3D
 var vegetation_density=1.0
@@ -43,7 +45,7 @@ func build_layout():
 	build_vegetation()
 
 func add_building(path: String,position: Vector3,rotation: float,dimensions: Vector3):
-	var body=StaticBody3D.new()
+	var body=Node3D.new()
 	body.name=path.get_file().get_basename().to_pascal_case()
 	body.position=position
 	body.rotation.y=rotation
@@ -51,21 +53,19 @@ func add_building(path: String,position: Vector3,rotation: float,dimensions: Vec
 	var instance=_instantiate_model(path)
 	if instance==null:return
 	body.add_child(instance)
-	var collision=CollisionShape3D.new()
-	var box_shape=BoxShape3D.new()
-	box_shape.size=Vector3(dimensions.x*.88,dimensions.y*.84,dimensions.z*.82)
-	collision.shape=box_shape
-	collision.position.y=box_shape.size.y*.5
-	body.add_child(collision)
-	body.collision_layer=1
-	body.collision_mask=0
+	if _add_mesh_sections(body,instance,"MASONRY",2_400_000.0,Color("b5a781"))==0:
+		# Fallback for a future model with no mesh surfaces: maintain the original
+		# dimension-based collision proxy, divided into independently removable sides.
+		var wall_h=dimensions.y*.68
+		var wall_y=wall_h*.5
+		var wall_t=maxf(.22,dimensions.z*.065)
+		_add_destructible_box(body,Vector3(0,wall_y,dimensions.z*.5),Vector3(dimensions.x,wall_h,wall_t),"MASONRY",2_400_000.0,Color("b5a781"))
+		_add_destructible_box(body,Vector3(0,wall_y,-dimensions.z*.5),Vector3(dimensions.x,wall_h,wall_t),"MASONRY",2_400_000.0,Color("b5a781"))
+		_add_destructible_box(body,Vector3(-dimensions.x*.5,wall_y,0),Vector3(wall_t,wall_h,dimensions.z),"MASONRY",2_400_000.0,Color("b5a781"))
+		_add_destructible_box(body,Vector3(dimensions.x*.5,wall_y,0),Vector3(wall_t,wall_h,dimensions.z),"MASONRY",2_400_000.0,Color("b5a781"))
 
 func add_barrier(path: String,position: Vector3,rotation: float,dimensions: Vector3,with_collision: bool):
-	var root: Node3D
-	if with_collision:
-		root=StaticBody3D.new()
-	else:
-		root=Node3D.new()
+	var root=Node3D.new()
 	root.position=position
 	root.rotation.y=rotation
 	add_child(root)
@@ -73,11 +73,52 @@ func add_barrier(path: String,position: Vector3,rotation: float,dimensions: Vect
 	if model==null:return
 	root.add_child(model)
 	if with_collision:
+		var kind="MASONRY" if path==RUIN_ASSET or path==WALL_ASSET else "WOOD"
+		var threshold=2_100_000.0 if kind=="MASONRY" else 420_000.0
+		if _add_mesh_sections(root,model,kind,threshold,Color("b8aa86") if kind=="MASONRY" else Color("765638"))==0:
+			_add_destructible_box(root,Vector3(0,dimensions.y*.5,0),dimensions,kind,threshold,Color("b8aa86") if kind=="MASONRY" else Color("765638"))
+
+func _add_mesh_sections(parent: Node3D,model: Node3D,kind: String,threshold_j: float,color: Color) -> int:
+	var added=0
+	var parent_inverse=parent.global_transform.affine_inverse()
+	for node in model.find_children("*","MeshInstance3D",true,false):
+		var mesh_node:=node as MeshInstance3D
+		if mesh_node.mesh==null:continue
+		var trimesh=mesh_node.mesh.create_trimesh_shape()
+		if trimesh==null:continue
+		var section: DestructibleSection=DestructibleSection.new()
+		section.name="Section_%s" % mesh_node.name.to_pascal_case()
+		section.transform=parent_inverse*mesh_node.global_transform
+		var volume=maxf(.5,mesh_node.get_aabb().size.x*mesh_node.get_aabb().size.y*mesh_node.get_aabb().size.z)
+		var section_strength=threshold_j*clampf(sqrt(volume/3.0),.55,1.5)
+		if mesh_node.name.to_lower().contains("door") or mesh_node.name.to_lower().contains("wood"):
+			section.configure("WOOD",minf(section_strength,480_000.0),Color("765638"))
+		else:
+			section.configure(kind,section_strength,color)
+		section.collision_layer=1
+		section.collision_mask=0
+		section.bind_visual_piece(mesh_node)
 		var collision=CollisionShape3D.new()
-		var shape=BoxShape3D.new();shape.size=dimensions
-		collision.shape=shape;collision.position.y=dimensions.y*.5
-		root.add_child(collision)
-		root.collision_layer=1;root.collision_mask=0
+		collision.shape=trimesh
+		section.add_child(collision)
+		parent.add_child(section)
+		added+=1
+	return added
+
+func _add_destructible_box(parent: Node3D,center: Vector3,size: Vector3,kind: String,threshold_j: float,color: Color) -> DestructibleSection:
+	var section: DestructibleSection=DestructibleSection.new()
+	section.name="%sSection" % kind.to_pascal_case()
+	section.position=center
+	section.configure(kind,threshold_j,color)
+	section.collision_layer=1
+	section.collision_mask=0
+	var shape=CollisionShape3D.new()
+	var box=BoxShape3D.new()
+	box.size=size
+	shape.shape=box
+	section.add_child(shape)
+	parent.add_child(section)
+	return section
 
 func _instantiate_model(path: String) -> Node3D:
 	var packed=load(path) as PackedScene
@@ -133,9 +174,21 @@ func build_vegetation():
 	var maple_count=maxi(8,roundi(17*vegetation_density))
 	var pine_count=maxi(5,roundi(11*vegetation_density))
 	var oak_count=maxi(2,roundi(4*vegetation_density))
-	add_instanced(TREE_ASSETS.maple,_tree_points(maple_count,0),true)
-	add_instanced(TREE_ASSETS.conifer,_tree_points(pine_count,1),true)
-	add_instanced(TREE_ASSETS.oak,_tree_points(oak_count,2),true)
+	var maple=_tree_points(maple_count,0)
+	var pine=_tree_points(pine_count,1)
+	var oak=_tree_points(oak_count,2)
+	add_instanced(TREE_ASSETS.maple,maple,true)
+	add_instanced(TREE_ASSETS.conifer,pine,true)
+	add_instanced(TREE_ASSETS.oak,oak,true)
+	# Only nine trees near the playable area get individual physics bodies. The
+	# perimeter forest remains batched in MultiMesh and does not create hundreds
+	# of active rigid bodies or collision shapes.
+	var near_positions=[Vector2(-32,-24),Vector2(-25,34),Vector2(-18,-43),Vector2(18,42),Vector2(28,-31),Vector2(38,16),Vector2(-44,12),Vector2(46,-8),Vector2(8,-52)]
+	for i in range(near_positions.size()):
+		var p: Vector2=near_positions[i]
+		var kind="maple" if i%3==0 else ("conifer" if i%3==1 else "oak")
+		var path=TREE_ASSETS[kind]
+		_add_interactive_tree(path,{"position":Vector3(p.x,ground(p.x,p.y),p.y),"yaw":rng.randf_range(-PI,PI),"scale":rng.randf_range(.58,.82)},kind)
 	var shrubs=[];var grasses=[]
 	for i in range(roundi(56*vegetation_density)):
 		var x=rng.randf_range(-165,165);var z=rng.randf_range(-165,165)
@@ -146,6 +199,29 @@ func build_vegetation():
 		else:shrubs.append(item)
 	add_instanced(SHRUB_ASSET,shrubs,false)
 	add_instanced(GRASS_ASSET,grasses,false)
+
+func _add_interactive_tree(path: String,placement: Dictionary,kind: String) -> void:
+	var tree: DestructibleTree=DestructibleTree.new()
+	tree.name="InteractiveTree_%s" % kind
+	tree.position=placement.position
+	tree.rotation.y=float(placement.yaw)
+	var scale_value=float(placement.scale)
+	var threshold=310_000.0 if kind=="maple" else (520_000.0 if kind=="conifer" else 780_000.0)
+	tree.configure("WOOD",threshold,Color("62513b"))
+	tree.collision_layer=1
+	tree.collision_mask=0
+	var collider=CollisionShape3D.new()
+	var trunk=CapsuleShape3D.new()
+	trunk.radius=(.27 if kind!="oak" else .38)*scale_value
+	trunk.height=(3.1 if kind!="oak" else 4.4)*scale_value
+	collider.shape=trunk
+	collider.position.y=trunk.height*.5
+	tree.add_child(collider)
+	var visual=_instantiate_model(path)
+	if visual!=null:
+		visual.scale=Vector3.ONE*scale_value
+		tree.add_child(visual)
+	add_child(tree)
 
 func _rock_points() -> Array:
 	var result=[]

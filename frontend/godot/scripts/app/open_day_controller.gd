@@ -22,8 +22,10 @@ static func configure() -> void:
 	_add_axis("od_move_right", JoyAxis.JOY_AXIS_LEFT_X, 1.0)
 	_add_axis("od_move_forward", JoyAxis.JOY_AXIS_LEFT_Y, -1.0)
 	_add_axis("od_move_reverse", JoyAxis.JOY_AXIS_LEFT_Y, 1.0)
-	_add_axis("od_look_left", JoyAxis.JOY_AXIS_RIGHT_X, -1.0)
-	_add_axis("od_look_right", JoyAxis.JOY_AXIS_RIGHT_X, 1.0)
+	# The current DualSense/right-stick horizontal feel is reversed for this game.
+	# Keep action names semantic: physical stick-right drives the look-left action.
+	_add_axis("od_look_left", JoyAxis.JOY_AXIS_RIGHT_X, 1.0)
+	_add_axis("od_look_right", JoyAxis.JOY_AXIS_RIGHT_X, -1.0)
 	_add_axis("od_look_up", JoyAxis.JOY_AXIS_RIGHT_Y, -1.0)
 	_add_axis("od_look_down", JoyAxis.JOY_AXIS_RIGHT_Y, 1.0)
 	_add_axis("od_fire", JoyAxis.JOY_AXIS_TRIGGER_RIGHT, 1.0)
@@ -31,10 +33,10 @@ static func configure() -> void:
 	_add_button("od_confirm", JoyButton.JOY_BUTTON_A)
 	_add_button("od_back", JoyButton.JOY_BUTTON_B)
 	_add_button("od_pause", JoyButton.JOY_BUTTON_START)
-	_add_ui_direction("od_ui_up", JoyButton.JOY_BUTTON_DPAD_UP, JoyAxis.JOY_AXIS_LEFT_Y, -1.0)
-	_add_ui_direction("od_ui_down", JoyButton.JOY_BUTTON_DPAD_DOWN, JoyAxis.JOY_AXIS_LEFT_Y, 1.0)
-	_add_ui_direction("od_ui_left", JoyButton.JOY_BUTTON_DPAD_LEFT, JoyAxis.JOY_AXIS_LEFT_X, -1.0)
-	_add_ui_direction("od_ui_right", JoyButton.JOY_BUTTON_DPAD_RIGHT, JoyAxis.JOY_AXIS_LEFT_X, 1.0)
+	_add_button("od_ui_up", JoyButton.JOY_BUTTON_DPAD_UP)
+	_add_button("od_ui_down", JoyButton.JOY_BUTTON_DPAD_DOWN)
+	_add_button("od_ui_left", JoyButton.JOY_BUTTON_DPAD_LEFT)
+	_add_button("od_ui_right", JoyButton.JOY_BUTTON_DPAD_RIGHT)
 	for action in ["od_ui_up","od_ui_down","od_ui_left","od_ui_right"]:InputMap.action_set_deadzone(action,.22)
 
 static func _add_axis(action: String, axis: int, direction: float) -> void:
@@ -47,10 +49,6 @@ static func _add_button(action: String, button: int) -> void:
 	var event := InputEventJoypadButton.new()
 	event.button_index = button
 	InputMap.action_add_event(action, event)
-
-static func _add_ui_direction(action: String, button: int, axis: int, direction: float) -> void:
-	_add_button(action, button)
-	_add_axis(action, axis, direction)
 
 static func _shaped_axis(value: float, deadzone: float = STICK_DEADZONE) -> float:
 	var magnitude := absf(value)

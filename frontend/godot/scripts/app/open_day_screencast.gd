@@ -28,7 +28,7 @@ func run():
 	app.open_day_menu()
 	await record(2.0)
 	app.configure_demo("t34_85")
-	app.session.seconds=90.0
+	app.session.seconds=120.0
 	app.launch()
 	for _attempt in range(300):
 		if is_instance_valid(app.battle) or app.backend_state=="ERROR":break

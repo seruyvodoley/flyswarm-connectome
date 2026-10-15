@@ -37,7 +37,6 @@ const EN = {
 	"comms.line":
 		"%.2f  %s → %s   out %.2f · recv %.3f · %.0f m",
 
-	"demo.hud": "YOU  %s\nVS\n🪰 FLY  %s\nTime: %02d:%02d",
 }
 
 const RU = {
@@ -435,7 +434,6 @@ const RU = {
 
 	"comms.line":
 		"%.2f  %s → %s   исх. %.2f · принято %.3f · %.0f м",
-	"demo.hud": "ВЫ  %s\nПРОТИВ\n🪰 МУХА  %s\nВремя: %02d:%02d",
 	"BIOLOGICAL SIGNALS": "БИОЛОГИЧЕСКИЕ СИГНАЛЫ",
 	"ENGINEERED CONTROL": "ИНЖЕНЕРНЫЙ СЛОЙ УПРАВЛЕНИЯ",
 	"MOVE": "ДВИЖЕНИЕ",

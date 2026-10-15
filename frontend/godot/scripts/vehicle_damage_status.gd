@@ -57,5 +57,10 @@ func _draw() -> void:
 	draw_string(font,Vector2(8,14),"ПЕРЕД" if russian else "FRONT",HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,Color(.78,.88,.77))
 	draw_line(Vector2(33,18),Vector2(33,29),Color(.78,.88,.77),1.5)
 	draw_colored_polygon(PackedVector2Array([Vector2(29,25),Vector2(37,25),Vector2(33,19)]),Color(.78,.88,.77))
-	draw_circle(Vector2(size.x-16,16),3.5,Color(.39,.89,.63))
-	draw_string(font,Vector2(size.x-85,20),"УЗЛЫ" if russian else "MODULES",HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,Color(.78,.88,.77))
+	var legend_y=16.0
+	draw_circle(Vector2(size.x-140,legend_y),3.5,Color(.39,.89,.63))
+	draw_string(font,Vector2(size.x-133,20),"ЦЕЛО" if russian else "OK",HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color(.78,.88,.77))
+	draw_circle(Vector2(size.x-91,legend_y),3.5,Color(1.0,.74,.23))
+	draw_string(font,Vector2(size.x-84,20),"УЩЕРБ" if russian else "HIT",HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color(.78,.88,.77))
+	draw_circle(Vector2(size.x-42,legend_y),3.5,Color(1.0,.29,.21))
+	draw_string(font,Vector2(size.x-35,20),"ВЫБЫЛ" if russian else "OUT",HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color(.78,.88,.77))

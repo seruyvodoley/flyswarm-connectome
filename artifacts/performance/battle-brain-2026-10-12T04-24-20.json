@@ -1,0 +1,101 @@
+{
+  "backend_state": "READY",
+  "battle_simulation_seconds": 16.1599999999997,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 2517.0,
+    "mean": 2420.16304347826,
+    "p99": 2516.0
+  },
+  "frame_ms": {
+    "max": 78.629,
+    "mean": 9.58160549872123,
+    "p99": 26.175
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "ipc_latency_ms_series": {
+    "max": 202.408,
+    "mean": 20.8664545454545,
+    "p99": 68.121
+  },
+  "male_cns": "real FlyBrain(batch=1)",
+  "male_cns_request_count": 717,
+  "male_cns_response_count": 716,
+  "male_cns_tick_ms": 4.37775003956631,
+  "male_cns_tick_ms_series": {
+    "max": 162.748500006273,
+    "mean": 7.62708921970219,
+    "p99": 38.4830419789068
+  },
+  "mode": "battle-brain",
+  "physics_ms": {
+    "max": 44.249,
+    "mean": 11.9262730179028,
+    "p99": 44.249
+  },
+  "presentation_fps": 104.237987321755,
+  "preview_rate_hz": 30.0,
+  "process_ms": {
+    "max": 76.782,
+    "mean": 20.7370057544757,
+    "p99": 76.782
+  },
+  "rendered_objects": {
+    "max": 2852.0,
+    "mean": 2755.75959079284,
+    "p99": 2850.0
+  },
+  "rendered_primitives": {
+    "max": 5504076.0,
+    "mean": 5014683.14705882,
+    "p99": 5503122.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 15.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sample_neural_response_rate_hz": 44.7210261069487,
+  "sample_neural_responses": 671,
+  "sample_physics_steps": 750,
+  "sample_realtime_factor": 0.999724875714186,
+  "sample_simulation_elapsed_seconds": 14.9999999999997,
+  "sample_wall_elapsed_seconds": 15.004128,
+  "sampled_frames": 1564,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "static_memory_bytes": {
+    "max": 321416111.0,
+    "mean": 319473852.767263,
+    "p99": 321415919.0
+  },
+  "subviewport_count": 0,
+  "video_memory_bytes": {
+    "max": 221331456.0,
+    "mean": 221331288.388747,
+    "p99": 221331456.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

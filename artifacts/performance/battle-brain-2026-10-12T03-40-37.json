@@ -1,0 +1,88 @@
+{
+  "backend_state": "NOT REQUIRED",
+  "battle_simulation_seconds": 9.11999999999989,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 2517.0,
+    "mean": 2443.79957356077,
+    "p99": 2516.0
+  },
+  "frame_ms": {
+    "max": 314.305,
+    "mean": 8.51871940298508,
+    "p99": 18.041
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "male_cns": "real FlyBrain(batch=1)",
+  "male_cns_tick_count": 431,
+  "male_cns_tick_ms": 86.236875038594,
+  "male_cns_tick_ms_series": {
+    "max": 134.66233399231,
+    "mean": 6.23505401469221,
+    "p99": 25.1189169939607
+  },
+  "mode": "battle-brain",
+  "physics_ms": {
+    "max": 300.799,
+    "mean": 21.7726912579959,
+    "p99": 300.799
+  },
+  "presentation_fps": 117.229250422675,
+  "process_ms": {
+    "max": 59.849,
+    "mean": 15.9457697228145,
+    "p99": 59.849
+  },
+  "rendered_objects": {
+    "max": 2891.0,
+    "mean": 2786.9223880597,
+    "p99": 2890.0
+  },
+  "rendered_primitives": {
+    "max": 5030276.0,
+    "mean": 4951568.03923241,
+    "p99": 5027208.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 20.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sampled_frames": 2345,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "static_memory_bytes": {
+    "max": 322532614.0,
+    "mean": 319206813.263113,
+    "p99": 322500082.0
+  },
+  "subviewport_count": 1,
+  "video_memory_bytes": {
+    "max": 241287168.0,
+    "mean": 229318561.678465,
+    "p99": 237125632.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

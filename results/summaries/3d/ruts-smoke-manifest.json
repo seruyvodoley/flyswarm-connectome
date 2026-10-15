@@ -1,0 +1,3242 @@
+{
+  "audio": "no_audio",
+  "controller": "RULE_BASED_CONTROL",
+  "date": "2026-09-16T15:53:26",
+  "engine": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "git_commit": "c717ca7680579429b9a01e1eb92c5e5f29560b7a",
+  "git_dirty": true,
+  "map": "Krasny Valley",
+  "map_seed": 1944,
+  "mode": "HISTORICAL",
+  "seconds": 20.0,
+  "side_swap": false,
+  "source_hashes": {
+    "battle.gd": "fed3204569ad85a4d3b420c131be1100c6526168f7efe259bb6e7bc6c156787d",
+    "bridge.gd": "dfafdb3be09365eec655954e8337578929a111eb0ca65f54de3747d9bf9cd1e7",
+    "catalog.gd": "137b41bbb91765bf0beb083eef029c0704ce9253b2e48dc0b6a7bc4e233e29c7",
+    "combat.gd": "36d9939caad17b6547fc858ec3496a2131459d5c730592b2bf0a4b02d000f391",
+    "terrain.gd": "6958036eefa1f4fdcbad1afd7277127d693e99bd32a40cc53c81d29a8b3bc3cf",
+    "tracks.gd": "c59aca57660e6d1a3343001ca2d11b746dcdcec5be321e6a356a347ba36326cc",
+    "vehicle.gd": "9f5858f9714686194687d407e6431daff530cde459338c24f19477a97c30c33d"
+  },
+  "vehicles": [
+    {
+      "ammo_count": 82.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "kwk42_ap",
+        "mass_kg": 6.8,
+        "muzzle_velocity_m_s": 935.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            185.0
+          ],
+          [
+            500.0,
+            165.0
+          ],
+          [
+            1000.0,
+            145.0
+          ],
+          [
+            1500.0,
+            125.0
+          ],
+          [
+            2000.0,
+            108.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "panther_g",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 16.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 55.0,
+          "thickness_mm": 80.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 25.0,
+      "display_name": "Panther G",
+      "elevation_deg": [
+        -8.0,
+        20.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "kwk42",
+      "gun_data": {
+        "ammo": "kwk42_ap",
+        "calibre_mm": 75.0,
+        "dispersion_mrad": 1.2,
+        "id": "kwk42",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "panther_g",
+      "length_m": 6.87,
+      "mass_kg": 44000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.88925
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.23275
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.88925
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.635,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.635,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.23275
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 8.0,
+      "reverse_kph": 4.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 30.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 8.0,
+      "width_m": 3.27
+    },
+    {
+      "ammo_count": 82.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "kwk42_ap",
+        "mass_kg": 6.8,
+        "muzzle_velocity_m_s": 935.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            185.0
+          ],
+          [
+            500.0,
+            165.0
+          ],
+          [
+            1000.0,
+            145.0
+          ],
+          [
+            1500.0,
+            125.0
+          ],
+          [
+            2000.0,
+            108.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "panther_g",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 16.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 55.0,
+          "thickness_mm": 80.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 25.0,
+      "display_name": "Panther G",
+      "elevation_deg": [
+        -8.0,
+        20.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "kwk42",
+      "gun_data": {
+        "ammo": "kwk42_ap",
+        "calibre_mm": 75.0,
+        "dispersion_mrad": 1.2,
+        "id": "kwk42",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "panther_g",
+      "length_m": 6.87,
+      "mass_kg": 44000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.88925
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.23275
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.88925
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.635,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.635,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.23275
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 8.0,
+      "reverse_kph": 4.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 30.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 8.0,
+      "width_m": 3.27
+    },
+    {
+      "ammo_count": 82.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "kwk42_ap",
+        "mass_kg": 6.8,
+        "muzzle_velocity_m_s": 935.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            185.0
+          ],
+          [
+            500.0,
+            165.0
+          ],
+          [
+            1000.0,
+            145.0
+          ],
+          [
+            1500.0,
+            125.0
+          ],
+          [
+            2000.0,
+            108.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "panther_g",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 16.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 55.0,
+          "thickness_mm": 80.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 25.0,
+      "display_name": "Panther G",
+      "elevation_deg": [
+        -8.0,
+        20.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "kwk42",
+      "gun_data": {
+        "ammo": "kwk42_ap",
+        "calibre_mm": 75.0,
+        "dispersion_mrad": 1.2,
+        "id": "kwk42",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "panther_g",
+      "length_m": 6.87,
+      "mass_kg": 44000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.88925
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.23275
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.88925
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.635,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.635,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.23275
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 8.0,
+      "reverse_kph": 4.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 30.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 8.0,
+      "width_m": 3.27
+    },
+    {
+      "ammo_count": 82.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "kwk42_ap",
+        "mass_kg": 6.8,
+        "muzzle_velocity_m_s": 935.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            185.0
+          ],
+          [
+            500.0,
+            165.0
+          ],
+          [
+            1000.0,
+            145.0
+          ],
+          [
+            1500.0,
+            125.0
+          ],
+          [
+            2000.0,
+            108.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "panther_g",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 16.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 55.0,
+          "thickness_mm": 80.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 25.0,
+      "display_name": "Panther G",
+      "elevation_deg": [
+        -8.0,
+        20.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "kwk42",
+      "gun_data": {
+        "ammo": "kwk42_ap",
+        "calibre_mm": 75.0,
+        "dispersion_mrad": 1.2,
+        "id": "kwk42",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "panther_g",
+      "length_m": 6.87,
+      "mass_kg": 44000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.88925
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.23275
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.88925
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.635,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.635,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.23275
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 8.0,
+      "reverse_kph": 4.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 30.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 8.0,
+      "width_m": 3.27
+    },
+    {
+      "ammo_count": 92.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "kwk36_ap",
+        "mass_kg": 10.2,
+        "muzzle_velocity_m_s": 773.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            145.0
+          ],
+          [
+            500.0,
+            130.0
+          ],
+          [
+            1000.0,
+            113.0
+          ],
+          [
+            1500.0,
+            98.0
+          ],
+          [
+            2000.0,
+            84.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "tiger_i",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 120.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 25.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 20.0,
+      "display_name": "Tiger I",
+      "elevation_deg": [
+        -8.0,
+        15.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "kwk36",
+      "gun_data": {
+        "ammo": "kwk36_ap",
+        "calibre_mm": 88.0,
+        "dispersion_mrad": 1.2,
+        "id": "kwk36",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "tiger_i",
+      "length_m": 6.32,
+      "mass_kg": 57000.0,
+      "max_speed_kph": 40.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.738
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.054
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.738
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.85,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.85,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.054
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 9.0,
+      "reverse_kph": 8.0,
+      "role": "heavy",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 14.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 8.0,
+      "width_m": 3.7
+    },
+    {
+      "ammo_count": 92.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "kwk36_ap",
+        "mass_kg": 10.2,
+        "muzzle_velocity_m_s": 773.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            145.0
+          ],
+          [
+            500.0,
+            130.0
+          ],
+          [
+            1000.0,
+            113.0
+          ],
+          [
+            1500.0,
+            98.0
+          ],
+          [
+            2000.0,
+            84.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "tiger_i",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 120.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 25.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 20.0,
+      "display_name": "Tiger I",
+      "elevation_deg": [
+        -8.0,
+        15.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "kwk36",
+      "gun_data": {
+        "ammo": "kwk36_ap",
+        "calibre_mm": 88.0,
+        "dispersion_mrad": 1.2,
+        "id": "kwk36",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "tiger_i",
+      "length_m": 6.32,
+      "mass_kg": 57000.0,
+      "max_speed_kph": 40.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.738
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.054
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.738
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.85,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.85,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.054
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 9.0,
+      "reverse_kph": 8.0,
+      "role": "heavy",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 14.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 8.0,
+      "width_m": 3.7
+    },
+    {
+      "ammo_count": 57.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "pak43_ap",
+        "mass_kg": 10.2,
+        "muzzle_velocity_m_s": 1000.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            230.0
+          ],
+          [
+            500.0,
+            210.0
+          ],
+          [
+            1000.0,
+            187.0
+          ],
+          [
+            1500.0,
+            163.0
+          ],
+          [
+            2000.0,
+            145.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "jagdpanther",
+      "armour_data": {
+        "casemate_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "casemate_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 25.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 55.0,
+          "thickness_mm": 80.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 24.0,
+      "display_name": "Jagdpanther",
+      "elevation_deg": [
+        -8.0,
+        14.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "pak43",
+      "gun_data": {
+        "ammo": "pak43_ap",
+        "calibre_mm": 88.0,
+        "dispersion_mrad": 1.2,
+        "id": "pak43",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "jagdpanther",
+      "length_m": 6.87,
+      "mass_kg": 45500.0,
+      "max_speed_kph": 46.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.88925
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.23275
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.88925
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.635,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.635,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.23275
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 10.0,
+      "reverse_kph": 4.0,
+      "role": "tank_destroyer",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 11.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 7.0,
+      "turreted": false,
+      "visual_turreted": false,
+      "wheel_count": 8.0,
+      "width_m": 3.27
+    },
+    {
+      "ammo_count": 57.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "pak43_ap",
+        "mass_kg": 10.2,
+        "muzzle_velocity_m_s": 1000.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            230.0
+          ],
+          [
+            500.0,
+            210.0
+          ],
+          [
+            1000.0,
+            187.0
+          ],
+          [
+            1500.0,
+            163.0
+          ],
+          [
+            2000.0,
+            145.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "jagdpanther",
+      "armour_data": {
+        "casemate_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "casemate_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 25.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 80.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 40.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 50.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 55.0,
+          "thickness_mm": 80.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 24.0,
+      "display_name": "Jagdpanther",
+      "elevation_deg": [
+        -8.0,
+        14.0
+      ],
+      "engine_kw": 522.0,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "pak43",
+      "gun_data": {
+        "ammo": "pak43_ap",
+        "calibre_mm": 88.0,
+        "dispersion_mrad": 1.2,
+        "id": "pak43",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "jagdpanther",
+      "length_m": 6.87,
+      "mass_kg": 45500.0,
+      "max_speed_kph": 46.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.88925
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.23275
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.88925
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.635,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.635,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          2.23275
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": true,
+      "reload_s": 10.0,
+      "reverse_kph": 4.0,
+      "role": "tank_destroyer",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 11.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 7.0,
+      "turreted": false,
+      "visual_turreted": false,
+      "wheel_count": 8.0,
+      "width_m": 3.27
+    },
+    {
+      "ammo_count": 56.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "zis53_ap",
+        "mass_kg": 9.2,
+        "muzzle_velocity_m_s": 792.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            135.0
+          ],
+          [
+            500.0,
+            120.0
+          ],
+          [
+            1000.0,
+            103.0
+          ],
+          [
+            1500.0,
+            88.0
+          ],
+          [
+            2000.0,
+            74.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "t34_85",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 20.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 52.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 60.0,
+          "thickness_mm": 45.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 28.0,
+      "display_name": "T-34-85",
+      "elevation_deg": [
+        -5.0,
+        22.0
+      ],
+      "engine_kw": 372.9,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "zis53",
+      "gun_data": {
+        "ammo": "zis53_ap",
+        "calibre_mm": 85.0,
+        "dispersion_mrad": 1.2,
+        "id": "zis53",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "t34_85",
+      "length_m": 6.0,
+      "mass_kg": 32000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.65
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -1.95
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.65
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.5,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.5,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.4
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 9.0,
+      "reverse_kph": 7.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 25.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 5.0,
+      "width_m": 3.0
+    },
+    {
+      "ammo_count": 56.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "zis53_ap",
+        "mass_kg": 9.2,
+        "muzzle_velocity_m_s": 792.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            135.0
+          ],
+          [
+            500.0,
+            120.0
+          ],
+          [
+            1000.0,
+            103.0
+          ],
+          [
+            1500.0,
+            88.0
+          ],
+          [
+            2000.0,
+            74.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "t34_85",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 20.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 52.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 60.0,
+          "thickness_mm": 45.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 28.0,
+      "display_name": "T-34-85",
+      "elevation_deg": [
+        -5.0,
+        22.0
+      ],
+      "engine_kw": 372.9,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "zis53",
+      "gun_data": {
+        "ammo": "zis53_ap",
+        "calibre_mm": 85.0,
+        "dispersion_mrad": 1.2,
+        "id": "zis53",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "t34_85",
+      "length_m": 6.0,
+      "mass_kg": 32000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.65
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -1.95
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.65
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.5,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.5,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.4
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 9.0,
+      "reverse_kph": 7.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 25.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 5.0,
+      "width_m": 3.0
+    },
+    {
+      "ammo_count": 56.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "zis53_ap",
+        "mass_kg": 9.2,
+        "muzzle_velocity_m_s": 792.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            135.0
+          ],
+          [
+            500.0,
+            120.0
+          ],
+          [
+            1000.0,
+            103.0
+          ],
+          [
+            1500.0,
+            88.0
+          ],
+          [
+            2000.0,
+            74.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "t34_85",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 20.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 52.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 60.0,
+          "thickness_mm": 45.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 28.0,
+      "display_name": "T-34-85",
+      "elevation_deg": [
+        -5.0,
+        22.0
+      ],
+      "engine_kw": 372.9,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "zis53",
+      "gun_data": {
+        "ammo": "zis53_ap",
+        "calibre_mm": 85.0,
+        "dispersion_mrad": 1.2,
+        "id": "zis53",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "t34_85",
+      "length_m": 6.0,
+      "mass_kg": 32000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.65
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -1.95
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.65
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.5,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.5,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.4
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 9.0,
+      "reverse_kph": 7.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 25.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 5.0,
+      "width_m": 3.0
+    },
+    {
+      "ammo_count": 56.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "zis53_ap",
+        "mass_kg": 9.2,
+        "muzzle_velocity_m_s": 792.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            135.0
+          ],
+          [
+            500.0,
+            120.0
+          ],
+          [
+            1000.0,
+            103.0
+          ],
+          [
+            1500.0,
+            88.0
+          ],
+          [
+            2000.0,
+            74.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "t34_85",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 20.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 52.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 60.0,
+          "thickness_mm": 45.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 28.0,
+      "display_name": "T-34-85",
+      "elevation_deg": [
+        -5.0,
+        22.0
+      ],
+      "engine_kw": 372.9,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "zis53",
+      "gun_data": {
+        "ammo": "zis53_ap",
+        "calibre_mm": 85.0,
+        "dispersion_mrad": 1.2,
+        "id": "zis53",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "t34_85",
+      "length_m": 6.0,
+      "mass_kg": 32000.0,
+      "max_speed_kph": 55.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.65
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -1.95
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.65
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.5,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.5,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.4
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 9.0,
+      "reverse_kph": 7.0,
+      "role": "medium",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 25.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 5.0,
+      "width_m": 3.0
+    },
+    {
+      "ammo_count": 28.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "d25t_ap",
+        "mass_kg": 25.0,
+        "muzzle_velocity_m_s": 780.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            200.0
+          ],
+          [
+            500.0,
+            183.0
+          ],
+          [
+            1000.0,
+            163.0
+          ],
+          [
+            1500.0,
+            145.0
+          ],
+          [
+            2000.0,
+            127.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "is2_1944",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 30.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 60.0,
+          "thickness_mm": 100.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 18.0,
+      "display_name": "IS-2 model 1944",
+      "elevation_deg": [
+        -3.0,
+        20.0
+      ],
+      "engine_kw": 387.8,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "d25t",
+      "gun_data": {
+        "ammo": "d25t_ap",
+        "calibre_mm": 122.0,
+        "dispersion_mrad": 1.2,
+        "id": "d25t",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "is2_1944",
+      "length_m": 6.77,
+      "mass_kg": 46000.0,
+      "max_speed_kph": 37.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.86175
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.20025
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.86175
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.535,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.535,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.708
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 24.0,
+      "reverse_kph": 10.0,
+      "role": "heavy",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 13.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 6.0,
+      "width_m": 3.07
+    },
+    {
+      "ammo_count": 28.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "d25t_ap",
+        "mass_kg": 25.0,
+        "muzzle_velocity_m_s": 780.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            200.0
+          ],
+          [
+            500.0,
+            183.0
+          ],
+          [
+            1000.0,
+            163.0
+          ],
+          [
+            1500.0,
+            145.0
+          ],
+          [
+            2000.0,
+            127.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "is2_1944",
+      "armour_data": {
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 60.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 30.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 100.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 90.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 60.0,
+          "thickness_mm": 100.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 18.0,
+      "display_name": "IS-2 model 1944",
+      "elevation_deg": [
+        -3.0,
+        20.0
+      ],
+      "engine_kw": 387.8,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "d25t",
+      "gun_data": {
+        "ammo": "d25t_ap",
+        "calibre_mm": 122.0,
+        "dispersion_mrad": 1.2,
+        "id": "d25t",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "is2_1944",
+      "length_m": 6.77,
+      "mass_kg": 46000.0,
+      "max_speed_kph": 37.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.86175
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -2.20025
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.86175
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.535,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.535,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.708
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 24.0,
+      "reverse_kph": 10.0,
+      "role": "heavy",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 180.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 13.0,
+      "turreted": true,
+      "visual_turreted": true,
+      "wheel_count": 6.0,
+      "width_m": 3.07
+    },
+    {
+      "ammo_count": 33.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "d10s_ap",
+        "mass_kg": 15.6,
+        "muzzle_velocity_m_s": 895.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            205.0
+          ],
+          [
+            500.0,
+            184.0
+          ],
+          [
+            1000.0,
+            163.0
+          ],
+          [
+            1500.0,
+            143.0
+          ],
+          [
+            2000.0,
+            125.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "su100",
+      "armour_data": {
+        "casemate_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "casemate_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 110.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 20.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 50.0,
+          "thickness_mm": 75.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 25.0,
+      "display_name": "SU-100",
+      "elevation_deg": [
+        -3.0,
+        20.0
+      ],
+      "engine_kw": 372.9,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "d10s",
+      "gun_data": {
+        "ammo": "d10s_ap",
+        "calibre_mm": 100.0,
+        "dispersion_mrad": 1.2,
+        "id": "d10s",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "su100",
+      "length_m": 6.1,
+      "mass_kg": 31600.0,
+      "max_speed_kph": 48.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.6775
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -1.9825
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.6775
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.5,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.5,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.44
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 13.0,
+      "reverse_kph": 7.0,
+      "role": "tank_destroyer",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 8.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 6.0,
+      "turreted": false,
+      "visual_turreted": false,
+      "wheel_count": 5.0,
+      "width_m": 3.0
+    },
+    {
+      "ammo_count": 33.0,
+      "ammo_data": {
+        "drag_per_m": 0.00004,
+        "explosive_filler_kg": null,
+        "id": "d10s_ap",
+        "mass_kg": 15.6,
+        "muzzle_velocity_m_s": 895.0,
+        "normalization_deg": 3.0,
+        "penetration_mm": [
+          [
+            100.0,
+            205.0
+          ],
+          [
+            500.0,
+            184.0
+          ],
+          [
+            1000.0,
+            163.0
+          ],
+          [
+            1500.0,
+            143.0
+          ],
+          [
+            2000.0,
+            125.0
+          ]
+        ],
+        "provenance": {
+          "kind": "approximation",
+          "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation.",
+          "source": "docs/known_approximations.md"
+        },
+        "ricochet_deg": 72.0,
+        "type": "APHE approximation"
+      },
+      "armour": "su100",
+      "armour_data": {
+        "casemate_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "casemate_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "lower_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "mantlet": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 110.0
+        },
+        "rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "roof": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 20.0
+        },
+        "side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 75.0
+        },
+        "turret_rear": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "turret_side": {
+          "material": "homogeneous approximation",
+          "slope_deg": 0.0,
+          "thickness_mm": 45.0
+        },
+        "upper_front": {
+          "material": "homogeneous approximation",
+          "slope_deg": 50.0,
+          "thickness_mm": 75.0
+        }
+      },
+      "brake_m_s2": 3.5,
+      "cross_country_kph": 25.0,
+      "display_name": "SU-100",
+      "elevation_deg": [
+        -3.0,
+        20.0
+      ],
+      "engine_kw": 372.9,
+      "fuel_litres": 500.0,
+      "gears": [
+        0.18,
+        0.3,
+        0.46,
+        0.65,
+        0.82,
+        1.0
+      ],
+      "gun": "d10s",
+      "gun_data": {
+        "ammo": "d10s_ap",
+        "calibre_mm": 100.0,
+        "dispersion_mrad": 1.2,
+        "id": "d10s",
+        "provenance": {
+          "kind": "approximation",
+          "source": "docs/known_approximations.md"
+        }
+      },
+      "hull_height_m": 1.9,
+      "id": "su100",
+      "length_m": 6.1,
+      "mass_kg": 31600.0,
+      "max_speed_kph": 48.0,
+      "modules": {
+        "ammo_rack": [
+          0.8,
+          1.1,
+          0.0
+        ],
+        "breech": [
+          0.0,
+          2.1,
+          0.7
+        ],
+        "commander": [
+          -0.55,
+          2.2,
+          -0.5
+        ],
+        "driver": [
+          -0.6,
+          1.1,
+          1.6775
+        ],
+        "engine": [
+          0.0,
+          1.1,
+          -1.9825
+        ],
+        "fuel": [
+          0.8,
+          1.1,
+          -1.6775
+        ],
+        "gunner": [
+          -0.55,
+          2.15,
+          0.4
+        ],
+        "loader": [
+          0.6,
+          2.0,
+          0.2
+        ],
+        "track_left": [
+          -1.5,
+          0.6,
+          0.0
+        ],
+        "track_right": [
+          1.5,
+          0.6,
+          0.0
+        ],
+        "transmission": [
+          0.0,
+          0.7,
+          -2.44
+        ],
+        "turret_drive": [
+          0.0,
+          1.8,
+          0.0
+        ]
+      },
+      "neutral_steering": false,
+      "reload_s": 13.0,
+      "reverse_kph": 7.0,
+      "role": "tank_destroyer",
+      "rolling_resistance": 0.055,
+      "steering_loss": 0.45,
+      "track_width_m": 0.55,
+      "traction": 0.65,
+      "traverse_limit_deg": 8.0,
+      "turn_rate_deg_s": 26.0,
+      "turret_rate_deg_s": 6.0,
+      "turreted": false,
+      "visual_turreted": false,
+      "wheel_count": 5.0,
+      "width_m": 3.0
+    }
+  ]
+}

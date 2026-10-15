@@ -1,0 +1,3269 @@
+extends Node3D
+signal completed(report)
+signal pause_requested
+signal backend_failed(message)
+var session_config
+var launch_args=PackedStringArray()
+var is_range=false
+var is_demo=false
+var replay_buffer=[]
+var report_cache={}
+var progress_clock=0.0
+
+const Catalog=preload("res://scripts/catalog.gd")
+const Combat=preload("res://scripts/combat.gd")
+const Terrain=preload("res://scripts/terrain.gd")
+const Vehicle=preload("res://scripts/vehicle.gd")
+const Bridge=preload("res://scripts/bridge.gd")
+const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
+const ImpactKillcam=preload("res://scripts/impact_killcam.gd")
+const VehicleDamageStatus=preload("res://scripts/vehicle_damage_status.gd")
+const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
+const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
+const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
+const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
+var terrain
+var tracks
+var vehicles=[]
+var objectives=[]
+var tickets=[300.0,300.0]
+var shells=[]
+var effects=[]
+var scenario={}
+var bridge=Bridge.new()
+var sim_time=0.0
+var frame=0
+var selected=0
+var camera_mode=1
+var last_camera_mode=-1
+var observer_environment: Environment
+var camera: Camera3D
+var camera_button: Button
+var previous_vehicle_button: Button
+var next_vehicle_button: Button
+var battlefield_pan=Vector2.ZERO
+var battlefield_zoom=1600.0
+
+var comm_view=0 # 0 off, 1 red, 2 blue, 3 all
+var comm_toggle: Button
+var comm_panel: PanelContainer
+var comm_title: Label
+var comm_text: RichTextLabel
+var comm_links: MeshInstance3D
+var comm_line_material: StandardMaterial3D
+var comm_history=[]
+var comm_last_sample=-1
+var comm_last_link={}
+var replay_communication={}
+var hud: Label
+var detail: Label
+var gunner_reticle: Control
+var control_layers=[]
+var telemetry_samples=[]
+var debug=false
+var sensor_debug: MeshInstance3D
+var replay_shell_nodes=[]
+var normalized=false
+var audio_mode="no_audio"
+var training=false
+var time_limit=600.0
+var record_path=""
+var recorder: FileAccess
+var start_wall=0
+var simulation_clock_started=false
+var pause_start_usec=0
+var physics_usec=0.0
+var rng=RandomNumberGenerator.new()
+var paused=false
+var requires_brain=false
+var replay=[]
+var replay_index=0
+var replay_clock=0.0
+var replay_mode=false
+var free_yaw=0.0
+var free_pitch=-.3
+var ended=false
+var finished_report=false
+var shot_distances=[]
+var capture_changes=0
+var objective_captures=[0,0]
+var objective_neutralizations=[0,0]
+var screenshot_path=""
+var demo_intro_left=0.0
+var demo_intro: Label
+var demo_status: Label
+var demo_controls: Label
+var demo_brain_panel: PanelContainer
+var demo_brain_text: Label
+var demo_brain_visible=true
+var demo_hud_clock=0.0
+var demo_sniper_mode=false
+var demo_aim_world_point=Vector3.ZERO
+var demo_aim_world_valid=false
+var demo_aim_vehicle_local_point=Vector3.ZERO
+var demo_fly_target_velocity=Vector3.ZERO
+var demo_fly_target_acceleration=Vector3.ZERO
+var demo_fly_velocity_valid=false
+var aim_prediction_timer=0.0
+var mouse_fire_pending=false
+var middle_drag_active=false
+var demo_nav_samples=0
+var demo_nav_intervention_sum=0.0
+var demo_neural_trace_samples=[]
+var demo_last_feedback=""
+var demo_camera_before_scope=1
+var demo_gamepad_active=false
+var demo_controller_lost=false
+var demo_controller_device=-1
+var demo_fire_held=false
+var demo_fire_rest=0.0
+var demo_zoom_rest=0.0
+var demo_camera_yaw=0.0
+var demo_camera_pitch=-.12
+var demo_look_smoothed=Vector2.ZERO
+var demo_controller_status: Label
+var impact_killcam: Control
+var vehicle_status_panel: PanelContainer
+var vehicle_status_text: Label
+var vehicle_status_detail: Label
+var vehicle_status_map: Control
+
+# ============================================================
+# TEST RANGE KILLCAM / HIT FEEDBACK
+# ============================================================
+
+var range_feedback: Label
+var range_feedback_timer=0.0
+
+var range_killcam_active=false
+var range_killcam_elapsed=0.0
+var range_killcam_duration=3.6
+var range_killcam_target=8
+var range_killcam_saved_camera=1
+var range_target_destroyed=false
+
+var range_killcam_panel: PanelContainer
+var range_killcam_title: Label
+var range_killcam_body: Label
+var range_killcam_path: MeshInstance3D
+var demo_smoke_screen: StaticBody3D
+var demo_smoke_material: StandardMaterial3D
+
+func option(name: String, fallback: String="") -> String:
+	var args=launch_args if session_config!=null else OS.get_cmdline_user_args()
+	for i in range(args.size()-1):
+		if args[i]==name:return args[i+1]
+	return fallback
+func has(name: String) -> bool:return name in (launch_args if session_config!=null else OS.get_cmdline_user_args())
+func objective_horizontal_distance(
+	a: Vector3,
+	b: Vector3
+) -> float:
+	return Vector2(
+		a.x-b.x,
+		a.z-b.z
+	).length()
+
+
+func create_objective_ring(
+	center: Vector3,
+	radius: float
+) -> MeshInstance3D:
+	# Exact circle in X/Z, but every vertex samples terrain height.
+	#
+	# Unlike the old flat CylinderMesh this cannot disappear into a slope.
+	var ring=MeshInstance3D.new()
+	var surface=SurfaceTool.new()
+
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var segments=128
+	var width=maxf(1.8,radius*.055)
+	var outer=radius
+	var inner=maxf(1.0,radius-width)
+
+	for i in range(segments):
+		var a0=TAU*float(i)/float(segments)
+		var a1=TAU*float(i+1)/float(segments)
+
+		var ox0=center.x+cos(a0)*outer
+		var oz0=center.z+sin(a0)*outer
+
+		var ix0=center.x+cos(a0)*inner
+		var iz0=center.z+sin(a0)*inner
+
+		var ox1=center.x+cos(a1)*outer
+		var oz1=center.z+sin(a1)*outer
+
+		var ix1=center.x+cos(a1)*inner
+		var iz1=center.z+sin(a1)*inner
+
+		var outer0=Vector3(
+			ox0,
+			terrain.height_at(ox0,oz0)+.28,
+			oz0
+		)
+
+		var inner0=Vector3(
+			ix0,
+			terrain.height_at(ix0,iz0)+.28,
+			iz0
+		)
+
+		var outer1=Vector3(
+			ox1,
+			terrain.height_at(ox1,oz1)+.28,
+			oz1
+		)
+
+		var inner1=Vector3(
+			ix1,
+			terrain.height_at(ix1,iz1)+.28,
+			iz1
+		)
+
+		for vertex in [
+			outer0,
+			inner0,
+			outer1,
+			outer1,
+			inner0,
+			inner1
+		]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(vertex)
+
+	ring.mesh=surface.commit()
+
+	var material=StandardMaterial3D.new()
+	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color=Color(.38,.41,.35,.88)
+	material.cull_mode=BaseMaterial3D.CULL_DISABLED
+
+	ring.material_override=material
+	ring.name="ObjectiveRing"
+
+	return ring
+
+
+func _ready():
+	set_process_input(true)
+	set_process_unhandled_input(true)
+	if session_config!=null:
+		launch_args=session_config.cli_args()
+		debug=AppState.settings.debug or session_config.range_mode in ["armour","modules"]
+	start_wall=Time.get_ticks_usec()
+	camera_mode=int(option("--camera","1"))
+	normalized=has("--normalized")
+	training=has("--training")
+	is_range=has("--range") or (session_config!=null and session_config.map=="test_range")
+	is_demo=has("--demo") or (session_config!=null and session_config.mode=="demo")
+	# Autonomous battles open in a true battlefield overview. Test range keeps
+	# the normal third-person follow camera.
+	if session_config!=null and not has("--camera"):
+		camera_mode=1 if is_range else 0
+	requires_brain=has("--connect")
+	audio_mode=option("--audio","no_audio")
+	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
+	if is_demo:
+		scenario.size_m=420
+		scenario.spawn_z=100
+		scenario.spawn_spacing=0
+		scenario.time_limit_s=90
+	scenario.seed=int(option("--seed",str(scenario.seed)))
+	if is_range:scenario.size_m=2200
+	var replay_manifest={}
+	if has("--replay"):
+		var manifest_path=option("--replay").get_base_dir().path_join("manifest.json")
+		if FileAccess.file_exists(manifest_path):replay_manifest=JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+		audio_mode=str(replay_manifest.get("audio",audio_mode))
+		if replay_manifest.get("map","").contains("Training"):
+			training=true
+			scenario=Catalog.read_json("scenarios/training_range.json")
+		if replay_manifest.has("vehicles") and replay_manifest.vehicles.size()==16:
+			for i in range(8):
+				scenario.blue[i]=replay_manifest.vehicles[i].id
+				scenario.red[i]=replay_manifest.vehicles[i+8].id
+		scenario.seed=int(replay_manifest.get("map_seed",scenario.seed))
+	time_limit=float(option("--seconds",str(scenario.time_limit_s)))
+	rng.seed=int(option("--battle-seed",str(scenario.seed)))
+	tickets=[float(scenario.tickets),float(scenario.tickets)]
+	terrain=Terrain.new()
+	add_child(terrain)
+	terrain.range_flat=is_range
+	terrain.mobility_course=is_range and session_config!=null and session_config.range_mode=="mobility"
+	terrain.demo_mode=is_demo
+	terrain.vegetation_density=AppState.settings.vegetation if session_config!=null else 1.0
+	terrain.build(training,int(scenario.seed),float(scenario.size_m))
+	if is_demo:
+		create_demo_smoke_screen()
+		var demo_arena=DemoArena.instantiate()
+		demo_arena.configure(terrain,AppState.settings.vegetation if session_config!=null else 1.0)
+		add_child(demo_arena)
+	tracks=load("res://scripts/tracks.gd").new()
+	add_child(tracks)
+	tracks.setup(self)
+	var sky=WorldEnvironment.new()
+	var env=Environment.new()
+	env.background_mode=Environment.BG_SKY
+	var sky_res=Sky.new()
+	var sky_mat=ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color=Color(.23,.36,.48)
+	sky_mat.sky_horizon_color=Color(.69,.73,.67)
+	if is_demo:
+		sky_mat.sky_top_color=Color(.24,.39,.53)
+		sky_mat.sky_horizon_color=Color(.78,.77,.65)
+		sky_mat.ground_bottom_color=Color(.31,.35,.29)
+		sky_mat.ground_horizon_color=Color(.63,.66,.56)
+	sky_res.sky_material=sky_mat
+	env.sky=sky_res
+	env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color=Color(.62,.69,.75)
+	env.ambient_light_energy=.65 if not is_demo else .86
+	env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
+	env.fog_enabled=true
+	env.fog_density=.00018 if not is_demo else .00065
+	env.fog_light_color=Color(.61,.68,.65) if not is_demo else Color(.71,.73,.66)
+	observer_environment=env
+	sky.environment=env
+	add_child(sky)
+	var sun=DirectionalLight3D.new()
+	sun.rotation_degrees=Vector3(-42,-28,0)
+	sun.light_color=Color(1,.92,.77)
+	sun.light_energy=1.7 if not is_demo else 1.55
+	sun.shadow_enabled=AppState.settings.shadows if session_config!=null else true
+	sun.directional_shadow_max_distance=300 if not is_demo else 245
+	add_child(sun)
+	for i in range(3):
+		var v=scenario.objectives[i]
+		var pos=Vector3(v[0],terrain.height_at(v[0],v[1]),v[1])
+		objectives.append({"position":pos,"owner":-1,"progress":0.0,"contested":false,"inside":[0,0]})
+		var marker=create_objective_ring(
+			pos,
+			float(scenario.zone_radius)
+		)
+		add_child(marker)
+		var label=Label3D.new()
+		label.text=["A","B","C"][i]
+		label.font_size=120
+		label.pixel_size=.08
+		label.position=pos+Vector3(0,18,0)
+		label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+		label.fixed_size=false
+		label.name="ObjectiveLabel"+str(i)
+		label.font_size=36
+		label.outline_size=4
+		add_child(label)
+		objectives[i].marker=marker
+		objectives[i].label=label
+
+		# A/B/C belong to the Domination battle mode.
+		# Test Range is a gunnery/mobility sandbox and does not process capture,
+		# so showing these markers there is misleading.
+		marker.visible = not is_range and not is_demo
+		label.visible = not is_range and not is_demo
+
+		update_objective_visual(i)
+	for i in range(16):
+		var team=int(i/8)
+		var id=scenario.blue[i%8] if team==0 else scenario.red[i%8]
+		id=option("--mirror",id)
+		if is_range and session_config!=null:id=session_config.training_vehicle if team==0 else session_config.target_vehicle
+		var tank=Vehicle.new()
+		add_child(tank)
+		tank.setup(Catalog.vehicle(id,normalized),i,self)
+		var sign_value=(-1 if team==0 else 1)*(-1 if has("--swap") else 1)
+		var x=(i%8-3.5)*scenario.spawn_spacing
+		var z=scenario.spawn_z*sign_value
+		tank.position=Vector3(x,terrain.height_at(x,z)+.1,z)
+		tank.rotation.y=0 if sign_value<0 else PI
+		vehicles.append(tank)
+		if is_range:
+			if i in [0,8]:
+				var distance=session_config.range_distance if session_config!=null else 500
+				tank.position=Vector3(0,.1,(-.5 if i==0 else .5)*distance)
+				tank.rotation.y=0 if i==0 else PI+deg_to_rad(session_config.target_angle if session_config!=null else 0)
+			else:
+				tank.alive=false; tank.hide();tank.position=Vector3(1500+i*20,-100,1500)
+				tank.collision_layer=0; tank.collision_mask=0
+				for plate in tank.armour_bodies:plate.collision_layer=0
+		if is_demo:
+			if i in [0,8]:
+				var demo_z=-100 if i==0 else 100
+				tank.position=Vector3(0,terrain.height_at(0,demo_z)+.1,demo_z)
+				tank.rotation.y=0 if i==0 else PI
+			else:
+				tank.alive=false;tank.hide();tank.position=Vector3(1200+i*10,-100,1200)
+				tank.collision_layer=0;tank.collision_mask=0
+				for plate in tank.armour_bodies:plate.collision_layer=0
+		if session_config!=null:
+			for mesh in tank.model.find_children("*","GeometryInstance3D",true,false):mesh.lod_bias=AppState.settings.lod
+
+	sensor_debug=MeshInstance3D.new()
+	add_child(sensor_debug)
+	camera=Camera3D.new()
+	camera.far=620 if is_demo else 4000
+	camera.near=.1
+	camera.fov=62
+	add_child(camera)
+	camera.position=Vector3(170,140,-250)
+	camera.look_at(Vector3(0,0,0))
+	var canvas=CanvasLayer.new()
+	add_child(canvas)
+	hud=Label.new()
+	hud.position=Vector2(24,18)
+	hud.add_theme_font_size_override("font_size",14)
+	hud.size.x=430
+	hud.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	hud.add_theme_color_override("font_shadow_color",Color.BLACK)
+	hud.add_theme_constant_override("shadow_offset_x",2)
+	hud.add_theme_constant_override("shadow_offset_y",2)
+	var backdrop=ColorRect.new()
+	backdrop.color=Color(.025,.04,.05,.78)
+	backdrop.position=Vector2(12,10)
+	backdrop.size=Vector2(455,290)
+	backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(backdrop)
+	canvas.add_child(hud)
+	detail=Label.new()
+	detail.position=Vector2(24,155)
+	detail.size.x=430
+	detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_font_size_override("font_size",12)
+	canvas.add_child(detail)
+	gunner_reticle=GunnerReticle.new()
+	gunner_reticle.visible=false
+	canvas.add_child(gunner_reticle)
+
+	# --------------------------------------------------------
+	# Test Range hit feedback / killcam UI
+	# --------------------------------------------------------
+
+	range_feedback=Label.new()
+	range_feedback.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	range_feedback.offset_left=-310
+	range_feedback.offset_right=310
+	range_feedback.offset_top=82
+	range_feedback.offset_bottom=132
+	range_feedback.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	range_feedback.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+	range_feedback.add_theme_font_size_override("font_size",22)
+	range_feedback.add_theme_color_override("font_shadow_color",Color.BLACK)
+	range_feedback.add_theme_constant_override("shadow_offset_x",2)
+	range_feedback.add_theme_constant_override("shadow_offset_y",2)
+	range_feedback.visible=false
+	canvas.add_child(range_feedback)
+
+	range_killcam_panel=PanelContainer.new()
+	range_killcam_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	range_killcam_panel.offset_left=-360
+	range_killcam_panel.offset_right=360
+	range_killcam_panel.offset_top=-430
+	range_killcam_panel.offset_bottom=-24
+	range_killcam_panel.visible=false
+	range_killcam_panel.clip_contents=true
+
+	var killcam_style=StyleBoxFlat.new()
+	killcam_style.bg_color=Color(.025,.035,.04,.92)
+	killcam_style.border_color=Color(.62,.54,.36,.9)
+	killcam_style.set_border_width_all(1)
+	killcam_style.set_corner_radius_all(5)
+	killcam_style.content_margin_left=20
+	killcam_style.content_margin_right=20
+	killcam_style.content_margin_top=14
+	killcam_style.content_margin_bottom=14
+	range_killcam_panel.add_theme_stylebox_override("panel",killcam_style)
+
+	var killcam_box=VBoxContainer.new()
+	killcam_box.add_theme_constant_override("separation",8)
+	range_killcam_panel.add_child(killcam_box)
+
+	range_killcam_title=Label.new()
+	range_killcam_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	range_killcam_title.add_theme_font_size_override("font_size",25)
+	killcam_box.add_child(range_killcam_title)
+
+	range_killcam_body=Label.new()
+	range_killcam_body.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	range_killcam_body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	range_killcam_body.add_theme_font_size_override("font_size",15)
+	killcam_box.add_child(range_killcam_body)
+
+	var reset_target_button=Button.new()
+	reset_target_button.text=AppState.tr_text("RESET TARGET")
+	reset_target_button.custom_minimum_size.y=40
+	reset_target_button.pressed.connect(reset_range_target)
+	killcam_box.add_child(reset_target_button)
+
+	canvas.add_child(range_killcam_panel)
+	impact_killcam=ImpactKillcam.new()
+	impact_killcam.visible=false
+	canvas.add_child(impact_killcam)
+	vehicle_status_panel=PanelContainer.new()
+	vehicle_status_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	vehicle_status_panel.offset_left=20
+	vehicle_status_panel.offset_right=340
+	vehicle_status_panel.offset_top=-390 if is_demo else -270
+	vehicle_status_panel.offset_bottom=-125 if is_demo else -20
+	vehicle_status_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var status_style=StyleBoxFlat.new()
+	status_style.bg_color=Color(.025,.075,.07,.62)
+	status_style.border_color=Color(.55,.72,.59,.8)
+	status_style.set_border_width_all(1)
+	status_style.content_margin_left=12
+	status_style.content_margin_right=12
+	status_style.content_margin_top=10
+	status_style.content_margin_bottom=10
+	vehicle_status_panel.add_theme_stylebox_override("panel",status_style)
+	vehicle_status_text=Label.new()
+	vehicle_status_text.add_theme_font_size_override("font_size",12)
+	vehicle_status_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	vehicle_status_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var status_column=VBoxContainer.new()
+	status_column.add_theme_constant_override("separation",2)
+	vehicle_status_panel.add_child(status_column)
+	status_column.add_child(vehicle_status_text)
+	vehicle_status_map=VehicleDamageStatus.new()
+	vehicle_status_map.custom_minimum_size=Vector2(300,164)
+	vehicle_status_map.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	status_column.add_child(vehicle_status_map)
+	vehicle_status_detail=Label.new()
+	vehicle_status_detail.add_theme_font_size_override("font_size",11)
+	vehicle_status_detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	vehicle_status_detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	status_column.add_child(vehicle_status_detail)
+	vehicle_status_panel.visible=false
+	canvas.add_child(vehicle_status_panel)
+
+	range_killcam_path=MeshInstance3D.new()
+	range_killcam_path.visible=false
+	add_child(range_killcam_path)
+
+	# Clickable observer controls.
+	camera_button=Button.new()
+	camera_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	camera_button.offset_left=-440
+	camera_button.offset_right=-225
+	camera_button.offset_top=18
+	camera_button.offset_bottom=62
+	camera_button.pressed.connect(cycle_camera)
+	canvas.add_child(camera_button)
+
+	# Observer vehicle selection.
+	# Visible in normal battles; Test Range only has one controlled vehicle.
+	previous_vehicle_button=Button.new()
+	previous_vehicle_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	previous_vehicle_button.offset_left=-228
+	previous_vehicle_button.offset_right=-124
+	previous_vehicle_button.offset_top=-66
+	previous_vehicle_button.offset_bottom=-22
+	previous_vehicle_button.text="◀"
+	previous_vehicle_button.tooltip_text="Previous vehicle · Shift+Tab"
+	previous_vehicle_button.visible=not is_range
+	previous_vehicle_button.pressed.connect(select_previous_vehicle)
+	canvas.add_child(previous_vehicle_button)
+
+	next_vehicle_button=Button.new()
+	next_vehicle_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	next_vehicle_button.offset_left=-114
+	next_vehicle_button.offset_right=-10
+	next_vehicle_button.offset_top=-66
+	next_vehicle_button.offset_bottom=-22
+	next_vehicle_button.text="▶"
+	next_vehicle_button.tooltip_text="Next vehicle · Tab"
+	next_vehicle_button.visible=not is_range
+	next_vehicle_button.pressed.connect(select_next_vehicle)
+	canvas.add_child(next_vehicle_button)
+
+	comm_toggle=Button.new()
+	comm_toggle.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	comm_toggle.offset_left=-215
+	comm_toggle.offset_right=-18
+	comm_toggle.offset_top=18
+	comm_toggle.offset_bottom=62
+	comm_toggle.pressed.connect(cycle_comms)
+	comm_toggle.visible=not is_range
+	canvas.add_child(comm_toggle)
+
+	comm_panel=PanelContainer.new()
+	comm_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	comm_panel.offset_left=-460
+	comm_panel.offset_right=-18
+	comm_panel.offset_top=72
+	comm_panel.offset_bottom=570
+
+	var comm_style=StyleBoxFlat.new()
+	comm_style.bg_color=Color(.025,.04,.05,.93)
+	comm_style.border_color=Color(.35,.43,.40)
+	comm_style.set_border_width_all(1)
+	comm_style.set_corner_radius_all(4)
+	comm_style.content_margin_left=14
+	comm_style.content_margin_right=14
+	comm_style.content_margin_top=12
+	comm_style.content_margin_bottom=12
+	comm_panel.add_theme_stylebox_override("panel",comm_style)
+
+	var comm_box=VBoxContainer.new()
+	comm_box.add_theme_constant_override("separation",8)
+	comm_panel.add_child(comm_box)
+
+	comm_title=Label.new()
+	comm_title.add_theme_font_size_override("font_size",20)
+	comm_box.add_child(comm_title)
+
+	var disclaimer=Label.new()
+	disclaimer.text=AppState.tr_text("Interface shows physical/neural signal telemetry, not decoded language.")
+	disclaimer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	disclaimer.modulate=Color(.68,.74,.70)
+	comm_box.add_child(disclaimer)
+
+	comm_text=RichTextLabel.new()
+	comm_text.bbcode_enabled=false
+	comm_text.fit_content=false
+	comm_text.scroll_active=true
+	comm_text.scroll_following=true
+	comm_text.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	comm_text.custom_minimum_size=Vector2(390,390)
+	comm_box.add_child(comm_text)
+
+	canvas.add_child(comm_panel)
+
+	comm_links=MeshInstance3D.new()
+	add_child(comm_links)
+	comm_line_material=StandardMaterial3D.new()
+	comm_line_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	comm_line_material.vertex_color_use_as_albedo=true
+
+	update_camera_button()
+	update_selection_buttons()
+	refresh_comm_panel()
+	if is_demo:setup_demo_ui(canvas)
+
+	if requires_brain: bridge.connect_backend(int(option("--port","8765")))
+	record_path=option("--record","")
+	if record_path!="":
+		DirAccess.make_dir_recursive_absolute(record_path)
+		if (session_config==null and not has("--no-replay")) or (session_config!=null and session_config.record):recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
+		var manifest={"date":Time.get_datetime_string_from_system(true),"map":scenario.name,"map_seed":scenario.seed,"mode":"NORMALIZED" if normalized else "HISTORICAL","audio":audio_mode,"controller":"backend" if requires_brain else "RULE_BASED_CONTROL","side_swap":has("--swap"),"vehicles":[],"seconds":time_limit}
+		var output=[]
+		OS.execute("git",["-C",ProjectSettings.globalize_path("res://../.."),"rev-parse","HEAD"],output)
+		manifest.git_commit="".join(output).strip_edges()
+		output=[]
+		OS.execute("git",["-C",ProjectSettings.globalize_path("res://../.."),"status","--porcelain"],output)
+		manifest.git_dirty=not "".join(output).strip_edges().is_empty()
+		if session_config!=null:manifest.session=session_config.as_dict()
+		manifest.engine=Engine.get_version_info()
+		manifest.source_hashes={}
+		for source in ["battle.gd","vehicle.gd","terrain.gd","tracks.gd","combat.gd","bridge.gd","catalog.gd"]:
+			manifest.source_hashes[source]=FileAccess.get_sha256("res://scripts/"+source)
+		for v in vehicles:manifest.vehicles.append(v.cfg)
+		FileAccess.open(record_path.path_join("manifest.json"),FileAccess.WRITE).store_string(JSON.stringify(manifest,"  "))
+	var replay_file=option("--replay","")
+	if replay_file!="":
+		replay_mode=true
+		var f=FileAccess.open(replay_file,FileAccess.READ)
+		if f==null:
+			if session_config!=null:backend_failed.emit("Replay file is missing")
+			return
+		while not f.eof_reached():
+			var line=f.get_line()
+			if line.strip_edges().is_empty():continue
+			var row=JSON.parse_string(line)
+			if row is Dictionary:replay.append(row)
+		requires_brain=false
+	print("READY ",scenario.name," 16 vehicles; ","NORMALIZED" if normalized else "HISTORICAL", " backend=",requires_brain)
+	screenshot_path=option("--screenshot","")
+
+func setup_demo_ui(canvas: CanvasLayer):
+	selected=0;camera_mode=1;last_camera_mode=-1;demo_intro_left=4.0;demo_sniper_mode=false
+	OpenDayController.configure()
+	initialize_demo_controller()
+	if not Input.joy_connection_changed.is_connected(_on_demo_joy_connection_changed):Input.joy_connection_changed.connect(_on_demo_joy_connection_changed)
+	hud.visible=false;detail.visible=true;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=true;gunner_reticle.camera_center_marker=true;update_camera_button()
+	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
+	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls);update_demo_control_hint()
+	demo_controller_status=Label.new();demo_controller_status.set_anchors_preset(Control.PRESET_CENTER);demo_controller_status.offset_left=-350;demo_controller_status.offset_right=350;demo_controller_status.offset_top=-75;demo_controller_status.offset_bottom=75;demo_controller_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_controller_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_controller_status.add_theme_font_size_override("font_size",26);demo_controller_status.add_theme_color_override("font_color",Color("ead58f"));demo_controller_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controller_status.add_theme_constant_override("shadow_offset_x",2);demo_controller_status.add_theme_constant_override("shadow_offset_y",2);demo_controller_status.visible=false;demo_controller_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controller_status)
+	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
+	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
+	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
+	var brain_box=VBoxContainer.new();brain_box.add_theme_constant_override("separation",10);demo_brain_panel.add_child(brain_box)
+	var fly_preview=DemoFlyPreview.new();fly_preview.custom_minimum_size=Vector2(340,145);fly_preview.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;brain_box.add_child(fly_preview)
+	demo_brain_text=Label.new();demo_brain_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_brain_text.add_theme_font_size_override("font_size",16);brain_box.add_child(demo_brain_text);canvas.add_child(demo_brain_panel)
+	demo_intro=Label.new();demo_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);demo_intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_intro.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_intro.add_theme_font_size_override("font_size",42);demo_intro.add_theme_color_override("font_color",Color("ead58f"));demo_intro.add_theme_color_override("font_shadow_color",Color.BLACK);demo_intro.add_theme_constant_override("shadow_offset_x",3);demo_intro.add_theme_constant_override("shadow_offset_y",3);demo_intro.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_intro)
+	vehicles[8].get_node("Identification").text="🪰 FLY-01"
+
+func initialize_demo_controller() -> void:
+	demo_controller_device=find_preferred_demo_controller()
+	demo_gamepad_active=demo_controller_device>=0
+	demo_controller_lost=false
+	demo_camera_yaw=vehicles[0].rotation.y if not vehicles.is_empty() else 0.0
+	demo_camera_pitch=-.12
+	demo_fire_held=false
+	if demo_gamepad_active:
+		demo_fire_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT)
+		demo_zoom_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_LEFT)
+		print("OPENDAY DUALSENSE id=",demo_controller_device," name=",Input.get_joy_name(demo_controller_device)," L2_rest=",demo_zoom_rest," R2_rest=",demo_fire_rest," stick=",[Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_LEFT_X),Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_LEFT_Y),Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_RIGHT_X),Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_RIGHT_Y)])
+
+func update_demo_control_hint() -> void:
+	if not is_instance_valid(demo_controls):return
+	if str(AppState.settings.language)=="ru":
+		demo_controls.text="ЛЕВЫЙ СТИК: ДВИЖЕНИЕ · ПРАВЫЙ СТИК: ВЗГЛЯД И ПРИЦЕЛ · L2: ПРИБЛИЖЕНИЕ · R2: ВЫСТРЕЛ · OPTIONS: ПАУЗА · ○: НАЗАД" if demo_gamepad_active else "МЫШЬ: ПРИЦЕЛИВАНИЕ · ЛКМ: ВЫСТРЕЛ · УДЕРЖИВАЙТЕ ПКМ: ПРИБЛИЖЕНИЕ · ПРОБЕЛ: ПАУЗА · ESC: МЕНЮ\nПОДКЛЮЧИТЕ DUALSENSE ДЛЯ РУЧНОГО УПРАВЛЕНИЯ"
+	else:
+		demo_controls.text="LEFT STICK: DRIVE · RIGHT STICK: LOOK AND AIM · L2: ZOOM · R2: FIRE · OPTIONS: PAUSE · ○: BACK" if demo_gamepad_active else "MOUSE: AIM · LMB: FIRE · HOLD RMB: ZOOM · SPACE: PAUSE · ESC: MENU\nCONNECT DUALSENSE FOR MANUAL DRIVE"
+
+func _on_demo_joy_connection_changed(device: int, connected: bool) -> void:
+	if not is_demo:return
+	if connected:
+		var connected_name=Input.get_joy_name(device).to_lower()
+		var active_name=Input.get_joy_name(demo_controller_device).to_lower() if demo_controller_device>=0 else ""
+		if demo_controller_lost or not demo_gamepad_active or (connected_name.contains("dualsense") and not active_name.contains("dualsense")):
+			var reconnecting=demo_controller_lost
+			demo_gamepad_active=true
+			demo_controller_lost=false
+			demo_controller_device=device
+			demo_fire_rest=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT)
+			demo_zoom_rest=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_TRIGGER_LEFT)
+			demo_fire_held=false
+			if is_instance_valid(demo_controller_status) and reconnecting:
+				demo_controller_status.text="КОНТРОЛЛЕР ПОДКЛЮЧЁН · НАЖМИТЕ OPTIONS ДЛЯ ПРОДОЛЖЕНИЯ" if str(AppState.settings.language)=="ru" else "CONTROLLER CONNECTED · PRESS OPTIONS TO RESUME"
+				demo_controller_status.visible=true
+			elif is_instance_valid(demo_controller_status):demo_controller_status.visible=false
+			update_demo_control_hint()
+		return
+	if device!=demo_controller_device:return
+	var next_device=find_preferred_demo_controller(device)
+	if next_device>=0:
+		demo_controller_device=next_device
+		demo_fire_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT)
+		demo_zoom_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_LEFT)
+		demo_fire_held=false
+		return
+	demo_fire_held=false
+	mouse_fire_pending=false
+	demo_sniper_mode=false
+	demo_controller_lost=true
+	demo_controller_safe_pause()
+	if is_instance_valid(demo_controller_status):
+		demo_controller_status.text="КОНТРОЛЛЕР ОТКЛЮЧЁН · БОЙ НА ПАУЗЕ" if str(AppState.settings.language)=="ru" else "CONTROLLER DISCONNECTED · BATTLE PAUSED"
+		demo_controller_status.visible=true
+	update_demo_control_hint()
+
+func demo_controller_safe_pause() -> void:
+	suspend_active_clock()
+	paused=true
+	if vehicles.is_empty():return
+	vehicles[0].cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
+	vehicles[0].drive_throttle=0.0
+	vehicles[0].speed=0.0
+	vehicles[0].yaw_rate=0.0
+
+func find_preferred_demo_controller(exclude_device: int=-1) -> int:
+	var devices=Input.get_connected_joypads()
+	for device in devices:
+		if int(device)!=exclude_device and Input.get_joy_name(int(device)).to_lower().contains("dualsense"):return int(device)
+	for device in devices:
+		if int(device)!=exclude_device:return int(device)
+	return -1
+
+func update_demo_controller_input(delta: float) -> void:
+	if not demo_gamepad_active or demo_controller_lost:return
+	if Input.is_action_just_pressed("od_pause"):
+		if paused and is_instance_valid(demo_controller_status) and demo_controller_status.visible:
+			resume_active_clock()
+			paused=false
+			if is_instance_valid(demo_controller_status):demo_controller_status.visible=false
+		elif demo_intro_left<=0.0:
+			pause_requested.emit()
+		return
+	if paused or demo_intro_left>0.0:return
+	var zoom_value=OpenDayController.normalize_trigger(Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_LEFT),demo_zoom_rest)
+	demo_set_sniper_mode(zoom_value>=OpenDayController.TRIGGER_THRESHOLD)
+	var fire_value=OpenDayController.normalize_trigger(Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT),demo_fire_rest)
+	var fire_now=fire_value>=OpenDayController.TRIGGER_THRESHOLD
+	if fire_now and not demo_fire_held:mouse_fire_pending=true
+	demo_fire_held=fire_now
+	var look_x=Input.get_action_strength("od_look_right")-Input.get_action_strength("od_look_left")
+	var look_y=Input.get_action_strength("od_look_down")-Input.get_action_strength("od_look_up")
+	var look_target=Vector2(look_x,look_y)
+	# Filter stick noise with a frame-rate-independent response; camera and
+	# reticle then follow one continuous aim target instead of twitching.
+	demo_look_smoothed=demo_look_smoothed.lerp(look_target,1.0-exp(-delta*12.0))
+	var angles=OpenDayController.advance_camera(demo_camera_yaw,demo_camera_pitch,demo_look_smoothed,delta,demo_sniper_mode)
+	demo_camera_yaw=angles.x
+	demo_camera_pitch=angles.y
+
+func demo_health(vehicle) -> float:
+	if not vehicle.alive:return 0.0
+	var total=maxi(1,vehicle.modules.size());var working=0
+	for value in vehicle.modules.values():working+=1 if value else 0
+	return float(working)/float(total)
+
+func demo_male_cns_trace_summary() -> Dictionary:
+	var channel_names=["DNp09_L","DNp09_R","DNa02_L","DNa02_R","DNp01","wing_song"]
+	var trace_summary={};var channel_values=[]
+	for _channel in channel_names:channel_values.append([])
+	var decoded_values=[]
+	var pursuit_active=0;var turn_active=0;var turret_active=0;var escape_active=0;var count=demo_neural_trace_samples.size()
+	for sample in demo_neural_trace_samples:
+		var trace=sample.get("trace",[])
+		while trace.size()<channel_names.size():trace.append(0.0)
+		for channel in channel_names.size():channel_values[channel].append(float(trace[channel]))
+		if float(trace[0])+float(trace[1])>2.0:pursuit_active+=1
+		if absf(float(trace[1])-float(trace[0]))>.05:turn_active+=1
+		if absf(float(trace[3])-float(trace[2]))>.05:turret_active+=1
+		if float(trace[4])>.05:escape_active+=1
+		var decoded=sample.get("decoder_action",[])
+		if decoded is Array and decoded.size()>=6:decoded_values.append(decoded)
+	for channel in channel_names.size():
+		var values: Array=channel_values[channel]
+		var ordered=values.duplicate();ordered.sort()
+		var sum=0.0;var nonzero=0
+		for value in values:
+			sum+=float(value)
+			if absf(float(value))>.05:nonzero+=1
+		var p95=float(ordered[mini(ordered.size()-1,int(floor((ordered.size()-1)*.95)))]) if not ordered.is_empty() else 0.0
+		trace_summary[channel_names[channel]]={"mean":sum/maxf(1.0,float(values.size())),"p95":p95,"max":float(ordered.back()) if not ordered.is_empty() else 0.0,"nonzero_fraction":float(nonzero)/maxf(1.0,float(values.size()))}
+	var decoded_summary=[]
+	for channel in 6:
+		var sum=0.0;var nonzero=0
+		for action in decoded_values:
+			sum+=float(action[channel])
+			if absf(float(action[channel]))>.05:nonzero+=1
+		decoded_summary.append({"mean":sum/maxf(1.0,float(decoded_values.size())),"nonzero_fraction":float(nonzero)/maxf(1.0,float(decoded_values.size()))})
+	return {"source":"fresh FlyBrain(batch=1) replies only","samples":count,"channels_hz":trace_summary,"baseline_decoder_actions":["throttle","brake","steer","turret","elevation","fire"],"baseline_decoder_stats":decoded_summary,"above_threshold_fraction":{"DNp09_sum_gt_2_hz":float(pursuit_active)/maxf(1.0,float(count)),"DNp09_turn_delta_gt_0p05_hz":float(turn_active)/maxf(1.0,float(count)),"DNa02_turret_delta_gt_0p05_hz":float(turret_active)/maxf(1.0,float(count)),"DNp01_escape_gt_0p05_hz":float(escape_active)/maxf(1.0,float(count))}}
+
+func update_vehicle_status():
+	if not is_instance_valid(vehicle_status_panel):return
+	var replaced_by_demo_impact=is_demo and is_instance_valid(impact_killcam) and impact_killcam.visible
+	vehicle_status_panel.visible=camera_mode in [1,2] and not range_killcam_active and not replaced_by_demo_impact and selected>=0 and selected<vehicles.size()
+	if not vehicle_status_panel.visible:return
+	var v=vehicles[selected]
+	var russian=str(AppState.settings.language)=="ru"
+	var crew_keys=["driver","gunner","commander","loader","radio_operator"]
+	var crew_total=0
+	var crew_alive=0
+	for key in crew_keys:
+		if v.modules.has(key):
+			crew_total+=1
+			if bool(v.modules[key]):crew_alive+=1
+	var lines=PackedStringArray()
+	lines.append("%s · %s" % [agent_label(selected),str(v.cfg.display_name)])
+	lines.append(("УНИЧТОЖЕН" if russian else "DESTROYED") if not v.alive else (("ЭКИПАЖ %d/%d · БК %d" if russian else "CREW %d/%d · AMMO %d") % [crew_alive,crew_total,v.ammo_left]))
+	var damaged=PackedStringArray()
+	var disabled=PackedStringArray()
+	for key in v.modules:
+		var module_name=status_module_name(str(key),russian)
+		if not bool(v.modules[key]):disabled.append(module_name)
+		elif float(v.module_damage.get(key,0.0))>0.0:damaged.append(module_name)
+	var detail=("ВЫВЕДЕНЫ: " if russian else "DISABLED: ")+(" · ".join(disabled) if not disabled.is_empty() else "—")
+	if not damaged.is_empty():detail+="\n"+("ПОВРЕЖДЕНЫ: " if russian else "DAMAGED: ")+" · ".join(damaged)
+	var weapon_state=v.weapon_block_reason()
+	if weapon_state.is_empty():weapon_state="ГОТОВО" if russian else "READY"
+	elif russian:weapon_state={"destroyed":"уничтожен","gunner":"наводчик выбыл","breech":"казённик сломан","ammo":"нет снарядов","reload":"перезарядка"}.get(weapon_state,weapon_state)
+	lines.append(("ОРУДИЕ: " if russian else "GUN: ")+weapon_state.to_upper())
+	vehicle_status_text.text="\n".join(lines)
+	vehicle_status_detail.text=detail
+	vehicle_status_map.show_vehicle(v)
+
+func status_module_name(key: String,russian: bool) -> String:
+	if not russian:return key.replace("_"," ")
+	return {"driver":"механик-водитель","gunner":"наводчик","commander":"командир","loader":"заряжающий","radio_operator":"радист","ammo_rack":"боеукладка","breech":"казённик","turret_drive":"привод башни","engine":"двигатель","transmission":"трансмиссия","fuel":"топливо","track_left":"левая гусеница","track_right":"правая гусеница"}.get(key,key.replace("_"," "))
+
+func demo_bar(value: float) -> String:
+	var filled=clampi(roundi(clampf(value,0,1)*10),0,10)
+	return "["+"#".repeat(filled)+"-".repeat(10-filled)+"]"
+
+func demo_signal_bar(value: float) -> String:
+	var filled=clampi(roundi(clampf(absf(value),0,1)*7),0,7)
+	return "#".repeat(filled)+"-".repeat(7-filled)
+
+func demo_intro_copy(key: String) -> String:
+	if str(AppState.settings.language)=="ru":
+		return {
+			"NERVOUS SYSTEM MODEL CONNECTED":"МОДЕЛЬ MALECNS УПРАВЛЯЕТ ТАНКОМ",
+			"YOU VS THE FLY":"ТЫ ПРОТИВ МУХИ",
+			"FIGHT":"БОЙ",
+		}.get(key,key)
+	return AppState.tr_text(key)
+
+func update_demo_hud():
+	if not is_instance_valid(demo_status) or vehicles.size()<9:return
+	var player=vehicles[0];var fly=vehicles[8];var remaining=maxf(0,time_limit-sim_time)
+	demo_status.text=AppState.tr_format("demo.hud",[demo_bar(float(player.demo_health)/float(player.demo_health_max)),demo_bar(float(fly.demo_health)/float(fly.demo_health_max)),int(remaining)/60,int(remaining)%60])
+	var trace=fly.dn.duplicate() if fly.dn is Array else []
+	while trace.size()<6:trace.append(0.0)
+	var control=control_layers[8] if control_layers.size()==16 else {}
+	var signal_names=["DNp09 L","DNp09 R","DNa02 L","DNa02 R","DNp01","Wing"]
+	var lines=PackedStringArray(["MALECNS · "+AppState.tr_text("BIOLOGICAL SIGNALS")])
+	for index in range(6):
+		var value=float(trace[index])
+		var polarity="+" if value>=0 else "−"
+		lines.append("%-8s %s %s%.2f" % [signal_names[index],demo_signal_bar(value),polarity,absf(value)])
+	var action=control.get("final_action",fly.cmd)
+	while action.size()<6:action.append(0.0)
+	var intent=control.get("neural_intent",control.get("raw_neural_action",[]))
+	var decoded=control.get("decoded_commands",control.get("decoder_action",[]))
+	var navigation=control.get("navigation_assistance",[])
+	var movement=maxf(absf(float(action[0])),maxf(absf(float(action[1])),absf(float(action[2]))))
+	var aiming=maxf(absf(float(action[3])),absf(float(action[4])))
+	var firing=float(action[5])
+	lines.append("")
+	lines.append(AppState.tr_text("ENGINEERED CONTROL"))
+	lines.append("%s  %s" % [AppState.tr_text("MOVE"),demo_signal_bar(movement)])
+	lines.append("%s    %s" % [AppState.tr_text("AIM"),demo_signal_bar(aiming)])
+	lines.append("%s   %s" % [AppState.tr_text("FIRE"),AppState.tr_text("LIVE" if firing>.15 else "IDLE")])
+	if intent.size()>=3 and decoded.size()>=3 and navigation.size()>=3:
+		lines.append("RAW T %.2f S %.2f · DEC T %.2f S %.2f" % [float(intent[0]),float(intent[2]),float(decoded[0]),float(decoded[2])])
+		lines.append("NAV Δ T %.2f S %.2f" % [float(navigation[0]),float(navigation[2])])
+	var nav_assist=control.get("navigation_assistance",[])
+	var gun_assist=control.get("gunnery_assistance",[])
+	if nav_assist.size()>=3:lines.append("NAV Δ T %.2f · S %.2f" % [float(nav_assist[0]),float(nav_assist[2])])
+	if gun_assist.size()>=3:lines.append("AIM Δ T %.2f · E %.2f · FIRE %.2f" % [float(gun_assist[0]),float(gun_assist[1]),float(gun_assist[2])])
+	var command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else -1.0
+	if command_age_ms>=0:
+		lines.append("%s: %.1f ms · #%d · age %.0f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0)),bridge.responses_received,command_age_ms])
+	else:
+		lines.append("%s: waiting for first MaleCNS response" % AppState.tr_text("Tick"))
+	demo_brain_text.text="\n".join(lines)
+
+func demo_apply_mouse_motion(cursor: Vector2,_hull_turning: bool=false):
+	if not is_demo or vehicles.is_empty() or paused or camera_mode!=1:return
+	var vehicle=vehicles[0]
+	if not vehicle.manual_aim:
+		vehicle.manual_aim=true
+	var origin=camera.project_ray_origin(cursor)
+	var ray=camera.project_ray_normal(cursor)
+	var query=PhysicsRayQueryParameters3D.create(origin,origin+ray*240.0,7,vehicle.excluded())
+	var hit=get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Vector3
+	if not hit.is_empty():
+		target=hit.position
+	else:
+		var floor_y=terrain.height_at(vehicle.position.x,vehicle.position.z)+1.0
+		var denominator=ray.y
+		var ray_distance=(floor_y-origin.y)/denominator if absf(denominator)>.04 else 110.0
+		target=origin+ray*clampf(ray_distance,25.0,180.0)
+	demo_aim_world_point=target
+	demo_aim_vehicle_local_point=vehicle.to_local(target)
+	demo_aim_world_valid=true
+	demo_update_aim_from_world_point(vehicle,target)
+
+func demo_update_aim_from_world_point(vehicle,target: Vector3):
+	var muzzle=vehicle.muzzle.global_position
+	var offset=target-muzzle
+	var horizontal=Vector2(offset.x,offset.z).length()
+	if horizontal<2.0:
+		target=muzzle+demo_camera_forward(vehicle)*70.0;offset=target-muzzle;horizontal=maxf(2.0,Vector2(offset.x,offset.z).length())
+	var world_yaw=atan2(offset.x,offset.z)
+	var relative_yaw=wrapf(world_yaw-vehicle.rotation.y,-PI,PI)
+	var traverse=deg_to_rad(float(vehicle.cfg.traverse_limit_deg))
+	vehicle.manual_turret_target=wrapf(relative_yaw,-PI,PI) if vehicle.cfg.turreted else clampf(relative_yaw,-traverse,traverse)
+	var muzzle_speed=float(vehicle.cfg.ammo_data.muzzle_velocity_m_s)
+	var dy=offset.y
+	var gravity=9.81
+	var discriminant=muzzle_speed**4-gravity*(gravity*horizontal*horizontal+2.0*dy*muzzle_speed*muzzle_speed)
+	var elevation=atan2(dy,horizontal)
+	if discriminant>=0.0:
+		elevation=atan((muzzle_speed*muzzle_speed-sqrt(discriminant))/(gravity*horizontal))
+	vehicle.manual_gun_target=clampf(elevation,deg_to_rad(float(vehicle.cfg.elevation_deg[0])),deg_to_rad(float(vehicle.cfg.elevation_deg[1])))
+
+func demo_set_sniper_mode(enabled: bool):
+	if not is_demo:return
+	demo_sniper_mode=enabled
+	if is_instance_valid(gunner_reticle):gunner_reticle.visible=true
+	if is_instance_valid(gunner_reticle):gunner_reticle.queue_redraw()
+
+func demo_toggle_sniper_scope():
+	demo_set_sniper_mode(not demo_sniper_mode)
+
+func demo_command(fire_pressed: bool=false) -> Array:
+	return [0.56,0.0,0.0,0.0,0.0,1.0 if fire_pressed else 0.0]
+
+func demo_player_command(fire_pressed: bool=false) -> Array:
+	var vehicle=vehicles[0]
+	var opponent=vehicles[8]
+	var delta=opponent.global_position-vehicle.global_position;delta.y=0
+	var desired=atan2(delta.x,delta.z)
+	if delta.length()<48.0:desired+=.35 if int(sim_time/16.0)%2==0 else -.35
+	var edge=Vector2(vehicle.position.x,vehicle.position.z)
+	if edge.length()>terrain.extent-30.0:desired=atan2(-vehicle.position.x,-vehicle.position.z)
+	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
+	return [0.48,0.0,clampf(error*1.15,-.72,.72),0.0,0.0,1.0 if fire_pressed else 0.0]
+
+func demo_mouse_commands(fire_pressed: bool) -> Array:
+	return demo_player_command(fire_pressed)
+
+func demo_gamepad_commands(fire_pressed: bool) -> Array:
+	var movement=Input.get_vector("od_move_left","od_move_right","od_move_forward","od_move_reverse",0.0)
+	var vehicle=vehicles[0]
+	vehicle.manual_hull_aim=false
+	return OpenDayController.drive_command(movement,fire_pressed)
+
+func demo_apply_gamepad_aim() -> void:
+	if not is_demo or vehicles.is_empty() or paused or demo_controller_lost or camera_mode!=1:return
+	var vehicle=vehicles[0]
+	vehicle.manual_aim=true
+	vehicle.manual_hull_aim=false
+	var centre=get_viewport().get_visible_rect().size*.5
+	var origin=camera.project_ray_origin(centre)
+	var ray=camera.project_ray_normal(centre)
+	var query=PhysicsRayQueryParameters3D.create(origin,origin+ray*260.0,7,vehicle.excluded())
+	var hit=get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Vector3
+	if not hit.is_empty():
+		target=hit.position
+	else:
+		var floor_y=terrain.height_at(vehicle.position.x,vehicle.position.z)+1.0
+		var distance=(floor_y-origin.y)/ray.y if absf(ray.y)>.035 else 120.0
+		target=origin+ray*clampf(distance,25.0,220.0)
+	demo_aim_world_point=target
+	demo_aim_vehicle_local_point=vehicle.to_local(target)
+	demo_aim_world_valid=true
+	demo_update_aim_from_world_point(vehicle,target)
+
+func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
+	# Keep the decoded CNS channels intact, then add separately recorded
+	# locomotion and gunnery assistance for a vehicle not designed to drive tanks.
+	var command=source.duplicate()
+	while command.size()<6:command.append(0.0)
+	if not vehicle.alive or not vehicles[0].alive:return [0,0,0,0,0,0]
+	var player=vehicles[0]
+	var delta=player.global_position-vehicle.global_position;delta.y=0
+	var distance=delta.length()
+	var waypoint: Vector3
+	# Circle to a changing standoff point; periodically reverse the flank.
+	var radial=Vector2(vehicle.position.x-player.position.x,vehicle.position.z-player.position.z)
+	if radial.length()<.01:radial=Vector2(0.0,1.0)
+	var flank_sign=1.0 if int(sim_time/12.0)%2==0 else -1.0
+	var flank_angle=flank_sign*deg_to_rad(58.0+18.0*sin(sim_time*.23))
+	var standoff=clampf(48.0+7.0*sin(sim_time*.29),40.0,58.0)
+	var player_to_fly=(vehicle.global_position-player.global_position).normalized()
+	var player_gun_forward=Vector3(sin(player.rotation.y+player.turret_angle),0.0,cos(player.rotation.y+player.turret_angle))
+	if player_gun_forward.dot(player_to_fly)>.94:
+		# Break the firing line when the opponent has settled its gun on us.
+		flank_angle=flank_sign*deg_to_rad(82.0)
+		standoff+=10.0
+	var offset=radial.normalized().rotated(flank_angle)*standoff
+	waypoint=Vector3(player.position.x+offset.x,player.position.y,player.position.z+offset.y)
+	if distance<32.0:
+		waypoint=player.position+Vector3(radial.normalized().x*44.0,0.0,radial.normalized().y*44.0)
+	var to_waypoint=waypoint-vehicle.global_position;to_waypoint.y=0
+	var desired=atan2(to_waypoint.x,to_waypoint.z)
+	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
+	var nav_steer=clampf(error*1.6,-1.0,1.0)
+	# A short look-ahead ray adds obstacle avoidance without overriding the CNS.
+	var forward=Vector3(sin(vehicle.rotation.y),0.0,cos(vehicle.rotation.y))
+	var ray_start=vehicle.global_position+Vector3(0,1.8,0)
+	var obstacle_query=PhysicsRayQueryParameters3D.create(ray_start,ray_start+forward*22.0,1,vehicle.excluded())
+	var obstacle=get_world_3d().direct_space_state.intersect_ray(obstacle_query)
+	if not obstacle.is_empty():nav_steer=1.0 if int(vehicle.agent_id+sim_time/3.0)%2==0 else -1.0
+	var neural_throttle=float(command[0]);var neural_steer=float(command[2])
+	var approach_throttle=.72 if to_waypoint.length()>20.0 else .42
+	command[0]=maxf(neural_throttle,approach_throttle)
+	command[2]=clampf(neural_steer*.35+nav_steer*.65,-1.0,1.0)
+	# The CNS keeps influencing motor commands, but a firing impulse alone may
+	# never discharge the gun. Only the ballistic solution below can release it.
+	command[5]=0.0
+	if sim_time>=10.0 and vehicle.seen and vehicle.target==0 and distance<280.0:
+		var velocity_delta=maxf(.001,dt)
+		var measured_velocity=player.velocity
+		if demo_fly_velocity_valid:
+			var measured_acceleration=(measured_velocity-demo_fly_target_velocity)/velocity_delta
+			measured_acceleration.y=0.0
+			demo_fly_target_acceleration=demo_fly_target_acceleration.lerp(measured_acceleration.limit_length(7.0),.28)
+		else:
+			demo_fly_target_acceleration=Vector3.ZERO
+		demo_fly_target_velocity=measured_velocity
+		demo_fly_velocity_valid=true
+		var projectile_speed=float(vehicle.cfg.ammo_data.muzzle_velocity_m_s)
+		var flight_time=distance/maxf(1.0,projectile_speed)
+		var predicted_target=player.global_position+Vector3(0,1.45,0)
+		var aim_delta=Vector3.ZERO
+		# Iteratively lead the target using shell flight time and smoothed
+		# acceleration, so a steering change does not leave the solution behind.
+		for _iteration in 4:
+			var lead_velocity=demo_fly_target_velocity+demo_fly_target_acceleration*flight_time
+			predicted_target=player.global_position+Vector3(0,1.45,0)+lead_velocity*flight_time+demo_fly_target_acceleration*.5*flight_time*flight_time
+			aim_delta=predicted_target-vehicle.muzzle.global_position
+			flight_time=aim_delta.length()/maxf(1.0,projectile_speed)
+		var horizontal=Vector2(aim_delta.x,aim_delta.z).length()
+		var desired_yaw=atan2(aim_delta.x,aim_delta.z)
+		var turret_error=wrapf(desired_yaw-vehicle.rotation.y-vehicle.turret_angle,-PI,PI)
+		var grav=9.81
+		var disc=projectile_speed**4-grav*(grav*horizontal*horizontal+2.0*aim_delta.y*projectile_speed*projectile_speed)
+		var desired_elevation=atan2(aim_delta.y,maxf(1.0,horizontal))
+		if disc>=0.0:desired_elevation=atan((projectile_speed*projectile_speed-sqrt(disc))/(grav*maxf(1.0,horizontal)))
+		var elevation_error=wrapf(desired_elevation-vehicle.gun_angle,-PI,PI)
+		var neural_turret=float(command[3]);var neural_elevation=float(command[4])
+		command[3]=clampf(neural_turret*.18+clampf(turret_error*2.8,-1.0,1.0)*.82,-1.0,1.0)
+		command[4]=clampf(neural_elevation*.18+clampf(elevation_error*3.6,-1.0,1.0)*.82,-1.0,1.0)
+		if disc>=0.0 and absf(turret_error)<deg_to_rad(.85) and absf(elevation_error)<deg_to_rad(.8) and vehicle.weapon_block_reason()=="":
+			command[5]=1.0
+	elif not vehicle.seen or vehicle.target!=0:
+		demo_fly_velocity_valid=false
+		demo_fly_target_acceleration=Vector3.ZERO
+	return command
+
+func has_los(a,b) -> bool:
+	if demo_sight_locked(a,b):return false
+	var start=a.global_position+Vector3(0,2.5,0)
+	var end=b.global_position+Vector3(0,1.7,0)
+	if terrain.forest_blocks(start,end):return false
+	var q=PhysicsRayQueryParameters3D.create(start,end,5,a.excluded())
+	var hit=get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.is_empty() or (hit.collider.has_meta("vehicle") and hit.collider.get_meta("vehicle")==b)
+
+func demo_sight_locked(a,b) -> bool:
+	return is_demo and sim_time<10.0 and a.team!=b.team
+
+func create_demo_smoke_screen():
+	demo_smoke_screen=StaticBody3D.new()
+	demo_smoke_screen.name="OpeningSmokeScreen"
+	demo_smoke_screen.collision_layer=4
+	demo_smoke_screen.collision_mask=0
+	add_child(demo_smoke_screen)
+	var shape=CollisionShape3D.new()
+	var slab=BoxShape3D.new()
+	slab.size=Vector3(600.0,24.0,3.0)
+	shape.shape=slab
+	shape.position=Vector3(0,11.0,0)
+	demo_smoke_screen.add_child(shape)
+	var visual=MeshInstance3D.new()
+	var mesh=BoxMesh.new()
+	mesh.size=slab.size
+	visual.mesh=mesh
+	demo_smoke_material=StandardMaterial3D.new()
+	demo_smoke_material.albedo_color=Color(.50,.55,.55,.82)
+	demo_smoke_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	demo_smoke_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	demo_smoke_material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED
+	visual.material_override=demo_smoke_material
+	visual.position=shape.position
+	demo_smoke_screen.add_child(visual)
+
+func update_demo_smoke_screen():
+	if not is_instance_valid(demo_smoke_screen):return
+	if sim_time<10.0:return
+	demo_smoke_screen.collision_layer=0
+	demo_smoke_material.albedo_color.a=clampf(1.0-(sim_time-10.0)/2.0,0.0,.82)
+	if sim_time>=12.0:demo_smoke_screen.visible=false
+
+func demo_camera_forward(vehicle) -> Vector3:
+	var turret_target=vehicle.manual_turret_target if vehicle.manual_aim else vehicle.turret_angle
+	var gun_target=vehicle.manual_gun_target if vehicle.manual_aim else vehicle.gun_angle
+	var yaw=vehicle.rotation.y+turret_target
+	return Vector3(sin(yaw)*cos(gun_target),sin(gun_target),cos(yaw)*cos(gun_target)).normalized()
+
+func demo_camera_basis_for_aim(_cursor: Vector2,target: Vector3) -> Basis:
+	var forward=(target-camera.global_position).normalized()
+	if forward.length_squared()<.001:forward=Vector3.FORWARD
+	# Mouse motion selects a world point; the camera brings that point to the
+	# screen centre. Build a fresh horizon-level basis instead of rotating the
+	# previous camera basis, which accumulated roll and caused the carousel.
+	var right=forward.cross(Vector3.UP)
+	if right.length_squared()<.001:right=Vector3.RIGHT
+	else:right=right.normalized()
+	var up=right.cross(forward).normalized()
+	return Basis(right,up,-forward).orthonormalized()
+
+func _physics_process(delta):
+	if paused:return
+	if is_demo and demo_intro_left>0:return
+
+	# Killcam is presentation-only. Freeze the manual range simulation while
+	# the observer camera inspects the destroyed target.
+	if is_range and range_killcam_active:
+		return
+	if replay_mode:
+		replay_clock+=delta
+		while replay_index<replay.size() and replay[replay_index].time<=replay_clock:
+			var row=replay[replay_index]
+			sim_time=row.time
+			tickets=row.tickets
+			replay_communication=row.get("communication",{}) if row.get("communication",{}) is Dictionary else {}
+			ingest_communication(replay_communication)
+			for state in row.vehicles:
+				var v=vehicles[int(state.id)]
+				v.position=Vector3(state.position[0],state.position[1],state.position[2])
+				v.rotation.y=state.yaw
+				v.turret.rotation.y=state.turret
+				v.gun.rotation.x=-state.gun
+				v.alive=state.alive
+				v.metrics=state.get("metrics",v.metrics)
+				v.turret_angle=state.turret
+				v.gun_angle=state.gun
+				v.modules=state.modules
+			for n in replay_shell_nodes:n.queue_free()
+			replay_shell_nodes=[]
+			for xyz in row.get("projectiles",[]):
+				var n=terrain.box(Vector3(xyz[0],xyz[1],xyz[2]),Vector3(.2,.2,.6),Color(1,.7,.2),false)
+				replay_shell_nodes.append(n)
+			for i in range(3):
+				var zone_state=row.zones[i]
+				objectives[i].owner=int(zone_state.get("owner",-1))
+				objectives[i].progress=float(zone_state.get("progress",0.0))
+				objectives[i].contested=zone_state.get("contested",false)
+				var replay_inside=zone_state.get("inside",[0,0])
+				objectives[i].inside=replay_inside.duplicate() if replay_inside is Array else [0,0]
+				update_objective_visual(i)
+			replay_index+=1
+		if replay_index>=replay.size():
+			if has("--quit"):get_tree().quit()
+			elif session_config!=null and not finished_report:finish()
+
+		return
+	if ended or paused:return
+	if is_demo and not simulation_clock_started:
+		# Realtime factor measures the running match, excluding its visible intro.
+		start_wall=Time.get_ticks_usec()
+		simulation_clock_started=true
+	var started=Time.get_ticks_usec()
+	bridge.poll()
+	var brain_response_fresh=bridge.fresh_response
+	if requires_brain:
+		var response_timeout_usec=3000000 if is_demo else 10000000
+		if bridge.pending and (Time.get_ticks_usec()-bridge.sent_at)>response_timeout_usec:
+			bridge.timeout_count+=1
+			push_error("Brain response timeout; no silent baseline fallback")
+			if session_config!=null:paused=true;backend_failed.emit("No neural response before the %s second timeout." % str(response_timeout_usec/1000000))
+			else:get_tree().quit(2)
+			return
+		if sim_time>0 and bridge.tcp.get_status()!=StreamPeerTCP.STATUS_CONNECTED and session_config!=null:
+			if not is_demo or bridge.responses_received>0 or Time.get_ticks_usec()-start_wall>3000000:
+				bridge.disconnect_count+=1
+				paused=true;backend_failed.emit("Connection to the local brain server was lost.");return
+		if is_demo:
+			# Physics is authoritative and advances every fixed Godot physics tick.
+			# Neural requests stay sequential and bounded to one in-flight request;
+			# until a newer valid sequence arrives, keep applying the last command.
+			# Before the first real MaleCNS response, use neutral control only.
+			if not brain_response_fresh:
+				if bridge.last_valid_commands.size()==16:
+					bridge.commands=bridge.last_valid_commands.duplicate(true)
+					bridge.repeated_command_steps+=1
+				else:
+					bridge.commands=[]
+					for _agent in 16:bridge.commands.append([0.0,0.0,0.0,0.0,0.0,0.0])
+		elif bridge.commands.is_empty():
+			if not bridge.pending:
+				var observations=[]
+				for v in vehicles:
+					v.sense(.02)
+					observations.append(v.observation())
+				bridge.request(observations,audio_mode)
+			if (Time.get_ticks_usec()-start_wall)>180000000 and sim_time==0:
+				push_error("Brain backend timeout")
+				if session_config!=null:paused=true;backend_failed.emit("Backend connection timed out.")
+				else:get_tree().quit(2)
+			return
+		for i in range(16):
+			var command=bridge.commands[i].duplicate()
+			var layer={}
+			if is_demo and not brain_response_fresh and control_layers.size()==16:
+				layer=control_layers[i].duplicate(true)
+			else:
+				var reply_layers=bridge.last_reply.get("control_layers",[])
+				if reply_layers.size()==16:layer=reply_layers[i].duplicate(true)
+
+			if is_demo and i==8 and bridge.last_valid_commands.size()==16 and is_malecns_controller(vehicles[i]):
+				var before_tactical=command.duplicate()
+				command=apply_demo_tactical_aux(vehicles[i],command,delta)
+				layer["neural_intent"]=layer.get("raw_neural_action",layer.get("neural_intent",[]))
+				var decoded_layer=layer.get("decoder_action",null)
+				layer["decoded_commands"]=decoded_layer if decoded_layer is Array else before_tactical.duplicate()
+				layer["navigation_assistance"]=[]
+				layer["gunnery_assistance"]=[]
+				var intervention=0.0
+				for j in range(6):
+					var amount=command[j]-before_tactical[j]
+					if j<=2:layer["navigation_assistance"].append(amount)
+					else:layer["gunnery_assistance"].append(amount)
+					intervention+=absf(amount)
+				demo_nav_samples+=1
+				demo_nav_intervention_sum+=intervention
+			elif is_malecns_controller(vehicles[i]):
+				var before_objective=command.duplicate()
+				command=apply_malecns_objective_aux(
+					vehicles[i],
+					command
+				)
+				layer["objective_aux_action"]=[]
+				for j in range(6):layer["objective_aux_action"].append(command[j]-before_objective[j])
+			layer["final_action"]=command.duplicate()
+			while control_layers.size()<16:control_layers.append({})
+			control_layers[i]=layer
+
+			vehicles[i].cmd=command
+
+			if not is_demo or brain_response_fresh:
+				var traces=bridge.last_reply.get("traces",[])
+				if traces.size()==16:
+					vehicles[i].dn=traces[i]
+					if is_demo and i==8 and brain_response_fresh:
+						var decoded=layer.get("decoder_action",[])
+						demo_neural_trace_samples.append({"trace":traces[i].duplicate(),"decoder_action":decoded.duplicate() if decoded is Array else []})
+				var heard=bridge.last_reply.get("heard",[])
+				if heard.size()==16:vehicles[i].audio_input=heard[i]
+			if layer.size()>0:
+				while control_layers.size()<16:control_layers.append({})
+				control_layers[i]=layer
+		if not is_demo or brain_response_fresh:
+			ingest_communication(bridge.last_reply.get("communication",{}))
+		bridge.commands=[]
+		if not is_demo:delta=.02
+	for v in vehicles:
+		if not requires_brain:
+			if frame%5==0:v.sense(delta*5)
+			v.cmd=v.teacher()
+			if is_demo and v.agent_id==8:v.cmd=apply_demo_tactical_aux(v,v.cmd,delta)
+		if is_range:
+			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
+		if is_demo:
+			if v.agent_id==0:v.cmd=demo_gamepad_commands(mouse_fire_pending) if demo_gamepad_active else demo_mouse_commands(mouse_fire_pending)
+			elif v.agent_id==8 and sim_time<10.0:v.cmd[5]=0.0
+			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
+		if training:
+			v.cmd[0]=0
+			v.cmd[2]=0
+		v.step(delta)
+	mouse_fire_pending=false
+	if is_range:
+		vehicles[0].target=8
+		vehicles[0].target_range=vehicles[0].position.distance_to(vehicles[8].position)
+	step_shells(delta)
+	if not is_range and not is_demo:step_objectives(delta)
+	sim_time+=delta
+	if is_demo:update_demo_smoke_screen()
+	frame+=1
+	physics_usec+=Time.get_ticks_usec()-started
+	if frame%5==0:
+		var row=JSON.stringify(snapshot())
+		if recorder:recorder.store_line(row)
+		elif session_config!=null and not replay_mode:
+			replay_buffer.append(row)
+			if replay_buffer.size()>6000:replay_buffer.pop_front()
+	if record_path!="" and sim_time-progress_clock>=.5:
+		progress_clock=sim_time
+		var telemetry_sample=snapshot()
+		telemetry_samples.append(telemetry_sample)
+		if telemetry_samples.size()>7200:telemetry_samples.pop_front()
+		FileAccess.open(record_path.path_join("live.json"),FileAccess.WRITE).store_string(JSON.stringify({"sim_time":sim_time,"wall_time":(Time.get_ticks_usec()-start_wall)/1000000.0}))
+	var elimination_end = (
+		minf(tickets[0], tickets[1]) <= 0 or
+		alive_count(0) == 0 or
+		alive_count(1) == 0
+	)
+
+	if sim_time>=time_limit or (not is_range and elimination_end):
+		finish()
+		return
+	if requires_brain and is_demo and not bridge.pending and bridge.tcp.get_status()==StreamPeerTCP.STATUS_CONNECTED:
+		var observations=[]
+		for v in vehicles:
+			v.sense(delta)
+			observations.append(v.observation())
+		bridge.request(observations,audio_mode)
+
+func suspend_active_clock() -> void:
+	if is_demo and simulation_clock_started and pause_start_usec==0:
+		pause_start_usec=Time.get_ticks_usec()
+
+func resume_active_clock() -> void:
+	if is_demo and pause_start_usec>0:
+		start_wall+=Time.get_ticks_usec()-pause_start_usec
+		pause_start_usec=0
+
+func fire(v):
+	var p=v.muzzle.global_position
+	var heading=v.rotation.y+v.turret_angle
+	var angle=v.gun_angle
+	var dispersion=float(v.cfg.gun_data.dispersion_mrad)*.001
+	heading+=rng.randfn(0,dispersion)
+	angle+=rng.randfn(0,dispersion)
+	var dir=v.muzzle.global_basis.z.normalized()
+	dir=dir.rotated(Vector3.UP,rng.randfn(0,dispersion)).rotated(v.global_basis.x,rng.randfn(0,dispersion))
+	var vis=MeshInstance3D.new()
+	var mesh=CapsuleMesh.new()
+	mesh.radius=.045
+	mesh.height=.34
+	mesh.radial_segments=6
+	mesh.rings=2
+	vis.mesh=mesh
+	var material=terrain.material(Color(1,.65,.17))
+	material.emission_enabled=true
+	material.emission=Color(1,.5,.1)
+	vis.material_override=material
+	add_child(vis)
+	vis.position=p
+	vis.look_at(p+dir,Vector3.UP)
+	vis.rotate_object_local(Vector3.RIGHT,-PI/2.0)
+	shells.append({"position":p,"velocity":dir*v.cfg.ammo_data.muzzle_velocity_m_s,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"origin":p,"distance":0.0,"age":0.0,"visual":vis})
+	effect(p,Color(1,.65,.16),.7,.10)
+	shot_distances.append(v.target_range)
+
+func should_show_impact(shooter,victim) -> bool:
+	return shooter!=null and victim!=null and shooter.team!=victim.team and shooter.agent_id==selected and camera_mode in [1,2] and is_instance_valid(impact_killcam)
+
+func step_shells(dt: float):
+	for i in range(shells.size()-1,-1,-1):
+		var s=shells[i]
+		var from=s.position
+		var old_velocity=s.velocity
+		var motion=Combat.advance_projectile(from,old_velocity,s.ammo,dt)
+		s.velocity=motion.velocity
+		var to=motion.position
+		s.distance+=from.distance_to(to)
+		s.age+=dt
+		var q=PhysicsRayQueryParameters3D.create(from,to,5,vehicles[s.owner].excluded())
+		var hit=get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			effect_burst(hit.position+hit.normal*.15,10,.7)
+			var victim=hit.collider.get_meta("vehicle") if hit.collider.has_meta("vehicle") else null
+
+			if victim!=null and victim.alive:
+				victim.hit(
+					s,
+					hit.position,
+					hit.normal,
+					hit.collider.get_meta("zone")
+				)
+				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
+				if should_show_impact(shooter,victim):
+					var cumulative_damaged=[]
+					for module_key in victim.module_damage:
+						if float(victim.module_damage[module_key])>0.0:cumulative_damaged.append(module_key)
+					impact_killcam.show_impact({"impact":victim.last_impact,"source_id":shooter.agent_id,"source_name":agent_label(shooter.agent_id),"target_name":agent_label(victim.agent_id)+" "+str(victim.cfg.display_name),"vehicle":victim.cfg.display_name,"vehicle_id":victim.cfg.id,"turret_angle":victim.turret_angle,"shell":s.ammo.get("id","unknown"),"shot_count":victim.impact_history.size(),"module_positions":victim.impact_module_positions(),"destroyed_modules":victim.last_impact.get("destroyed_modules",[]),"damaged_modules":cumulative_damaged})
+
+				if is_range and victim.agent_id==8 and int(s.owner)==0:
+					on_range_target_impact(
+						victim,
+						s,
+						hit.position
+					)
+			effect(hit.position,Color(.69,.51,.27),1.3,.6)
+		if not hit.is_empty() or s.age>8 or s.distance>2500:
+			s.visual.queue_free()
+			shells.remove_at(i)
+		else:
+			s.position=to
+			s.visual.position=to
+			s.visual.look_at(to+s.velocity.normalized(),Vector3.UP)
+			s.visual.rotate_object_local(Vector3.RIGHT,-PI/2.0)
+
+func is_malecns_controller(vehicle) -> bool:
+	if not requires_brain:
+		return false
+
+	if session_config==null:
+		return str(
+			bridge.last_reply.get("mode","")
+		)=="BIOLOGICAL_BASELINE"
+
+	var controller = (
+		session_config.blue_controller
+		if vehicle.team==0
+		else session_config.red_controller
+	)
+
+	return str(controller)=="brain"
+
+
+func apply_malecns_objective_aux(
+	vehicle,
+	source: Array
+) -> Array:
+	# ========================================================
+	# ENGINEERED TACTICAL AUXILIARY
+	# ========================================================
+	#
+	# MaleCNS still controls pursuit/combat/turret behaviour.
+	#
+	# A fly connectome has no concept of:
+	#     map A/B/C objectives
+	#     War Thunder capture rules
+	#     strategic waypoints
+	#
+	# Therefore objective navigation is intentionally implemented OUTSIDE
+	# MaleCNS at the vehicle/world motor layer.
+	#
+	# Objective XYZ is NEVER injected into the neural sensory encoder.
+
+	var command=source.duplicate()
+
+	while command.size()<6:
+		command.append(0.0)
+
+	if not vehicle.alive:
+		return [
+			0.0,0.0,0.0,
+			0.0,0.0,0.0
+		]
+
+	if objectives.is_empty():
+		return command
+
+	var destination=objective_destination(vehicle)
+
+	var delta=destination-vehicle.global_position
+	delta.y=0.0
+
+	var distance=delta.length()
+
+	if distance<.001:
+		return command
+
+	var desired_heading=atan2(
+		delta.x,
+		delta.z
+	)
+
+	var heading_error=wrapf(
+		desired_heading-vehicle.rotation.y,
+		-PI,
+		PI
+	)
+
+	var radius=float(scenario.zone_radius)
+
+	var inside_capture_zone=(
+		distance<radius*.62
+	)
+
+	# --------------------------------------------------------
+	# TRAVEL TO OBJECTIVE
+	# --------------------------------------------------------
+
+	if not inside_capture_zone:
+		var navigation_steer=clampf(
+			heading_error*1.55,
+			-1.0,
+			1.0
+		)
+
+		# The vehicle should actually travel at useful battlefield speed.
+		#
+		# This is still normalized throttle: historical acceleration and
+		# cross-country speed limits remain Vehicle.step()'s responsibility.
+		var navigation_throttle=.82
+
+		if absf(heading_error)>.60:
+			navigation_throttle=.46
+
+		if absf(heading_error)>1.15:
+			navigation_throttle=.22
+
+		if distance<radius*1.45:
+			navigation_throttle=minf(
+				navigation_throttle,
+				.34
+			)
+
+		# When MaleCNS sees an enemy, neural combat behaviour receives more
+		# authority while the objective vector remains a weak tactical bias.
+		var navigation_weight=.78
+
+		if vehicle.seen:
+			navigation_weight=.30
+			navigation_throttle*=.72
+
+		command[2]=lerpf(
+			float(command[2]),
+			navigation_steer,
+			navigation_weight
+		)
+
+		command[0]=maxf(
+			float(command[0]),
+			navigation_throttle
+		)
+
+	# --------------------------------------------------------
+	# HOLD / CAPTURE OBJECTIVE
+	# --------------------------------------------------------
+
+	else:
+		# Like a normal capture-mode player, stop inside the circle instead
+		# of driving straight through it.
+		#
+		# If combat is occurring, allow a small amount of neural movement.
+		if vehicle.seen:
+			command[0]=clampf(
+				float(command[0]),
+				0.0,
+				.28
+			)
+		else:
+			command[0]=0.0
+			command[2]=0.0
+
+	# --------------------------------------------------------
+	# SIMPLE WORLD-LEVEL OBSTACLE AVOIDANCE
+	# --------------------------------------------------------
+
+	if not inside_capture_zone:
+		var probe_start=(
+			vehicle.global_position
+			+Vector3(0,1.2,0)
+		)
+
+		var probe_end=(
+			probe_start
+			+vehicle.global_basis.z*13.0
+		)
+
+		var query=PhysicsRayQueryParameters3D.create(
+			probe_start,
+			probe_end,
+			3,
+			vehicle.excluded()
+		)
+
+		var obstacle=(
+			get_world_3d()
+			.direct_space_state
+			.intersect_ray(query)
+		)
+
+		if not obstacle.is_empty():
+			command[0]=-.15
+			command[2]=(
+				1.0
+				if vehicle.agent_id%2==0
+				else -1.0
+			)
+
+	return command
+
+
+func objective_capture_multiplier(count: int) -> float:
+	if count <= 0:
+		return 0.0
+
+	var bonus = float(scenario.get("capture_multi_bonus_per_extra_vehicle", 0.35))
+	var cap = float(scenario.get("capture_multi_cap", 2.0))
+
+	return minf(
+		cap,
+		1.0 + bonus * float(count - 1)
+	)
+
+
+func objective_destination(vehicle) -> Vector3:
+	# Rule AI знает о целях сценария.
+	# MaleCNS по-прежнему НЕ получает XYZ точек или скрытую команду
+	# "ехать на B".
+	var preferred = vehicle.agent_id % objectives.size()
+	var preferred_zone = objectives[preferred]
+
+	if int(preferred_zone.get("owner", -1)) != vehicle.team:
+		return preferred_zone["position"]
+
+	if bool(preferred_zone.get("contested", false)):
+		return preferred_zone["position"]
+
+	var best = -1
+	var best_distance = INF
+
+	for offset in range(objectives.size()):
+		var index = (preferred + offset) % objectives.size()
+		var zone = objectives[index]
+
+		if int(zone.get("owner", -1)) == vehicle.team:
+			if not bool(zone.get("contested", false)):
+				continue
+
+		var distance = vehicle.global_position.distance_squared_to(
+			zone["position"]
+		)
+
+		if distance < best_distance:
+			best_distance = distance
+			best = index
+
+	if best >= 0:
+		return objectives[best]["position"]
+
+	# Все точки уже наши: возвращаемся к исходной назначенной точке
+	# и фактически обороняем её.
+	return preferred_zone["position"]
+
+func rl_task_features(vehicle) -> Array:
+	# ENGINEERED policy input. This array goes to the external adapter only;
+	# it is never injected into MaleCNS sensory cells.
+	var destination=objective_destination(vehicle)
+	var assigned=0
+	var nearest=INF
+	for i in range(objectives.size()):
+		var distance=objectives[i].position.distance_squared_to(destination)
+		if distance<nearest:
+			nearest=distance
+			assigned=i
+	var delta=destination-vehicle.global_position
+	var bearing=wrapf(atan2(delta.x,delta.z)-vehicle.rotation.y,-PI,PI)
+	var zone=objectives[assigned]
+	var intact=0
+	for working in vehicle.modules.values():intact+=1 if working else 0
+	var health=float(intact)/maxf(1.0,float(vehicle.modules.size()))
+	return [
+		vehicle.speed/maxf(1.0,float(vehicle.cfg.max_speed_kph)/3.6),
+		vehicle.reload_left/maxf(1.0,float(vehicle.cfg.reload_s)),
+		health,1.0 if vehicle.alive else 0.0,
+		sin(bearing),cos(bearing),delta.length()/1500.0,
+		float(zone.owner),float(zone.progress),
+		tickets[vehicle.team]/300.0,tickets[1-vehicle.team]/300.0,
+		float(assigned)/2.0,1.0 if vehicle.seen else 0.0,1.0,
+		vehicle.turret_angle/maxf(0.01,deg_to_rad(float(vehicle.cfg.traverse_limit_deg))),
+		vehicle.gun_angle/maxf(0.01,maxf(absf(deg_to_rad(float(vehicle.cfg.elevation_deg[0]))),absf(deg_to_rad(float(vehicle.cfg.elevation_deg[1])))))
+	]
+
+
+func objective_hud_status(zone: Dictionary) -> String:
+	var inside = zone.get("inside", [0, 0])
+
+	if bool(zone.get("contested", false)):
+		return "%s %d:%d" % [
+			AppState.tr_text("CONTESTED"),
+			int(inside[0]),
+			int(inside[1])
+		]
+
+	var control = float(zone.get("progress", 0.0))
+	var percent = clampi(
+		int(round(absf(control) * 100.0)),
+		0,
+		100
+	)
+
+	var owner = int(zone.get("owner", -1))
+
+	if owner == 0:
+		return "%s %d%%" % [
+			AppState.tr_text("BLUE"),
+			percent
+		]
+
+	if owner == 1:
+		return "%s %d%%" % [
+			AppState.tr_text("RED"),
+			percent
+		]
+
+	if control > 0.001:
+		return "%s ↑ %d%%" % [
+			AppState.tr_text("BLUE"),
+			percent
+		]
+
+	if control < -0.001:
+		return "%s ↑ %d%%" % [
+			AppState.tr_text("RED"),
+			percent
+		]
+
+	return AppState.tr_text("NEUTRAL")
+
+
+func update_objective_visual(index: int):
+	if index < 0 or index >= objectives.size():
+		return
+
+	var zone = objectives[index]
+
+	var neutral = Color(0.34, 0.36, 0.34)
+	var blue = Color(0.22, 0.42, 0.78)
+	var red = Color(0.76, 0.25, 0.18)
+	var contested = Color(0.90, 0.70, 0.16)
+
+	var control = float(zone.get("progress", 0.0))
+	var colour = neutral
+
+	if bool(zone.get("contested", false)):
+		colour = contested
+	elif control > 0.0:
+		colour = neutral.lerp(
+			blue,
+			clampf(control, 0.0, 1.0)
+		)
+	elif control < 0.0:
+		colour = neutral.lerp(
+			red,
+			clampf(-control, 0.0, 1.0)
+		)
+
+	var marker = zone.get("marker", null)
+
+	if is_instance_valid(marker):
+		if marker.material_override != null:
+			marker.material_override.albedo_color = colour
+
+	var objective_label = zone.get("label", null)
+
+	if is_instance_valid(objective_label):
+		objective_label.text = (
+			["A", "B", "C"][index]
+			+ "\n"
+			+ objective_hud_status(zone)
+		)
+
+
+func step_objectives(dt: float):
+	# Signed Domination control:
+	#
+	#   +1.0  BLUE owns
+	#    0.0  neutral
+	#   -1.0  RED owns
+	#
+	# Поэтому полный переворот:
+	#
+	# enemy-owned -> neutral -> friendly-owned
+
+	for index in range(objectives.size()):
+		var zone = objectives[index]
+
+		var counts = [0, 0]
+		var occupants = [[], []]
+
+		for vehicle in vehicles:
+			if not vehicle.alive:
+				continue
+
+			if objective_horizontal_distance(vehicle.position,zone["position"]) >= float(scenario.zone_radius):
+				continue
+
+			counts[vehicle.team] += 1
+			occupants[vehicle.team].append(vehicle)
+
+			vehicle.metrics.objective_presence_s += dt
+
+		zone["inside"] = [
+			counts[0],
+			counts[1]
+		]
+
+		var contested_now = (
+			counts[0] > 0
+			and counts[1] > 0
+		)
+
+		zone["contested"] = contested_now
+
+		# ====================================================
+		# CONTESTED
+		# ====================================================
+
+		if contested_now:
+			# Противники в круге блокируют изменение прогресса.
+			for team in range(2):
+				for vehicle in occupants[team]:
+					vehicle.metrics.contest_s += dt
+
+		# ====================================================
+		# ONE TEAM ONLY
+		# ====================================================
+
+		elif counts[0] > 0 or counts[1] > 0:
+			var team = 0
+			if counts[1] > 0:
+				team = 1
+
+			var direction = 1.0
+			if team == 1:
+				direction = -1.0
+
+			var multiplier = objective_capture_multiplier(
+				counts[team]
+			)
+
+			var capture_seconds = maxf(
+				0.001,
+				float(scenario.capture_seconds)
+			)
+
+			var previous = float(
+				zone.get("progress", 0.0)
+			)
+
+			var updated = clampf(
+				previous
+				+ direction
+				* (dt / capture_seconds)
+				* multiplier,
+				-1.0,
+				1.0
+			)
+
+			zone["progress"] = updated
+
+			# Только реальное движение capture bar считается вкладом
+			# в захват. Простое стояние на уже своей точке сюда не входит.
+			var effective_effort = (
+				absf(updated - previous)
+				* capture_seconds
+			)
+
+			if effective_effort > 0.0:
+				var per_vehicle = (
+					effective_effort
+					/ maxf(
+						1.0,
+						float(counts[team])
+					)
+				)
+
+				for vehicle in occupants[team]:
+					vehicle.metrics.capture_s += per_vehicle
+
+			# ====================================================
+			# ENEMY OWNED -> NEUTRAL
+			# ====================================================
+
+			var owner = int(
+				zone.get("owner", -1)
+			)
+
+			if owner == 0 and updated <= 0.0:
+				zone["owner"] = -1
+
+				objective_neutralizations[1] += 1
+				capture_changes += 1
+
+			elif owner == 1 and updated >= 0.0:
+				zone["owner"] = -1
+
+				objective_neutralizations[0] += 1
+				capture_changes += 1
+
+			# ====================================================
+			# NEUTRAL -> OWNED
+			# ====================================================
+
+			owner = int(
+				zone.get("owner", -1)
+			)
+
+			if owner == -1:
+				if updated >= 1.0:
+					zone["owner"] = 0
+
+					objective_captures[0] += 1
+					capture_changes += 1
+
+				elif updated <= -1.0:
+					zone["owner"] = 1
+
+					objective_captures[1] += 1
+					capture_changes += 1
+
+		update_objective_visual(index)
+
+	# ========================================================
+	# DOMINATION TICKET BLEED
+	# ========================================================
+	#
+	# Равное число точек:
+	#     bleed отсутствует
+	#
+	# 2 : 1
+	#     отстающая сторона теряет 1× base
+	#
+	# 2 : 0 / 3 : 1
+	#     2×
+	#
+	# 3 : 0
+	#     3×
+
+	var owned = [0, 0]
+
+	for zone in objectives:
+		var owner = int(
+			zone.get("owner", -1)
+		)
+
+		if owner >= 0:
+			owned[owner] += 1
+
+	var difference = owned[0] - owned[1]
+
+	var bleed = float(
+		scenario.ticket_bleed_per_s
+	)
+
+	if difference > 0:
+		tickets[1] = maxf(
+			0.0,
+			tickets[1]
+				- dt
+				* bleed
+				* float(difference)
+		)
+
+	elif difference < 0:
+		tickets[0] = maxf(
+			0.0,
+			tickets[0]
+				- dt
+				* bleed
+				* float(-difference)
+		)
+
+
+func alive_count(team: int) -> int:
+	var count=0
+	for v in vehicles:
+		if v.alive and v.team==team:count+=1
+	return count
+func effect(
+	p: Vector3,
+	c: Color,
+	size: float,
+	lifetime: float,
+	expansion: float=.25,
+	rise_speed: float=0.0
+):
+	# Bounded visual effect.
+	#
+	# Old implementation multiplied scale every frame for the whole lifetime.
+	# A destroyed tank started at 5 m radius and grew for 8 seconds, producing
+	# a cloud hundreds of metres wide.
+	#
+	# This implementation has an explicit MAXIMUM expansion.
+
+	if session_config!=null:
+		var limit=int(60*AppState.settings.effects)
+		if effects.size()>=maxi(6,limit):
+			return
+
+	var mesh=MeshInstance3D.new()
+	var quad=QuadMesh.new();quad.size=Vector2(size*2.0,size*2.0);mesh.mesh=quad
+	var material=ShaderMaterial.new();material.shader=EffectSpriteShader
+	material.set_shader_parameter("tint",c)
+	material.set_shader_parameter("irregularity",.12 if c.r<.4 else .28)
+	material.set_shader_parameter("glow",.9 if c.r>.7 else .0)
+	mesh.material_override=material
+
+	add_child(mesh)
+	mesh.global_position=p
+
+	effects.append({
+		"node":mesh,
+		"life":lifetime,
+		"initial":lifetime,
+		"expansion":maxf(0.0,expansion),
+		"rise_speed":rise_speed,
+		"base_alpha":c.a
+	})
+
+func effect_burst(p: Vector3,amount: int=20,lifetime: float=1.25):
+	if session_config!=null and effects.size()>=maxi(6,int(60*AppState.settings.effects)):return
+	var particles=GPUParticles3D.new();particles.name="ImpactBurst";particles.position=p
+	particles.amount=amount;particles.lifetime=lifetime;particles.one_shot=true;particles.explosiveness=.92;particles.emitting=true
+	var process=ParticleProcessMaterial.new();process.direction=Vector3(0,1,0);process.spread=180;process.initial_velocity_min=1.6;process.initial_velocity_max=4.8;process.gravity=Vector3(0,-2.6,0);process.scale_min=.22;process.scale_max=.58
+	particles.process_material=process
+	var quad=QuadMesh.new();quad.size=Vector2(.7,.7);particles.draw_pass_1=quad
+	var material=ShaderMaterial.new();material.shader=EffectSpriteShader;material.set_shader_parameter("tint",Color(.29,.25,.19,.76));material.set_shader_parameter("irregularity",.36);particles.material_override=material
+	add_child(particles)
+	effects.append({"node":particles,"life":lifetime+.15,"particles":true})
+
+
+func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
+	# A tank destruction is a compact flash/fire/smoke event.
+	# Catastrophic ammo-rack destruction is somewhat stronger, but still
+	# deliberately bounded to a few metres rather than dozens/hundreds.
+
+	var intensity=1.15 if catastrophic else 1.0
+
+	# Very short internal flash.
+	effect(
+		p+Vector3(0,.7,0),
+		Color(1.0,.58,.12,1.0),
+		.85*intensity,
+		.16,
+		.40,
+		.2
+	)
+	effect_burst(p+Vector3(0,.55,0),22 if catastrophic else 16,1.35)
+
+	# Fireball.
+	effect(
+		p+Vector3(0,1.0,0),
+		Color(.72,.27,.055,.92),
+		1.20*intensity,
+		.42,
+		.45,
+		.35
+	)
+
+	# Several compact smoke lobes instead of one enormous expanding sphere.
+	var smoke_count=5 if catastrophic else 4
+
+	for i in range(smoke_count):
+		var angle=rng.randf_range(0.0,TAU)
+		var radius=rng.randf_range(.25,1.25)
+
+		var offset=Vector3(
+			cos(angle)*radius,
+			rng.randf_range(.8,2.0),
+			sin(angle)*radius
+		)
+
+		effect(
+			p+offset,
+			Color(.13,.12,.105,.72),
+			rng.randf_range(.65,.95)*intensity,
+			rng.randf_range(2.0,2.8),
+			.85,
+			rng.randf_range(.45,.75)
+		)
+
+
+func snapshot() -> Dictionary:
+	var states=[]
+	for v in vehicles:
+		var controls=control_layers[v.agent_id].duplicate(true) if control_layers.size()==16 else {"final_action":v.cmd.duplicate()}
+		states.append({"id":v.agent_id,"team":"blue" if v.team==0 else "red","vehicle":v.cfg.id,"position":[v.position.x,v.position.y,v.position.z],"speed_m_s":v.speed,"yaw":v.rotation.y,"turret":v.turret_angle,"gun":v.gun_angle,"alive":v.alive,"modules":v.modules.duplicate(),"metrics":v.metrics.duplicate(),"target":v.target,"impact":v.last_impact.duplicate(true),"neural_trace":v.dn.duplicate(),"heard_input":v.audio_input,"control":controls})
+	var zones=[]
+	for z in objectives:zones.append({"owner":z.owner,"progress":z.progress,"contested":z.contested,"inside":z.inside.duplicate()})
+	return {"time":sim_time,"vehicles":states,"tickets":tickets.duplicate(),"zones":zones,"brain":bridge.last_reply.get("mode","DISCONNECTED"),"projectiles":shell_snapshot(),"communication":current_communication().duplicate(true)}
+func shell_snapshot() -> Array:
+	var out=[]
+	for s in shells:out.append([s.position.x,s.position.y,s.position.z])
+	return out
+
+func finish(notify_result=true):
+	if finished_report:return
+	finished_report=true
+	ended=true
+	var wall=(Time.get_ticks_usec()-start_wall)/1000000.0
+	var report=snapshot()
+	for index in vehicles.size():
+		report.vehicles[index].module_damage=vehicles[index].module_damage.duplicate(true)
+		report.vehicles[index].impact_history=vehicles[index].impact_history.duplicate(true)
+		report.vehicles[index].module_positions=vehicles[index].impact_module_positions()
+	report.wall_seconds=wall
+	report.realtime_factor=sim_time/maxf(.001,wall)
+	report.mean_physics_ms=physics_usec/maxf(1,frame)/1000
+	report.physics_steps=frame
+	report.render_fps=Engine.get_frames_per_second() if DisplayServer.get_name()!="headless" else null
+	report.ipc_roundtrip_ms=bridge.latency_ms
+	report.brain_tick_ms=bridge.last_reply.get("tick_ms",null)
+	report.neural_steps=bridge.responses_received
+	report.neural_requests=bridge.tick
+	report.neural_response_rate_hz=bridge.responses_received/maxf(.001,wall)
+	report.repeated_motor_command_steps=bridge.repeated_command_steps
+	report.neural_response_timeouts=bridge.timeout_count
+	report.backend_disconnects=bridge.disconnect_count
+	report.last_valid_command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else null
+	if is_demo:
+		report.demo_navigation_samples=demo_nav_samples
+		report.demo_navigation_intervention_mean=demo_nav_intervention_sum/maxf(1.0,float(demo_nav_samples)*6.0)
+		report.demo_no_silent_fallback=true
+		report.demo_male_cns_trace_summary=demo_male_cns_trace_summary()
+	report.male_cns_tick_ms=sample_statistics(bridge.tick_ms_samples)
+	report.ipc_latency_ms=sample_statistics(bridge.latency_ms_samples)
+	report.shot_distances=shot_distances
+	report.backend_metadata=bridge.last_reply.get("metadata",{})
+	report.capture_changes=capture_changes
+	report.objective_captures=objective_captures.duplicate()
+	report.objective_neutralizations=objective_neutralizations.duplicate()
+	report.track_segments=tracks.segments
+	report.max_rut_depth_m=tracks.max_depth
+	report.completion="complete" if notify_result else "interrupted"
+	report.mode="NORMALIZED" if normalized else "HISTORICAL"
+	if record_path!="":
+		FileAccess.open(record_path.path_join("summary.json"),FileAccess.WRITE).store_string(JSON.stringify(report,"  "))
+		write_research_exports(report)
+		if recorder:recorder.flush()
+	print("SUMMARY ",JSON.stringify({"sim_s":sim_time,"wall_s":wall,"xRT":report.realtime_factor,"physics_ms":report.mean_physics_ms,"brain_tick_ms":report.brain_tick_ms,"alive":[alive_count(0),alive_count(1)]}))
+	report_cache=report
+	if session_config!=null and notify_result:completed.emit(report)
+	if has("--quit"):get_tree().quit()
+
+func sample_statistics(samples: Array[float]) -> Dictionary:
+	if samples.is_empty():return {"count":0,"mean":null,"p95":null,"p99":null,"max":null}
+	var ordered=samples.duplicate()
+	ordered.sort()
+	var total=0.0
+	for value in samples:total+=value
+	return {"count":samples.size(),"mean":total/samples.size(),"p95":ordered[mini(ordered.size()-1,int(ceil(samples.size()*.95))-1)],"p99":ordered[mini(ordered.size()-1,int(ceil(samples.size()*.99))-1)],"max":ordered[-1]}
+
+func csv_value(value) -> String:
+	var text=JSON.stringify(value) if value is Array or value is Dictionary else str(value)
+	return '"'+text.replace('"','""')+'"'
+
+func write_csv(path: String,header: Array,rows: Array):
+	var file=FileAccess.open(path,FileAccess.WRITE)
+	file.store_line(",".join(header))
+	for row in rows:
+		var cells=PackedStringArray()
+		for value in row:cells.append(csv_value(value))
+		file.store_line(",".join(cells))
+
+func write_research_exports(report: Dictionary):
+	# Bounded 2 Hz samples: enough for analysis without creating unbounded raw files.
+	write_csv(record_path.path_join("results.csv"),["sim_time","wall_seconds","blue_tickets","red_tickets","blue_alive","red_alive","realtime_factor","brain_tick_ms"],[[report.time,report.wall_seconds,report.tickets[0],report.tickets[1],alive_count(0),alive_count(1),report.realtime_factor,report.brain_tick_ms]])
+	var agents=[]
+	var actions=[]
+	for sample in telemetry_samples:
+		for state in sample.vehicles:
+			agents.append([sample.time,state.id,state.team,state.vehicle,state.position,state.speed_m_s,state.alive,state.target,state.modules,state.metrics])
+			var c=state.control
+			actions.append([sample.time,state.id,c.get("raw_neural_action",null),c.get("decoder_action",null),c.get("objective_aux_action",null),c.get("gunnery_aux_action",null),c.get("adapter_action",null),c.get("final_action",null)])
+	write_csv(record_path.path_join("per_agent.csv"),["sim_time","agent_id","team","vehicle","position","speed_m_s","alive","target","modules","metrics"],agents)
+	write_csv(record_path.path_join("actions.csv"),["sim_time","agent_id","raw_neural_action","decoder_action","objective_aux_action","gunnery_aux_action","adapter_action","final_action"],actions)
+func _process(dt):
+	if is_demo:update_demo_controller_input(dt)
+	if is_demo and demo_intro_left>0:
+		demo_intro_left=maxf(0,demo_intro_left-dt)
+		if demo_intro_left>3.0:demo_intro.text=demo_intro_copy("NERVOUS SYSTEM MODEL CONNECTED")
+		elif demo_intro_left>2.0:
+			if demo_gamepad_active:
+				var intro_format="ТВОЙ ТАНК: %s\nЛЕВЫЙ СТИК — ДВИЖЕНИЕ · ПРАВЫЙ — ВЗГЛЯД И ПРИЦЕЛ · L2 — ПРИБЛИЖЕНИЕ · R2 — ВЫСТРЕЛ" if str(AppState.settings.language)=="ru" else "Your tank: %s\nLeft stick drive · right stick look and aim · L2 zoom · R2 fire"
+				demo_intro.text=intro_format % [vehicles[0].cfg.display_name]
+			elif str(AppState.settings.language)=="ru":
+				demo_intro.text="ТВОЙ ТАНК: %s\nКУРСОР — НАВЕДЕНИЕ · ЛКМ — ВЫСТРЕЛ · УДЕРЖИВАЙ ПКМ — ПРИБЛИЖЕНИЕ\nТАНК САМ ДВИЖЕТСЯ И МЕНЯЕТ ПОЗИЦИЮ" % vehicles[0].cfg.display_name
+			else:
+				var intro_format=AppState.tr_text("demo.intro.vehicle")
+				if intro_format=="demo.intro.vehicle":intro_format="Your tank: %s\nMove cursor to aim · LMB fire · hold RMB to zoom\nYour tank drives and repositions by itself"
+				demo_intro.text=intro_format % [vehicles[0].cfg.display_name]
+		elif demo_intro_left>1.0:demo_intro.text=demo_intro_copy("YOU VS THE FLY")+"\n"+str(ceili(demo_intro_left))
+		else:demo_intro.text=demo_intro_copy("FIGHT")
+		if demo_intro_left<=0:demo_intro.visible=false
+	for i in range(effects.size()-1,-1,-1):
+		var fx=effects[i]
+
+		fx["life"]=float(fx["life"])-dt
+		if fx.get("particles",false):
+			if float(fx["life"])<=0.0:
+				fx["node"].queue_free();effects.remove_at(i)
+			continue
+
+		var initial=maxf(
+			.001,
+			float(fx.get("initial",1.0))
+		)
+
+		var progress=clampf(
+			1.0-float(fx["life"])/initial,
+			0.0,
+			1.0
+		)
+
+		# Smooth 0 -> 1 without unbounded multiplicative growth.
+		var smooth=progress*progress*(3.0-2.0*progress)
+
+		var maximum_scale=1.0+float(
+			fx.get("expansion",.25)
+		)
+
+		fx["node"].scale=Vector3.ONE*lerpf(
+			1.0,
+			maximum_scale,
+			smooth
+		)
+
+		fx["node"].position.y+=float(
+			fx.get("rise_speed",0.0)
+		)*dt
+		if is_demo and is_instance_valid(camera):fx["node"].look_at(camera.global_position,Vector3.UP)
+
+		var material=fx["node"].material_override
+
+		if material is StandardMaterial3D:
+			var colour=material.albedo_color
+
+			colour.a=float(
+				fx.get("base_alpha",1.0)
+			)*pow(
+				maxf(0.0,1.0-progress),
+				1.35
+			)
+
+			material.albedo_color=colour
+
+		if float(fx["life"])<=0.0:
+			fx["node"].queue_free()
+			effects.remove_at(i)
+	if range_feedback_timer>0.0:
+		range_feedback_timer=maxf(0.0,range_feedback_timer-dt)
+
+		if range_feedback_timer<=0.0 and is_instance_valid(range_feedback):
+			range_feedback.visible=false
+
+	if is_range and range_killcam_active:
+		if camera_mode in [0,3]:
+			end_range_killcam()
+			return
+		if is_instance_valid(vehicle_status_panel):vehicle_status_panel.visible=false
+		update_range_killcam(dt)
+		return
+
+	var v=vehicles[selected] if not vehicles.is_empty() else null
+	if v==null:return
+	update_vehicle_status()
+	if is_instance_valid(impact_killcam) and impact_killcam.visible and (camera_mode not in [1,2] or impact_killcam.source_id!=selected):
+		impact_killcam.dismiss()
+	if camera_mode in [0,3] and is_instance_valid(range_killcam_panel):range_killcam_panel.visible=false
+	if is_demo:
+		demo_hud_clock+=dt
+		if demo_hud_clock>=.1:demo_hud_clock=0;update_demo_hud()
+	# One gun sight is shared by every battle scenario and appears in third
+	# person, gunner and sniper views only.
+	gunner_reticle.visible=camera_mode in [1,2]
+	gunner_reticle.set_weapon_state(v.ammo_left,v.reload_left,is_demo and demo_sniper_mode,v.weapon_block_reason())
+	sensor_debug.visible=debug
+	if debug:
+		var mesh=ImmediateMesh.new()
+		var mat=StandardMaterial3D.new()
+		mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color=Color(.3,1,.6)
+		mesh.surface_begin(Mesh.PRIMITIVE_LINES,mat)
+		var origin=v.position+Vector3(0,2.5,0)
+		if v.target>=0:
+			mesh.surface_add_vertex(origin)
+			mesh.surface_add_vertex(vehicles[v.target].position+Vector3(0,2,0))
+		for side in [-1,1]:
+			var angle=v.rotation.y+side*deg_to_rad(100)
+			mesh.surface_add_vertex(origin)
+			mesh.surface_add_vertex(origin+Vector3(sin(angle),0,cos(angle))*35)
+		mesh.surface_end()
+		sensor_debug.mesh=mesh
+	if camera_mode==0:
+		# True whole-battle observer view. It is deliberately independent of
+		# the selected vehicle.
+		camera.projection=Camera3D.PROJECTION_ORTHOGONAL
+		camera.size=battlefield_zoom
+		camera.keep_aspect=Camera3D.KEEP_HEIGHT
+		var pan=Vector2.ZERO
+		if Input.is_physical_key_pressed(KEY_W):pan.y-=1
+		if Input.is_physical_key_pressed(KEY_S):pan.y+=1
+		if Input.is_physical_key_pressed(KEY_A):pan.x-=1
+		if Input.is_physical_key_pressed(KEY_D):pan.x+=1
+		if pan.length()>0:
+			battlefield_pan+=pan.normalized()*dt*maxf(120,battlefield_zoom*.55)
+			battlefield_pan.x=clampf(battlefield_pan.x,-terrain.extent*.8,terrain.extent*.8)
+			battlefield_pan.y=clampf(battlefield_pan.y,-terrain.extent*.8,terrain.extent*.8)
+		camera.position=Vector3(battlefield_pan.x,1100,battlefield_pan.y)
+		camera.rotation=Vector3(-PI/2,0,0)
+	elif camera_mode==1:
+		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+		var target_fov=42.0 if is_demo and demo_sniper_mode else 62.0
+		camera.fov=move_toward(camera.fov,target_fov,45.0*dt) if is_demo else 62.0
+		var demo_forward=demo_camera_forward(v) if is_demo else Vector3(sin(v.rotation.y+v.turret_angle),0,cos(v.rotation.y+v.turret_angle))
+		# Keep the selected aim point attached to the vehicle's local frame. A
+		# fixed world point drifts behind a moving tank and makes the camera
+		# swing around to chase it, which reads as jitter and loses the vehicle.
+		if is_demo and demo_gamepad_active:
+			var forward=OpenDayController.camera_forward(demo_camera_yaw,demo_camera_pitch)
+			var flat_forward=Vector3(sin(demo_camera_yaw),0.0,cos(demo_camera_yaw)).normalized()
+			var focus=v.global_position+Vector3(0,2.5,0)
+			var desired_position=focus-flat_forward*14.0+Vector3(0,5.2,0)
+			var camera_ray=PhysicsRayQueryParameters3D.create(focus,desired_position,7,v.excluded())
+			var obstruction=get_world_3d().direct_space_state.intersect_ray(camera_ray)
+			if not obstruction.is_empty():desired_position=obstruction.position+(focus-desired_position).normalized()*.45
+			camera.position=desired_position if last_camera_mode!=camera_mode else camera.position.lerp(desired_position,1.0-exp(-dt*7.0))
+			camera.look_at(camera.position+forward,Vector3.UP)
+			demo_apply_gamepad_aim()
+		else:
+			if is_demo and demo_aim_world_valid:demo_aim_world_point=v.to_global(demo_aim_vehicle_local_point)
+			var follow_forward=Vector3(sin(v.rotation.y),0,cos(v.rotation.y)) if is_demo else demo_forward
+			if is_demo and demo_aim_world_valid:
+				var aim_heading=demo_aim_world_point-v.position
+				aim_heading.y=0.0
+				if aim_heading.length_squared()>.01:follow_forward=aim_heading.normalized()
+			var follow=v.position-follow_forward*(15.0 if is_demo else 16.0)+Vector3(0,8,0)
+			var follow_weight=1.0-exp(-dt*3.5)
+			camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,follow_weight)
+			if is_demo and demo_aim_world_valid:
+				# Mouse aim moves the camera target; gamepad aim owns the view direction.
+				var cursor=get_viewport().get_mouse_position()
+				var desired_basis=demo_camera_basis_for_aim(cursor,demo_aim_world_point)
+				var rotation_weight=1.0-exp(-dt*3.5)
+				camera.global_basis=camera.global_basis.slerp(desired_basis,rotation_weight).orthonormalized()
+			else:
+				var look_target=v.position+Vector3(0,2,0)+demo_forward*(20 if is_demo else 0)
+				camera.look_at(look_target)
+	elif camera_mode==2:
+		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+		camera.fov=62.0
+		camera.position=v.muzzle.global_position+Vector3(0,.4,0)
+		var a=v.rotation.y+v.turret_angle
+		camera.look_at(camera.position+Vector3(sin(a)*cos(v.gun_angle),sin(v.gun_angle),cos(a)*cos(v.gun_angle))*100)
+	else:
+		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+		var movement=Vector3.ZERO
+		if Input.is_physical_key_pressed(KEY_W):movement-=camera.global_basis.z
+		if Input.is_physical_key_pressed(KEY_S):movement+=camera.global_basis.z
+		if Input.is_physical_key_pressed(KEY_A):movement-=camera.global_basis.x
+		if Input.is_physical_key_pressed(KEY_D):movement+=camera.global_basis.x
+		if Input.is_physical_key_pressed(KEY_Q):movement.y-=1
+		if Input.is_physical_key_pressed(KEY_E):movement.y+=1
+		camera.position+=movement*dt*100
+	observer_environment.fog_enabled=camera_mode!=0
+	last_camera_mode=camera_mode
+	if gunner_reticle.visible:
+		aim_prediction_timer-=dt
+		if aim_prediction_timer<=0.0:
+			aim_prediction_timer=1.0/60.0 if is_demo else .12
+			if is_demo:
+				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
+				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
+				var aligned=absf(wrapf(v.manual_turret_target-v.turret_angle,-PI,PI))<deg_to_rad(.8) and absf(v.manual_gun_target-v.gun_angle)<deg_to_rad(.6)
+				gunner_reticle.set_aim_ready(aligned and v.reload_left<=0.0)
+			else:
+				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
+				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
+	if is_demo and not demo_gamepad_active and not paused and demo_intro_left<=0.0 and vehicles.size()>0 and demo_aim_world_valid:
+		demo_update_aim_from_world_point(vehicles[0],demo_aim_world_point)
+	update_identification_labels()
+	var connection=AppState.tr_text("BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL")
+	if requires_brain:
+		connection=AppState.tr_text("BRAIN WAITING") if not bridge.connected() else "2 × batch=8 · "+bridge.last_reply.get("mode","")
+
+		if bridge.connected() and is_malecns_controller(v):
+			connection+=" · OBJECTIVE_AUX"
+
+	var physics_name=AppState.tr_text("Normalized research control" if normalized else "Historical · provisional data")
+	var audio_name=AppState.tr_text({"no_audio":"No Audio","team_audio":"Team Audio","all_audio":"All Audio"}.get(audio_mode,audio_mode))
+
+	hud.text=AppState.tr_format("hud.header",[
+		tickets[0],alive_count(0),tickets[1],alive_count(1),
+		("-" if is_range else objective_hud_status(objectives[0])),
+		("-" if is_range else objective_hud_status(objectives[1])),
+		("-" if is_range else objective_hud_status(objectives[2])),
+		sim_time,physics_name,audio_name,connection,
+		bridge.tick,bridge.last_reply.get("tick_ms",0),bridge.latency_ms,
+		Engine.get_frames_per_second()
+	])
+
+	var communication=current_communication()
+	var songs=communication.get("song_out",[])
+	var own_song=float(songs[v.agent_id]) if songs.size()==16 else 0.0
+	var los_text=AppState.tr_text("yes" if v.seen else "no")
+
+	detail.text=AppState.tr_format("hud.detail",[
+		v.cfg.display_name,
+		AppState.tr_text(str(v.cfg.role)),
+		"B" if v.team==0 else "R",
+		v.agent_id%8+1,
+		v.agent_id%8,
+		v.speed*3.6,
+		clampi(int(absf(v.speed)/3)+1,1,v.cfg.gears.size()),
+		v.ammo_left,
+		v.reload_left,
+		v.target,
+		v.target_range,
+		los_text,
+		rad_to_deg(v.gun_angle),
+		own_song,
+		v.audio_input,
+		str(v.dn),
+		camera_name(),
+		(str(v.modules)+"\n"+str(v.last_impact)) if debug else ""
+	])
+	if (is_demo or is_range) and not gunner_reticle.block_message().is_empty():
+		detail.text+="\n"+("ОГОНЬ: " if str(AppState.settings.language)=="ru" else "FIRE: ")+gunner_reticle.block_message()
+	if is_range:
+		detail.text+="\n"+AppState.tr_text("MANUAL · WASD drive · Q/E turret · R/F elevation · Space/LMB fire · ESC menu")
+		if debug:detail.text+="\n"+AppState.tr_text("TARGET IMPACT: ")+str(vehicles[8].last_impact)
+	if ended:detail.text+="\n"+AppState.tr_text("BATTLE COMPLETE")
+	if screenshot_path!="" and sim_time>float(option("--capture-at","3.6")) and DisplayServer.get_name()!="headless":
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(screenshot_path)
+		screenshot_path=""
+func _unhandled_input(event):
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed and not (is_demo and demo_gamepad_active):
+		if (is_demo or is_range) and camera_mode in [1,2] and not paused and not (is_range and range_killcam_active):
+			mouse_fire_pending=true
+	if is_demo and not demo_gamepad_active and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT:
+		demo_set_sniper_mode(event.pressed)
+	if event is InputEventMouseButton and event.pressed and camera_mode==0:
+		if event.button_index==MOUSE_BUTTON_LEFT:
+			select_vehicle_from_screen(
+				event.position
+			)
+
+		elif event.button_index==MOUSE_BUTTON_WHEEL_UP:
+			battlefield_zoom=clampf(battlefield_zoom*.86,280,1800)
+		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
+			battlefield_zoom=clampf(battlefield_zoom*1.16,280,1800)
+	if is_demo and not demo_gamepad_active and event is InputEventMouseButton and event.pressed and demo_intro_left>0:
+		demo_intro_left=0;demo_intro.visible=false
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.physical_keycode:
+			KEY_TAB:
+				if event.shift_pressed:
+					select_previous_vehicle()
+				else:
+					select_next_vehicle()
+			KEY_C:
+				if is_range and range_killcam_active:
+					end_range_killcam()
+				else:
+					cycle_camera()
+			KEY_T:cycle_comms()
+			KEY_F1:debug=not debug
+			KEY_ENTER:
+				if is_range:
+					reset_range_target()
+			KEY_KP_ENTER:
+				if is_range:
+					reset_range_target()
+			KEY_SPACE:
+				if not is_range:paused=not paused
+			KEY_ESCAPE:
+				if session_config!=null:pause_requested.emit()
+				else:get_tree().quit()
+	if is_range and not paused and event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		var range_vehicle=vehicles[0]
+		if not range_vehicle.manual_aim:
+			range_vehicle.manual_aim=true
+			range_vehicle.manual_turret_target=range_vehicle.turret_angle
+			range_vehicle.manual_gun_target=range_vehicle.gun_angle
+		range_vehicle.manual_turret_target=wrapf(range_vehicle.manual_turret_target+event.relative.x*.003,-PI,PI) if range_vehicle.cfg.turreted else clampf(range_vehicle.manual_turret_target+event.relative.x*.003,-deg_to_rad(range_vehicle.cfg.traverse_limit_deg),deg_to_rad(range_vehicle.cfg.traverse_limit_deg))
+		range_vehicle.manual_gun_target=clampf(range_vehicle.manual_gun_target-event.relative.y*.002,deg_to_rad(range_vehicle.cfg.elevation_deg[0]),deg_to_rad(range_vehicle.cfg.elevation_deg[1]))
+	if camera_mode==3:
+		if Input.is_physical_key_pressed(KEY_LEFT):camera.rotate_y(.035)
+		if Input.is_physical_key_pressed(KEY_RIGHT):camera.rotate_y(-.035)
+		if Input.is_physical_key_pressed(KEY_UP):camera.rotate_object_local(Vector3.RIGHT,.035)
+		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
+
+func _input(event):
+	if is_demo and not demo_gamepad_active and event is InputEventMouseMotion:
+		demo_apply_mouse_motion(event.position,false)
+		return
+	if not (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed):return
+	if is_demo and not demo_gamepad_active and demo_intro_left>0:
+		demo_intro_left=0.0
+		if is_instance_valid(demo_intro):demo_intro.visible=false
+		get_viewport().set_input_as_handled()
+		return
+	if (is_demo and demo_gamepad_active) or not (is_demo or is_range) or camera_mode not in [1,2] or paused or (is_range and range_killcam_active):return
+	# Capture before GUI controls can consume a quick click. Interactive buttons
+	# retain their behavior; decorative HUD labels must not swallow playfield fire.
+	var hovered=get_viewport().gui_get_hovered_control()
+	if hovered is BaseButton:return
+	mouse_fire_pending=true
+
+
+
+func select_vehicle(index: int):
+	if index<0 or index>=vehicles.size():
+		return
+
+	if not vehicles[index].alive:
+		return
+
+	selected=index
+	if is_instance_valid(impact_killcam):impact_killcam.dismiss()
+
+	# Snap follow/gunner camera to the newly selected agent instead of
+	# interpolating from the old vehicle across the whole battlefield.
+	last_camera_mode=-1
+
+	update_selection_buttons()
+
+
+func select_vehicle_direction(direction: int):
+	if vehicles.is_empty():
+		return
+
+	for offset in range(1,vehicles.size()+1):
+		var index=(
+			selected
+			+direction*offset
+		+vehicles.size()*2
+		)%vehicles.size()
+
+		if vehicles[index].alive:
+			select_vehicle(index)
+			return
+
+
+func select_next_vehicle():
+	select_vehicle_direction(1)
+
+
+func select_previous_vehicle():
+	select_vehicle_direction(-1)
+
+
+func update_selection_buttons():
+	if vehicles.is_empty():
+		return
+
+	var current=agent_label(selected)
+
+	if is_instance_valid(previous_vehicle_button):
+		previous_vehicle_button.text="◀ "+current
+
+	if is_instance_valid(next_vehicle_button):
+		next_vehicle_button.text=current+" ▶"
+
+
+func select_vehicle_from_screen(screen_position: Vector2):
+	if camera_mode!=0:
+		return
+
+	if not is_instance_valid(camera):
+		return
+
+	var origin=camera.project_ray_origin(
+		screen_position
+	)
+
+	var direction=camera.project_ray_normal(
+		screen_position
+	)
+
+	var query=PhysicsRayQueryParameters3D.create(
+		origin,
+		origin+direction*5000.0,
+		6
+	)
+
+	var hit=(
+		get_world_3d()
+		.direct_space_state
+		.intersect_ray(query)
+	)
+
+	if hit.is_empty():
+		return
+
+	var collider=hit.get(
+		"collider",
+		null
+	)
+
+	if collider==null:
+		return
+
+	var candidate=null
+
+	if collider.has_meta("vehicle"):
+		candidate=collider.get_meta(
+			"vehicle"
+		)
+
+	elif collider in vehicles:
+		candidate=collider
+
+	if candidate==null:
+		return
+
+	if not candidate.alive:
+		return
+
+	select_vehicle(
+		int(candidate.agent_id)
+	)
+
+
+
+func camera_name() -> String:
+	return AppState.tr_text([
+		"Battlefield",
+		"Third-person",
+		"Gunner",
+		"Free camera",
+	][camera_mode])
+
+func update_camera_button():
+	if is_instance_valid(camera_button):
+		camera_button.text=AppState.tr_format("camera.button",[camera_name()])
+
+func update_identification_labels():
+	# Convert a bounded screen font size to world units. Label3D fixed_size uses
+	# projection-dependent scaling and must not reuse a world-space pixel_size.
+	var height=maxf(1,get_viewport().get_visible_rect().size.y)
+	for tank in vehicles:
+		var label=tank.get_node("Identification") as Label3D
+
+		var identification=agent_label(
+			tank.agent_id
+		)
+		if is_demo and tank.agent_id==8:identification="🪰 FLY-01"
+		if is_demo and tank.agent_id==0:identification=AppState.tr_text("YOU")
+
+		if tank.agent_id==selected:
+			identification="▶ "+identification
+
+		label.text=(
+			identification
+			if camera_mode==0
+			else identification+" · "+tank.cfg.display_name
+		)
+
+		label.outline_size=(
+			10
+			if tank.agent_id==selected
+			else 6
+		)
+
+		if tank.agent_id==selected:
+			label.modulate=Color(
+				1.0,
+				.92,
+				.28
+			)
+		else:
+			label.modulate=(
+				Color(.35,.65,1.0)
+				if tank.team==0
+				else Color(1.0,.4,.25)
+			)
+
+		label.visible=tank.alive and (
+			camera_mode==0
+			or camera.position.distance_to(tank.position)<300
+		)
+		size_world_label(label,15,height)
+		label.global_position=tank.global_position+Vector3(0,5,0)
+		if camera_mode==0:
+			label.global_position+=camera.global_basis.y*((1 if tank.agent_id%2==0 else -1)*12*camera.size/height)
+	for i in range(objectives.size()):
+		size_world_label(get_node("ObjectiveLabel"+str(i)),24,height)
+
+func size_world_label(label: Label3D, pixels: float, viewport_height: float):
+	var units=camera.size/viewport_height
+	if camera.projection==Camera3D.PROJECTION_PERSPECTIVE:
+		var depth=-(camera.global_transform.affine_inverse()*label.global_position).z
+		units=2*maxf(.1,depth)*tan(deg_to_rad(camera.fov)*.5)/viewport_height
+	label.pixel_size=units*pixels/label.font_size
+
+func cycle_camera():
+	camera_mode=(camera_mode+1)%4
+	if camera_mode in [0,3] and is_instance_valid(impact_killcam):impact_killcam.dismiss()
+	if camera_mode in [0,3] and is_instance_valid(range_killcam_panel):range_killcam_panel.visible=false
+	update_camera_button()
+
+func comm_mode_label() -> String:
+	return AppState.tr_text([
+		"Comms: Off",
+		"Comms: Red",
+		"Comms: Blue",
+		"Comms: All",
+	][comm_view])
+
+func cycle_comms():
+	comm_view=(comm_view+1)%4
+	refresh_comm_panel()
+
+func current_communication() -> Dictionary:
+	var value=replay_communication if replay_mode else bridge.last_reply.get("communication",{})
+	return value if value is Dictionary else {}
+
+func agent_label(id: int) -> String:
+	return ("B"+str(id+1)) if id<8 else ("R"+str(id-7))
+
+func comm_event_visible(event: Dictionary) -> bool:
+	if comm_view==3:return true
+	var sender=int(event.get("sender",-1))
+	if sender<0:return false
+	if comm_view==1:return sender>=8
+	if comm_view==2:return sender<8
+	return false
+
+func visible_comm_events(limit: int=12) -> Array:
+	var result=[]
+	for event in comm_history:
+		if sim_time-float(event.get("time",0))<=2.0 and comm_event_visible(event):
+			result.append(event)
+			if result.size()>=limit:break
+	return result
+
+func ingest_communication(communication):
+	if not communication is Dictionary or communication.is_empty():return
+	if not communication.get("sample",-1) is float and not communication.get("sample",-1) is int:return
+	var sample=int(communication.get("sample",-1))
+	if sample<0 or sample==comm_last_sample:return
+	comm_last_sample=sample
+
+	var sources=communication.get("events",[])
+	if not sources is Array:return
+	for source in sources:
+		if not source is Dictionary:continue
+		if not source.get("sender",null) is float and not source.get("sender",null) is int:continue
+		if not source.get("receiver",null) is float and not source.get("receiver",null) is int:continue
+		var event=source.duplicate(true)
+		var sender=int(event.get("sender",-1))
+		var receiver=int(event.get("receiver",-1))
+		if sender<0 or sender>=16 or receiver<0 or receiver>=16:continue
+
+		if sender==receiver:continue
+		if not event.get("received",null) is float and not event.get("received",null) is int:continue
+		if not event.get("raw",null) is float and not event.get("raw",null) is int:continue
+		if not event.get("distance_m",null) is float and not event.get("distance_m",null) is int:continue
+		if not is_finite(float(event.received)) or float(event.received)<0:continue
+		if not is_finite(float(event.distance_m)) or float(event.distance_m)<0:continue
+		var key=str(sender)+">"+str(receiver)
+		var last_time=float(comm_last_link.get(key,-999.0))
+
+		# UI-only deduplication. It does NOT modify neural communication.
+		if sim_time-last_time<.25:continue
+
+		comm_last_link[key]=sim_time
+		event.time=sim_time
+		comm_history.push_front(event)
+
+	while comm_history.size()>80:
+		comm_history.pop_back()
+
+	refresh_comm_panel()
+
+func update_comm_links(events: Array):
+	if not is_instance_valid(comm_links):return
+
+	if comm_view==0 or events.is_empty():
+		comm_links.mesh=null
+		return
+
+	var valid=[]
+	for event in events:
+		var sender=int(event.get("sender",-1));var receiver=int(event.get("receiver",-1))
+		if sender>=0 and sender<vehicles.size() and receiver>=0 and receiver<vehicles.size():
+			if vehicles[sender].alive and vehicles[receiver].alive:valid.append(event)
+	if valid.is_empty():comm_links.mesh=null;return
+	var mesh=ImmediateMesh.new()
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES,comm_line_material)
+
+	for event in valid:
+		var sender=int(event.sender)
+		var receiver=int(event.receiver)
+		if sender<0 or sender>=vehicles.size() or receiver<0 or receiver>=vehicles.size():
+			continue
+
+		if not vehicles[sender].alive or not vehicles[receiver].alive:continue
+		var strength=clampf(float(event.get("received",0))/.20,.25,1.0)
+		var base=Color(.34,.66,1.0) if sender<8 else Color(1.0,.42,.30)
+		var colour=base.darkened(1.0-strength)
+
+		mesh.surface_set_color(colour)
+		mesh.surface_add_vertex(vehicles[sender].global_position+Vector3(0,5,0))
+		mesh.surface_set_color(colour)
+		mesh.surface_add_vertex(vehicles[receiver].global_position+Vector3(0,5,0))
+
+	mesh.surface_end()
+	comm_links.mesh=mesh
+
+func refresh_comm_panel():
+	if is_instance_valid(comm_toggle):
+		comm_toggle.text=comm_mode_label()
+
+	if not is_instance_valid(comm_panel):return
+
+	comm_panel.visible=comm_view!=0
+	if comm_view==0:
+		update_comm_links([])
+		return
+
+	comm_title.text=AppState.tr_text([
+		"",
+		"Team Communication · Red",
+		"Team Communication · Blue",
+		"Team Communication · All",
+	][comm_view])
+
+	if audio_mode=="no_audio":
+		comm_text.text=AppState.tr_text("Communication channel disabled")
+		update_comm_links([])
+		return
+
+	if not requires_brain and not replay_mode:
+		comm_text.text=AppState.tr_text("No neural communication telemetry in Rule AI mode.")
+		update_comm_links([])
+		return
+
+	var events=visible_comm_events(14)
+	if events.is_empty():
+		comm_text.text=AppState.tr_text("No signal above threshold yet.")
+		update_comm_links([])
+		return
+
+	var lines=[]
+	for event in events:
+		lines.append(AppState.tr_format("comms.line",[
+			float(event.get("time",0)),
+			agent_label(int(event.sender)),
+			agent_label(int(event.receiver)),
+			float(event.get("raw",0)),
+			float(event.get("received",0)),
+			float(event.get("distance_m",0)),
+		]))
+
+	comm_text.text="\n".join(lines)
+	update_comm_links(events)
+
+
+func range_impact_result(impact: Dictionary) -> String:
+	if bool(impact.get("ricochet",false)):
+		return AppState.tr_text("RICOCHET")
+
+	if bool(impact.get("penetrated",false)):
+		return AppState.tr_text("PENETRATION")
+
+	return AppState.tr_text("NO PENETRATION")
+
+
+func show_range_feedback(message: String, duration: float=1.8):
+	if not is_instance_valid(range_feedback):
+		return
+
+	range_feedback.text=message
+	range_feedback.visible=true
+	range_feedback_timer=duration
+
+
+func range_kill_reason(target) -> String:
+	if str(target.last_impact.get("kill_reason",""))=="ammo_rack":
+		return AppState.tr_text("Ammo rack detonation")
+	if str(target.last_impact.get("kill_reason",""))=="crew_knockout":
+		return AppState.tr_text("Crew incapacitated")
+
+	return AppState.tr_text("Critical internal damage")
+
+
+func on_range_target_impact(target, shell: Dictionary, point: Vector3):
+	if not is_range:
+		return
+
+	var impact=target.last_impact
+	if not impact is Dictionary:
+		return
+
+	var result=range_impact_result(impact)
+
+	var capability=float(
+		impact.get("capability",0.0)
+	)
+
+	var effective=float(
+		impact.get("effective",0.0)
+	)
+
+	var zone=str(
+		impact.get("zone","?")
+	)
+
+	var damaged=impact.get("damaged",[])
+	var damaged_text=""
+
+	if damaged is Array and not damaged.is_empty():
+		damaged_text=" · "+", ".join(
+			PackedStringArray(damaged)
+		)
+
+	show_range_feedback(
+		"%s · %s · %.0f / %.0f mm%s" % [
+			result,
+			zone,
+			capability,
+			effective,
+			damaged_text
+		]
+	)
+
+	if not target.alive:
+		start_range_killcam(
+			target,
+			shell,
+			point
+		)
+
+
+func clear_range_killcam_path():
+	if is_instance_valid(range_killcam_path):
+		range_killcam_path.mesh=null
+		range_killcam_path.visible=false
+
+
+func draw_range_killcam_path(
+	origin: Vector3,
+	impact_point: Vector3
+):
+	if not is_instance_valid(range_killcam_path):
+		return
+
+	var mesh=ImmediateMesh.new()
+	var material=StandardMaterial3D.new()
+
+	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color=Color(1.0,.76,.20,1.0)
+	material.no_depth_test=true
+
+	mesh.surface_begin(
+		Mesh.PRIMITIVE_LINES,
+		material
+	)
+
+	mesh.surface_add_vertex(origin)
+	mesh.surface_add_vertex(impact_point)
+
+	mesh.surface_end()
+
+	range_killcam_path.mesh=mesh
+	range_killcam_path.visible=true
+
+
+func start_range_killcam(
+	target,
+	shell: Dictionary,
+	impact_point: Vector3
+):
+	if not is_range or camera_mode not in [1,2]:
+		return
+
+	range_target_destroyed=true
+	range_killcam_active=true
+	range_killcam_elapsed=0.0
+	range_killcam_target=target.agent_id
+	range_killcam_saved_camera=camera_mode
+
+	camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+	camera.fov=55
+
+	var impact=target.last_impact
+	var ammo=shell.get("ammo",{})
+
+	var shell_name=str(
+		ammo.get(
+			"id",
+			impact.get("shell","unknown")
+		)
+	)
+
+	var damaged=impact.get("damaged",[])
+	var damaged_text=AppState.tr_text("none")
+
+	if damaged is Array and not damaged.is_empty():
+		damaged_text=", ".join(
+			PackedStringArray(damaged)
+		)
+
+	var reason=range_kill_reason(target)
+
+	range_killcam_title.text=AppState.tr_text(
+		"TARGET DESTROYED"
+	)
+
+	var killcam_lines = PackedStringArray()
+	killcam_lines.append("ОТЧЁТ О ПОПАДАНИИ" if str(AppState.settings.language)=="ru" else "IMPACT REPORT")
+	killcam_lines.append(target.cfg.display_name)
+	killcam_lines.append("")
+	killcam_lines.append(
+		AppState.tr_text("Shell")
+		+ ": "
+		+ shell_name
+	)
+	killcam_lines.append(
+		AppState.tr_text("Hit zone")
+		+ ": "
+		+ str(impact.get("zone", "?"))
+	)
+	killcam_lines.append(
+		AppState.tr_text("Impact distance")
+		+ ": %.0f m" % float(impact.get("distance", 0.0))
+	)
+	killcam_lines.append(
+		AppState.tr_text("Damaged modules")
+		+ ": "
+		+ damaged_text
+	)
+	killcam_lines.append(
+		AppState.tr_text("Destruction reason")
+		+ ": "
+		+ reason
+	)
+	killcam_lines.append("")
+	killcam_lines.append(
+		("C — закрыть отчёт" if str(AppState.settings.language)=="ru" else "C — close report")
+		+ " · "
+		+ AppState.tr_text("Press Enter to reset target")
+	)
+
+	range_killcam_body.text = "\n".join(killcam_lines)
+
+	range_killcam_panel.visible=true
+
+	var origin=shell.get(
+		"origin",
+		vehicles[0].muzzle.global_position
+	)
+
+	if origin is Vector3:
+		draw_range_killcam_path(
+			origin,
+			impact_point
+		)
+
+	show_range_feedback(
+		AppState.tr_text("TARGET DESTROYED"),
+		2.0
+	)
+
+
+func update_range_killcam(dt: float):
+	if not range_killcam_active:
+		return
+
+	range_killcam_elapsed+=dt
+
+	if range_killcam_target < 0 or range_killcam_target >= vehicles.size():
+		end_range_killcam()
+		return
+
+	var target=vehicles[range_killcam_target]
+
+	var centre = target.global_position + Vector3(0, 1.5, 0)
+
+	# Slow cinematic orbit around the wreck.
+	var angle = target.rotation.y + 2.35 + range_killcam_elapsed * 0.32
+
+	var radius=11.5
+
+	var desired = centre + Vector3(
+		sin(angle) * radius,
+		5.2,
+		cos(angle) * radius
+	)
+
+	camera.projection=Camera3D.PROJECTION_PERSPECTIVE
+	camera.position=camera.position.lerp(
+		desired,
+		minf(1.0,dt*4.5)
+	)
+
+	camera.look_at(
+		centre,
+		Vector3.UP
+	)
+
+	if range_killcam_elapsed>=range_killcam_duration:
+		end_range_killcam()
+
+
+func end_range_killcam():
+	if not range_killcam_active:
+		return
+
+	range_killcam_active=false
+	range_killcam_elapsed=0.0
+
+	camera_mode=range_killcam_saved_camera
+	update_camera_button()
+
+	clear_range_killcam_path()
+
+	range_killcam_panel.visible=false
+
+
+func reset_range_target():
+	if not is_range:
+		return
+
+	if vehicles.size()<=8:
+		return
+
+	var target=vehicles[8]
+
+	range_killcam_active=false
+	range_target_destroyed=false
+	range_killcam_elapsed=0.0
+
+	clear_range_killcam_path()
+
+	if is_instance_valid(range_killcam_panel):
+		range_killcam_panel.visible=false
+
+	target.reset_destroyed_state()
+	target.show()
+
+	target.speed=0.0
+	target.velocity=Vector3.ZERO
+	target.yaw_rate=0.0
+
+	target.turret_angle=0.0
+	target.gun_angle=0.0
+
+	target.reload_left=0.0
+	target.ammo_left=int(target.cfg.ammo_count)
+
+	target.cmd=[
+		0.0,0.0,0.0,
+		0.0,0.0,0.0
+	]
+
+	target.target=-1
+	target.seen=false
+	target.last_impact={}
+
+	for key in target.modules:
+		target.modules[key]=true
+		target.module_damage[key]=0.0
+
+	# Remove destruction-char material override and restore materials embedded
+	# in the GLB.
+	for mesh in target.model.find_children(
+		"*",
+		"MeshInstance3D",
+		true,
+		false
+	):
+		mesh.material_override=null
+
+	var distance=500
+	var angle=0
+
+	if session_config!=null:
+		distance=int(session_config.range_distance)
+		angle=int(session_config.target_angle)
+
+	target.position = Vector3(0.0, 0.1, 0.5 * float(distance))
+
+	target.rotation = Vector3(
+		0.0,
+		PI + deg_to_rad(float(angle)),
+		0.0
+	)
+
+	if target.turret:
+		target.turret.rotation.y=0.0
+
+	if target.gun:
+		target.gun.rotation.x=0.0
+
+	camera_mode=1
+	update_camera_button()
+
+	vehicles[0].target=8
+	vehicles[0].target_range = vehicles[0].position.distance_to(target.position)
+
+	show_range_feedback(
+		AppState.tr_text("TARGET RESTORED"),
+		1.5
+	)
+
+
+func manual_commands() -> Array:
+	if range_killcam_active:
+		return [0,0,0,0,0,0]
+	if camera_mode in [0,3]:return [0,0,0,0,0,0]
+	var drive=float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
+	var steer=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
+	var turn=float(Input.is_physical_key_pressed(KEY_E))-float(Input.is_physical_key_pressed(KEY_Q))
+	var elevate=float(Input.is_physical_key_pressed(KEY_R))-float(Input.is_physical_key_pressed(KEY_F))
+	if absf(turn)+absf(elevate)>0.0:vehicles[0].manual_aim=false
+	var fire=float(mouse_fire_pending or Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+	if session_config!=null and session_config.range_mode in ["free","mobility"]:fire=0
+	return [drive,0,steer,turn,elevate,fire]
+func save_replay():
+	if record_path=="":return
+	if not recorder:
+		recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
+		for row in replay_buffer:recorder.store_line(row)
+		replay_buffer.clear()
+	recorder.flush()
+func _exit_tree():
+	bridge.tcp.disconnect_from_host()
+	if recorder:recorder.flush();recorder.close()

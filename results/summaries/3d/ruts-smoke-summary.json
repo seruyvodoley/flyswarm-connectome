@@ -1,0 +1,700 @@
+{
+  "backend_metadata": {},
+  "brain": "DISCONNECTED",
+  "brain_tick_ms": null,
+  "capture_changes": 0,
+  "ipc_roundtrip_ms": 0.0,
+  "max_rut_depth_m": 0.0257532774042082,
+  "mean_physics_ms": 4.67118181818182,
+  "mode": "HISTORICAL",
+  "projectiles": [],
+  "realtime_factor": 0.987113825613852,
+  "render_fps": null,
+  "shot_distances": [
+    811.723693847656,
+    806.990783691406,
+    810.348693847656,
+    724.45166015625,
+    711.690734863281,
+    711.920776367188
+  ],
+  "tickets": [
+    300.0,
+    300.0
+  ],
+  "time": 20.0199999999997,
+  "track_segments": 6956,
+  "vehicles": [
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 0,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 114.708430993487,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -148.672271728516,
+        -5.40548753738403,
+        -297.192108154297
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "panther_g",
+      "yaw": -0.47097036242485
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 1,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 118.531809398904,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -53.2579612731934,
+        -6.56617641448975,
+        -282.665435791016
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "panther_g",
+      "yaw": 0.145809844136238
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 2,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 98.0136518041545,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        30.7300682067871,
+        -6.78329610824585,
+        -335.0458984375
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "panther_g",
+      "yaw": 0.848252952098846
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 3,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 108.791640570736,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -75.8988037109375,
+        -7.25844097137451,
+        -310.736297607422
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "panther_g",
+      "yaw": -0.624806582927704
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 4,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 114.868422789878,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.08,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        10.6571989059448,
+        -7.25362253189087,
+        -285.180755615234
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "tiger_i",
+      "yaw": -0.0291817598044872
+    },
+    {
+      "alive": true,
+      "gun": -0.0452193929173591,
+      "id": 5,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 1.4,
+        "distance_travelled": 51.6744764732866,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.1,
+        "target_switches": 1,
+        "target_visible_s": 8.21999999999991
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        74.0706634521484,
+        -5.42404508590698,
+        -359.730377197266
+      ],
+      "target": 9,
+      "turret": -0.97008560707207,
+      "vehicle": "tiger_i",
+      "yaw": 0.720904767513275
+    },
+    {
+      "alive": true,
+      "gun": 0.00373376456424493,
+      "id": 6,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 13.6999999999998,
+        "distance_travelled": 91.0682499793111,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.08,
+        "target_switches": 2,
+        "target_visible_s": 13.6999999999998
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        28.4193496704102,
+        -6.59221982955933,
+        -320.165252685547
+      ],
+      "target": -1,
+      "turret": 0.191986217719376,
+      "vehicle": "jagdpanther",
+      "yaw": -0.721971988677979
+    },
+    {
+      "alive": true,
+      "gun": 0.00182131089015829,
+      "id": 7,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 2.58,
+        "distance_travelled": 112.144630399871,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 2,
+        "stationary_s": 0.08,
+        "target_switches": 1,
+        "target_visible_s": 18.2199999999997
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        75.9058532714844,
+        -4.16225719451904,
+        -290.065826416016
+      ],
+      "target": 9,
+      "turret": -0.0739443210482787,
+      "vehicle": "jagdpanther",
+      "yaw": -0.202334105968475
+    },
+    {
+      "alive": true,
+      "gun": 0.0444169560673881,
+      "id": 8,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 4.95999999999998,
+        "distance_travelled": 134.213489583693,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.06,
+        "target_switches": 1,
+        "target_visible_s": 5.39999999999997
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -14.2028722763062,
+        -7.47638750076294,
+        295.82666015625
+      ],
+      "target": -1,
+      "turret": 0.485979738730816,
+      "vehicle": "t34_85",
+      "yaw": 2.42321586608887
+    },
+    {
+      "alive": true,
+      "gun": -0.00582681201562267,
+      "id": 9,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 1.26,
+        "distance_travelled": 85.9203588925302,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 9.81999999999988
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -109.1298828125,
+        -2.52166771888733,
+        324.002990722656
+      ],
+      "target": 7,
+      "turret": -0.819907080876381,
+      "vehicle": "t34_85",
+      "yaw": -2.60941934585571
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 10,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 130.906677851628,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -25.2593536376953,
+        -6.38836193084717,
+        270.181304931641
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "t34_85",
+      "yaw": 3.00950932502747
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 11,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 123.049933082075,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        54.1913871765137,
+        -6.60950994491577,
+        298.021240234375
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "t34_85",
+      "yaw": 2.52867317199707
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 12,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 72.0784371967711,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.1,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        -29.3345508575439,
+        -6.64175367355347,
+        342.710388183594
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "is2_1944",
+      "yaw": -2.47312355041504
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 13,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 76.2100988968014,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.1,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        32.3867416381836,
+        -7.9684681892395,
+        324.407653808594
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "is2_1944",
+      "yaw": -3.00985717773438
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 14,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 93.6557616672944,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 0.06,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        112.022033691406,
+        -6.67038345336914,
+        316.440979003906
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "su100",
+      "yaw": 2.65845704078674
+    },
+    {
+      "alive": true,
+      "gun": 0.0,
+      "id": 15,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "distance_travelled": 68.2830855437169,
+        "kills": 0,
+        "penetrations": 0,
+        "reverse_s": 0.82,
+        "shots": 0,
+        "stationary_s": 0.54,
+        "target_switches": 0,
+        "target_visible_s": 0.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "position": [
+        54.0698509216309,
+        -9.27787590026855,
+        349.89892578125
+      ],
+      "target": -1,
+      "turret": 0.0,
+      "vehicle": "su100",
+      "yaw": -2.35082077980042
+    }
+  ],
+  "wall_seconds": 20.281349,
+  "zones": [
+    {
+      "owner": -1,
+      "progress": 0.0
+    },
+    {
+      "owner": -1,
+      "progress": 0.0
+    },
+    {
+      "owner": -1,
+      "progress": 0.0
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "id": "kwk42_ap",
+  "type": "APHE approximation",
+  "mass_kg": 6.8,
+  "muzzle_velocity_m_s": 935,
+  "drag_per_m": 4e-05,
+  "penetration_mm": [
+    [
+      100,
+      185
+    ],
+    [
+      500,
+      165
+    ],
+    [
+      1000,
+      145
+    ],
+    [
+      1500,
+      125
+    ],
+    [
+      2000,
+      108
+    ]
+  ],
+  "normalization_deg": 3,
+  "ricochet_deg": 72,
+  "explosive_filler_kg": null,
+  "provenance": {
+    "kind": "approximation",
+    "source": "docs/known_approximations.md",
+    "note": "Provisional normal-incidence curve, monotonically interpolated. Not historically calibrated. Explosive filler unknown; no explosive blast simulation."
+  }
+}

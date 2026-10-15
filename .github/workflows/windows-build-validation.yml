@@ -1,0 +1,101 @@
+name: Windows x64 build validation
+
+on:
+  push:
+    branches: [feat/historical-3d-tank-simulator]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies and Inno Setup
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+          choco install innosetup --yes --no-progress
+          "${env:ProgramFiles(x86)}\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install Godot 4.7.2 and export templates
+        shell: pwsh
+        run: |
+          $version = '4.7.2-stable'
+          $base = "https://github.com/godotengine/godot/releases/download/$version"
+          Invoke-WebRequest "$base/Godot_v4.7.2-stable_win64.exe.zip" -OutFile godot.zip
+          Expand-Archive godot.zip godot
+          $godot = (Get-ChildItem godot -Filter 'Godot_v4.7.2-stable_win64.exe' -Recurse | Select-Object -First 1).FullName
+          if (-not $godot) { throw 'Godot executable was not found in the official archive.' }
+          "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Invoke-WebRequest "$base/Godot_v4.7.2-stable_export_templates.tpz" -OutFile templates.tpz
+          New-Item -ItemType Directory -Force templates | Out-Null
+          New-Item -ItemType Directory -Force "$env:APPDATA\Godot\export_templates\4.7.2.stable" | Out-Null
+          tar -xf templates.tpz -C templates
+          Copy-Item 'templates\templates\*' "$env:APPDATA\Godot\export_templates\4.7.2.stable" -Recurse -Force
+
+      - name: Run MARL and simulator tests
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$PWD\src"
+          python -m unittest discover -s tests -v
+          & $env:GODOT_EXE --headless --editor --path frontend/godot --import
+          & $env:GODOT_EXE --headless --path frontend/godot --script res://scripts/validation.gd
+          & $env:GODOT_EXE --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
+
+      - name: Build and smoke-test Windows app and backend
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF.StartsWith('refs/tags/')) { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.2.0-beta.19' }
+          python tools/package_windows.py --version $version --godot "$env:GODOT_EXE"
+          $installer = Get-ChildItem build/windows -Filter '*windows-x64-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer was not produced.' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'FlySwarmInstalled'
+          Start-Process -FilePath $installer.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir" -Wait
+          $app = Join-Path $installDir 'FlySwarm.exe'
+          if (-not (Test-Path $app)) { throw 'Installed app executable is missing.' }
+          & $app --headless --quit-after 3
+          $backend = Join-Path $installDir 'Resources\backend\FlySwarmBackend\FlySwarmBackend.exe'
+          $smoke = Join-Path $env:RUNNER_TEMP 'installed-smoke'
+          & $backend --marl --output-root $smoke baseline --episodes 1 --max-steps 16
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Random baseline smoke failed.' }
+          $checkpointDir = Join-Path $smoke 'training'
+          & $backend --marl --output-root $smoke --experiment-dir $checkpointDir train --steps 64 --seed 7 --max-steps 16
+          if ($LASTEXITCODE -ne 0) { throw 'Installed PPO training smoke failed.' }
+          $checkpoint = Join-Path $checkpointDir 'checkpoint\ppo_team.zip'
+          & $backend --marl --output-root $smoke evaluate $checkpoint --episodes 1 --seed 21 --max-steps 16
+          if ($LASTEXITCODE -ne 0) { throw 'Installed PPO evaluation smoke failed.' }
+          & $backend --marl --output-root $smoke compare $checkpoint --episodes 1 --seed 31 --max-steps 16
+          if ($LASTEXITCODE -ne 0) { throw 'Installed paired comparison smoke failed.' }
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlySwarm-Windows-x64-installer
+          path: |
+            build/windows/FlySwarm-*-windows-x64-setup.exe
+            build/windows/SHA256SUMS-windows.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Windows portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlySwarm-Windows-x64-portable
+          path: |
+            build/windows/FlySwarm-*-windows-x64.zip
+            build/windows/SHA256SUMS-windows.txt
+          if-no-files-found: error
+          retention-days: 30

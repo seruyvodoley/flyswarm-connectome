@@ -1,0 +1,10 @@
+{
+  "id": "kwk36",
+  "calibre_mm": 88,
+  "ammo": "kwk36_ap",
+  "dispersion_mrad": 1.2,
+  "provenance": {
+    "kind": "approximation",
+    "source": "docs/known_approximations.md"
+  }
+}

@@ -578,4 +578,14 @@ func reset_destroyed_state():
 		identification.modulate=Color(.35,.65,1.0) if team==0 else Color(1.0,.4,.25)
 
 func observation() -> Dictionary:
-	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"rl_task":world.rl_task_features(self),"teacher":teacher(),"target":target}
+	var target_health=1.0
+	if seen and target>=0 and target<world.vehicles.size():
+		var enemy=world.vehicles[target]
+		if enemy!=null:
+			if enemy.has_method("demo_health"):
+				target_health=float(enemy.demo_health)/maxf(1.0,float(enemy.demo_health_max))
+			else:
+				var intact=0
+				for working in enemy.modules.values():intact+=1 if working else 0
+				target_health=float(intact)/maxf(1.0,float(enemy.modules.size()))
+	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"rl_task":world.rl_task_features(self),"teacher":teacher(),"target":target,"target_distance_m":target_range,"turret_angle_rad":turret_angle,"gun_angle_rad":gun_angle,"target_health_observed":target_health}

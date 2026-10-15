@@ -9,8 +9,49 @@ from flyswarm.policy import Readout,features
 from flyswarm.marl.policy import SharedPPOPolicy
 from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features
 
+class CombatPPOPolicy:
+    """Versioned external controller exported by MaleCNS Combat Training."""
+    def __init__(self,path,metadata):
+        from stable_baselines3 import PPO
+        from flyswarm.training.combat import SCHEMA,NEURAL_CHANNELS,GAME_FEATURES
+        if metadata.get('schema')!=SCHEMA:raise ValueError('Unsupported combat policy feature schema')
+        expected=list(NEURAL_CHANNELS)+list(GAME_FEATURES)
+        if metadata.get('features')!=expected:raise ValueError('Combat policy feature layout mismatch')
+        digest=hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        expected_digest=metadata.get('checkpoint_sha256',metadata.get('sha256'))
+        if expected_digest!=digest:raise ValueError('Combat policy checksum mismatch')
+        self.model=PPO.load(str(path),device='cpu')
+        self.metadata={'schema':SCHEMA,'algorithm':'Stable-Baselines3 PPO','male_cns_required':bool(metadata.get('male_cns_required',metadata.get('training_stage')=='malecns'))}
+    def act(self,observation):
+        action,_=self.model.predict(np.asarray(observation,dtype=np.float32),deterministic=True)
+        return np.asarray(action,dtype=float),None
+
+def combat_features(trace,observation):
+    from flyswarm.training.combat import NEURAL_CHANNELS
+    neural=np.log1p(np.maximum(0,np.asarray(trace,dtype=float)))/5
+    proprio=np.asarray(observation.get('proprio',[0.]*6),dtype=float)
+    rl=np.asarray(observation.get('rl_task',[0.]*14),dtype=float)
+    turret=float(observation.get('turret_angle_rad',float(proprio[3])*np.pi))
+    target_bearing=float(observation.get('bearing',0.0))+turret
+    turret_error=float(observation.get('bearing',0.0))
+    game=np.asarray([
+        float(proprio[0]),min(float(observation.get('target_distance_m',0.0))/500.0,2.0),
+        np.sin(target_bearing),np.cos(target_bearing),np.sin(target_bearing),np.cos(target_bearing),
+        np.sin(turret_error),np.cos(turret_error),float(observation.get('gun_angle_rad',proprio[4]))/.5,
+        float(proprio[2]),float(rl[2]) if rl.size>2 else 1.0,
+        float(observation.get('target_health_observed',1.0)),float(bool(observation.get('visible',False))),
+        0.0,0.0,0.0,
+    ],dtype=float)
+    return np.concatenate([neural,game])
+
 def load_policy(path):
     """Load either the ridge readout or any supported shared PPO adapter."""
+    path=Path(path)
+    if path.suffix.lower()=='.zip':
+        metadata_path=path.parent/'metadata.json'
+        if not metadata_path.exists():metadata_path=path.with_suffix('.json')
+        if not metadata_path.exists():raise ValueError('Combat PPO metadata.json sidecar is missing')
+        return CombatPPOPolicy(path,json.loads(metadata_path.read_text(encoding='utf-8')))
     with np.load(path,allow_pickle=False) as data:
         if "value" in data and data["weights"].ndim==2 and data["weights"].shape[1]==6:
             return SharedPPOPolicy.load(path)
@@ -109,9 +150,10 @@ def main():
                             team='blue' if o['id']<8 else 'red'
                             policy=team_policies.get(team,policies.get(o['vehicle'],policies.get('shared')))
                             if policies and policy is None:raise ValueError(f"No policy for {o['vehicle']}")
+                            is_combat_ppo=isinstance(policy,CombatPPOPolicy)
                             is_ppo=isinstance(policy,SharedPPOPolicy)
-                            mode=policy.mode if policy and not is_ppo else a.feature_mode
-                            x=ppo_features(policy,t,o) if is_ppo else features(t,o['proprio'],mode)
+                            mode=policy.mode if policy and not (is_ppo or is_combat_ppo) else a.feature_mode
+                            x=combat_features(t,o) if is_combat_ppo else (ppo_features(policy,t,o) if is_ppo else features(t,o['proprio'],mode))
                             decoded=brain.baseline(t)
                             raw_neural=np.asarray(t,dtype=float)
                             objective_aux=np.zeros(6);gunnery_aux=np.zeros(6)
@@ -122,7 +164,7 @@ def main():
                             elif getattr(a,team+'_controller')=='rule':
                                 action=np.array(o['teacher']);decoded=None
                             elif policy:
-                                action=policy.act(x,deterministic=True)[0] if is_ppo else policy.predict(x);adapter_action=action.copy()
+                                action=policy.act(x,deterministic=True)[0] if is_ppo else (policy.act(x)[0] if is_combat_ppo else policy.predict(x));adapter_action=action.copy()
                             else:
                                 action=decoded.copy()
 

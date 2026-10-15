@@ -9,6 +9,8 @@ var results_button: Button
 var replay_items=[]
 var replay_list: ItemList
 var form_controls={}
+var reward_curve: Control
+var reward_curve_refresh=0.0
 const IDS=["panther_g","tiger_i","jagdpanther","t34_85","is2_1944","su100"]
 const VEHICLES=["Panther Ausf. G","Tiger I · late 1944","Jagdpanther","T-34-85 · 1944","IS-2 · 1944","SU-100"]
 func _ready():
@@ -55,34 +57,6 @@ func _ready():
 	var buttons=find_children("*","Button",true,false)
 	if not buttons.is_empty():buttons[0].grab_focus()
 
-func _input(_event):
-	if not AppState.open_day_mode or page!="PauseMenu":return
-	if Input.is_action_just_pressed("od_pause"):
-		get_viewport().set_input_as_handled()
-		AppState.resume()
-		return
-	var back=Input.is_action_just_pressed("od_back")
-	var confirm=Input.is_action_just_pressed("od_confirm")
-	var direction=0
-	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):direction=-1
-	elif Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):direction=1
-	if not back and not confirm and direction==0:return
-	get_viewport().set_input_as_handled()
-	if back:
-		AppState.resume()
-		return
-	var buttons: Array[Button]=[]
-	for node in find_children("*","Button",true,false):
-		if node is Button and node.visible and not node.disabled:buttons.append(node)
-	if buttons.is_empty():return
-	var focus=get_viewport().gui_get_focus_owner()
-	var index=buttons.find(focus)
-	if index<0:index=0
-	if direction!=0:
-		index=(index+direction+buttons.size())%buttons.size()
-		buttons[index].grab_focus()
-	elif confirm:
-		buttons[index].emit_signal("pressed")
 func label(parent: Node,text: String,size=19) -> Label:
 	var node=Label.new();node.text=AppState.tr_text(text);node.add_theme_font_size_override("font_size",size);parent.add_child(node);return node
 func text_block(text: String):
@@ -107,10 +81,10 @@ func number(text: String,value: float,minimum: float,maximum: float,callback: Ca
 func toggle(text: String,value: bool,callback: Callable):
 	var node=CheckBox.new();node.text=AppState.tr_text(text);node.button_pressed=value;node.toggled.connect(callback);body.add_child(node)
 func policy_field(text: String,field: String):
-	var box=row(text);var node=LineEdit.new();node.text=AppState.session.get(field);node.placeholder_text=AppState.tr_text("Select a frozen .npz readout");node.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(node)
+	var box=row(text);var node=LineEdit.new();node.text=AppState.session.get(field);node.placeholder_text=AppState.tr_text("Select a frozen .npz readout or combat PPO .zip");node.size_flags_horizontal=Control.SIZE_EXPAND_FILL;box.add_child(node)
 	node.text_changed.connect(func(value):AppState.session.set(field,value))
 	button(box,"Browse",func():
-		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.npz ; "+AppState.tr_text("Readout policy")]);add_child(dialog)
+		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.npz,*.zip ; "+AppState.tr_text("Readout or combat policy")]);add_child(dialog)
 		dialog.file_selected.connect(func(path):node.text=path;AppState.session.set(field,path);dialog.queue_free())
 		dialog.popup_centered_ratio(.75))
 func back():button(body,"Back",AppState.menu)
@@ -213,7 +187,50 @@ func training():
 	button(body,"EVALUATE POLICY",func():
 		if not FileAccess.file_exists(s.blue_policy):notice("Load an existing .npz policy first.")
 		else:AppState.start_job(true))
+	label(body,"MALECNS COMBAT TRAINING",25).modulate=Color("c1a573")
+	text_block("Train an external combat policy with PPO. The connectome stays frozen. MaleCNS mode uses the real FlyBrain(batch=1) and requires the configured dataset; Gameplay Pretraining is labelled separately and does not use neural signals.")
+	dropdown("Neural input",["MaleCNS Training / Fine-tuning","Gameplay Pretraining · no MaleCNS"],["malecns","pretraining"],s.training_stage,func(v):s.training_stage=v)
+	dropdown("Training program",["Automatic curriculum","Full battle"],["automatic","full_battle"],s.training_program,func(v):s.training_program=v)
+	number("PPO steps",s.training_steps,16,200000,func(v):s.training_steps=int(v))
+	number("Maximum training time (minutes)",s.training_time_minutes,1,4320,func(v):s.training_time_minutes=int(v))
+	number("Episode limit (seconds)",s.training_seconds,30,600,func(v):s.training_seconds=int(v))
+	number("Training seed",s.training_seed,0,2147480000,func(v):s.training_seed=int(v))
+	number("Checkpoint interval (steps)",s.checkpoint_interval,64,10000,func(v):s.checkpoint_interval=int(v))
+	var checkpoint_box=row("Checkpoint (.zip)")
+	var checkpoint_edit=LineEdit.new();checkpoint_edit.name="CombatCheckpoint";checkpoint_edit.text=s.combat_checkpoint;checkpoint_edit.placeholder_text=AppState.tr_text("Select a PPO checkpoint");checkpoint_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;checkpoint_box.add_child(checkpoint_edit)
+	checkpoint_edit.text_changed.connect(func(value):s.combat_checkpoint=value)
+	button(checkpoint_box,"Browse…",func():
+		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.zip ; PPO checkpoint or deployment policy"]);add_child(dialog)
+		dialog.file_selected.connect(func(path):checkpoint_edit.text=path;s.combat_checkpoint=path;dialog.queue_free())
+		dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.75))
+	var actions=HBoxContainer.new();actions.add_theme_constant_override("separation",10);body.add_child(actions)
+	button(actions,"START NEW COMBAT TRAINING",func():
+		s.mode="combat_training";s.combat_action="train";s.resume_checkpoint="";AppState.start_job())
+	button(actions,"RESUME / CONTINUE",func():
+		var checkpoint=s.combat_checkpoint
+		if checkpoint=="":checkpoint=_find_combat_checkpoint()
+		if checkpoint=="" or not FileAccess.file_exists(checkpoint):notice("Select an existing latest.zip checkpoint to resume training.");return
+		s.combat_checkpoint=checkpoint;s.resume_checkpoint=checkpoint;s.mode="combat_training";s.combat_action="train";AppState.start_job())
+	var combat_actions=HBoxContainer.new();combat_actions.add_theme_constant_override("separation",10);body.add_child(combat_actions)
+	button(combat_actions,"EVALUATE MODEL",func():
+		if s.combat_checkpoint=="" or not FileAccess.file_exists(s.combat_checkpoint):notice("Select a combat checkpoint first.");return
+		s.mode="combat_training";s.combat_action="evaluate";AppState.start_job())
+	button(combat_actions,"PREPARE FOR OPEN DAY",func():
+		if s.combat_checkpoint=="" or not FileAccess.file_exists(s.combat_checkpoint):notice("Select a combat checkpoint first.");return
+		s.mode="combat_training";s.combat_action="deploy";AppState.start_job())
 	back()
+
+func _find_combat_checkpoint() -> String:
+	var root=AppState.results_root()
+	var dir=DirAccess.open(root)
+	if dir==null:return ""
+	var paths:Array[String]=[];dir.list_dir_begin();var name=dir.get_next()
+	while name!="":
+		if dir.current_is_dir() and name.begins_with("combat-training-"):
+			var candidate=root.path_join(name).path_join("checkpoints/latest.zip")
+			if FileAccess.file_exists(candidate):paths.append(candidate)
+		name=dir.get_next()
+	paths.sort();return paths.back() if not paths.is_empty() else ""
 func test_range():
 	title("MANUAL VEHICLE CONTROL","Test Range")
 	var s=AppState.session
@@ -333,14 +350,32 @@ func job_progress():
 	title("MEASURED EXPERIMENT","Running session")
 	job_text=text_block("Starting worker…")
 	progress=ProgressBar.new();progress.max_value=1;body.add_child(progress)
-	text_block("Reward / rolling reward: N/A for ridge imitation. No scientific interpretation is generated.")
-	button(body,"CANCEL",AppState.stop_job)
+	if AppState.session.mode=="combat_training":
+		text_block("External PPO policy · frozen MaleCNS · analytical tank-duel environment. Training reward is not proof of combat quality.")
+		reward_curve=Control.new();reward_curve.name="CombatRewardCurve";reward_curve.custom_minimum_size=Vector2(0,150);reward_curve.size_flags_horizontal=Control.SIZE_EXPAND_FILL;reward_curve.set_script(load("res://scripts/app/training_curve.gd"));body.add_child(reward_curve)
+		var pause=button(body,"PAUSE / RESUME",AppState.toggle_job_pause);pause.name="PauseJob"
+		var checkpoint=button(body,"SAVE CHECKPOINT NOW",AppState.request_job_checkpoint);checkpoint.name="SaveCheckpointNow"
+	else:text_block("Reward / rolling reward: N/A for ridge imitation. No scientific interpretation is generated.")
+	button(body,"STOP TRAINING" if AppState.session.mode=="combat_training" else "CANCEL",AppState.stop_job)
 	results_button=button(body,"OPEN RESULTS FOLDER",func():OS.shell_open(AppState.job_path));results_button.disabled=true
 	button(body,"RUN AGAIN",func():AppState.start_job()).disabled=true
 	button(body,"RETURN",AppState.menu)
 func update_job(data: Dictionary):
 	if not is_instance_valid(job_text):return
-	job_text.text=AppState.tr_format("job.progress",[AppState.tr_text(str(data.get("state","starting"))),data.get("condition","—"),data.get("seed","—"),data.get("run",0),data.get("total",0),data.get("sim_time",0),data.get("wall_time",0),AppState.tr_text(str(data.get("message",""))),AppState.job_path,data.get("checkpoint",AppState.tr_text("not saved yet"))])
+	if AppState.session.mode=="combat_training":
+		var state=str(data.get("state","starting"));var current=int(data.get("timesteps",0));var target=int(data.get("target_timesteps",AppState.session.training_steps))
+		var male="MALECNS ACTIVE" if data.get("male_cns_active",AppState.session.training_stage=="malecns") else "GAMEPLAY PRETRAINING · NO MALECNS"
+		job_text.text="%s\n%s · %s\nSteps: %d / %d · %.1f steps/sec · ETA %.1f min\nEpisodes: %s · Elapsed: %.1f min\nReward: %s\nCheckpoint: %s\n%s" % [state.to_upper(),male,str(data.get("stage","—")),current,target,float(data.get("steps_per_second",0)),float(data.get("eta_seconds",0))/60.0,str(data.get("episodes",0)),float(data.get("elapsed_seconds",0))/60.0,str(data.get("latest_episode_reward","not enough episodes")),str(data.get("checkpoint",AppState.tr_text("not saved yet"))),str(data.get("message",""))]
+		if state=="complete":
+			var evaluation=AppState.read_json(AppState.job_path.path_join("evaluation.json"))
+			var score=evaluation.get("current_policy",{})
+			if not score.is_empty():
+				job_text.text+="\nIndependent evaluation · %d paired seeds\nWins %.0f%% · accuracy %.1f%% · damage %.2f\nShots %.1f · distance %.1f m · stuck recovery %.2f" % [evaluation.get("baseline_rule",{}).get("episodes",[]).size(),float(score.get("win_rate",0))*100.0,float(score.get("accuracy",0))*100.0,float(score.get("mean_damage",0)),float(score.get("mean_shots",0)),float(score.get("mean_distance_m",0)),float(score.get("mean_stuck_recoveries",0))]
+		progress.max_value=maxf(1,target);progress.value=current
+		var pause_button=find_child("PauseJob",true,false)
+		if pause_button:pause_button.text="RESUME" if state=="paused" else "PAUSE"
+	else:
+		job_text.text=AppState.tr_format("job.progress",[AppState.tr_text(str(data.get("state","starting"))),data.get("condition","—"),data.get("seed","—"),data.get("run",0),data.get("total",0),data.get("sim_time",0),data.get("wall_time",0),AppState.tr_text(str(data.get("message",""))),AppState.job_path,data.get("checkpoint",AppState.tr_text("not saved yet"))])
 	var again=find_child("RunAgain",true,false)
 	if again:again.disabled=not data.get("state","") in ["complete","cancelled","error"]
 	progress.max_value=maxf(1,data.get("total",1));progress.value=data.get("completed",0)
@@ -362,6 +397,23 @@ func disconnect_dialog(reason: String):
 	text_block(reason+"\n"+AppState.tr_text("Reconnect starts fresh neural state; the resumed episode is not scientifically continuous."))
 	button(body,"RECONNECT",AppState.reconnect)
 	button(body,"RETURN TO MENU",AppState.menu)
-func _process(_dt):
+func _refresh_training_curve():
+	if not is_instance_valid(reward_curve):return
+	var metrics_path=AppState.job_path.path_join("metrics.csv")
+	if not FileAccess.file_exists(metrics_path):return
+	var lines=FileAccess.get_file_as_string(metrics_path).split("\n",false)
+	if lines.size()<2:return
+	var columns=lines[0].split(",")
+	var reward_index=columns.find("episode_reward")
+	if reward_index<0:return
+	var samples:Array[float]=[]
+	for line in lines.slice(1):
+		var fields=line.split(",")
+		if fields.size()>reward_index:samples.append(float(fields[reward_index]))
+	reward_curve.call("set_samples",samples)
+func _process(dt):
 	status.text=AppState.tr_text("BACKEND")+"  ·  "+AppState.tr_text(AppState.backend_state)
 	if page=="LoadingScreen" and not AppState.backend_state in ["ERROR","DISCONNECTED"]:headline.text=AppState.tr_text(AppState.loading_message)
+	if page=="JobProgress" and AppState.session.mode=="combat_training":
+		reward_curve_refresh+=dt
+		if reward_curve_refresh>=.5:reward_curve_refresh=0.0;_refresh_training_curve()

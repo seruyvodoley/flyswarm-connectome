@@ -95,12 +95,11 @@ func _replace_deferred(generation: int) -> void:
 func _fit_camera(model: Node3D) -> void:
 	var bounds := AABB()
 	var found := false
-	var inverse := model.global_transform.affine_inverse()
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := node as MeshInstance3D
 		if mesh_node.mesh == null:
 			continue
-		var transform_to_model := inverse * mesh_node.global_transform
+		var transform_to_model := Appearance.relative_transform(model, mesh_node)
 		var box := mesh_node.get_aabb()
 		for corner in _corners(box):
 			var point := transform_to_model * corner
@@ -120,7 +119,7 @@ func _fit_camera(model: Node3D) -> void:
 	# Keep margin for the projecting gun barrel at every turntable angle.
 	var distance := (half_height / tan(deg_to_rad(camera.fov * 0.5)) + maxf(0.5, bounds.size.z * 0.18)) * 1.18
 	camera.position = target + Vector3(bounds.size.x * 0.24, bounds.size.y * 0.48, distance)
-	camera.look_at(target)
+	camera.transform = Transform3D(Basis.looking_at(target - camera.position, Vector3.UP), camera.position)
 
 func _sync_viewport_size() -> void:
 	if not is_instance_valid(viewport):return

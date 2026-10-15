@@ -147,9 +147,27 @@ class Job:
   assert before==hashlib.sha256(policy.read_bytes()).hexdigest(),'Evaluation modified policy bytes'
   (self.out/'evaluation.json').write_text(json.dumps(result,indent=2))
   self.status(state='complete',checkpoint=str(policy),message='Readout saved/reloaded; frozen evaluation complete. Reward: N/A; no validated combat-success metric.')
+ def combat_training(self):
+  if self.c.get('dataset_path'):os.environ['FLY_DATA']=str(self.c['dataset_path'])
+  from flyswarm.training.combat import run_training,evaluate_checkpoint,prepare_deployment
+  action=self.c.get('combat_action','train')
+  if action=='train':
+   result=run_training(self.c,self.out,self.status,self.check)
+  elif action=='evaluate':
+   checkpoint=Path(self.c.get('combat_checkpoint',''))
+   result=evaluate_checkpoint(checkpoint,self.c,self.out)
+  elif action=='deploy':
+   checkpoint=Path(self.c.get('combat_checkpoint',''))
+   best=checkpoint.parent/'best.zip'
+   if best.is_file():checkpoint=best
+   result=prepare_deployment(checkpoint,self.out/'deployment')
+  else:raise ValueError(f'Unknown combat training action: {action}')
+  self.status(state='complete',completed=1,total=1,checkpoint=str(result.get('checkpoint',self.c.get('combat_checkpoint',''))),
+              male_cns_active=self.c.get('training_stage','malecns')=='malecns',message='Combat controller outputs saved and validated.')
  def execute(self):
   try:
    if self.c['mode']=='training':self.training()
+   elif self.c['mode']=='combat_training':self.combat_training()
    else:self.research()
   except Cancelled:self.status(state='cancelled',message='Cancelled; owned child processes stopped.')
   except Exception as exc:self.status(state='error',message=str(exc))

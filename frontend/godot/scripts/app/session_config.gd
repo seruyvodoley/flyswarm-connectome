@@ -27,6 +27,16 @@ var record=true
 var range_distance=500
 var target_angle=0
 var range_mode="gunnery"
+var training_stage="malecns"
+var training_program="automatic"
+var training_steps=512
+var training_seconds=180
+var training_time_minutes=60
+var training_seed=7
+var checkpoint_interval=256
+var resume_checkpoint=""
+var combat_checkpoint=""
+var combat_action="train"
 var demo_vehicle="t34_85"
 var demo_opponent="t34_85"
 var output=""
@@ -42,9 +52,11 @@ func as_dict() -> Dictionary:
 func validate() -> String:
 	if seconds<=0:return "Duration must be positive."
 	if mode=="training" and battle_seed==validation_seed:return "Training and validation seeds must differ."
+	if mode=="combat_training" and training_steps<16:return "Combat training requires at least 16 PPO steps."
+	if mode=="combat_training" and combat_action in ["evaluate","deploy"] and combat_checkpoint.strip_edges()=="":return "Select a combat checkpoint first."
 	for team in ["blue","red"]:
 		if get(team+"_controller")=="adapter" and not FileAccess.file_exists(get(team+"_policy")):
-			return team.to_upper()+": select an existing .npz policy."
+			return team.to_upper()+": select an existing readout or combat policy file."
 	if mode=="replay" and not FileAccess.file_exists(replay_path):return "Replay file is missing."
 	return ""
 func cli_args() -> PackedStringArray:

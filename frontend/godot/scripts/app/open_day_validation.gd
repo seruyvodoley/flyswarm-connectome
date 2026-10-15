@@ -21,6 +21,34 @@ func run():
 	DirAccess.make_dir_recursive_absolute(screenshot_dir)
 	app=root.get_node("AppState")
 	var original_language=app.settings.language
+	app.open_day_mode=false;app.show_page("MainMenu");await process_frame
+	var main_buttons=app.view.find_children("*","Button",true,false)
+	check(not main_buttons.is_empty(),"Main menu exposes focusable gamepad controls")
+	if not main_buttons.is_empty():
+		main_buttons[0].grab_focus()
+		var main_cross=InputEventJoypadButton.new();main_cross.device=0;main_cross.button_index=JoyButton.JOY_BUTTON_A;main_cross.pressed=true;Input.parse_input_event(main_cross);await process_frame
+		check(app.current_page=="OpenDayMain","Cross/A activates the focused main-menu action")
+		main_cross.pressed=false;Input.parse_input_event(main_cross);await process_frame
+	for page_name in ["Settings","ResearchLab","TrainingMenu","MarlLaboratory"]:
+		app.open_day_mode=false;app.show_page(page_name);await process_frame
+		var activated=[0]
+		var probe=Button.new();probe.text="Controller input validation";probe.pressed.connect(func():activated[0]+=1);app.view.add_child(probe);probe.grab_focus()
+		var window_cross=InputEventJoypadButton.new();window_cross.device=0;window_cross.button_index=JoyButton.JOY_BUTTON_A;window_cross.pressed=true;Input.parse_input_event(window_cross);await process_frame
+		check(activated[0]==1,"Cross/A activates the focused control in "+page_name)
+		window_cross.pressed=false;Input.parse_input_event(window_cross);await process_frame
+	app.open_day_mode=false;app.show_page("TrainingMenu");await process_frame
+	check(app.view.find_child("CombatCheckpoint",true,false)!=null,"Readout Training retains its policy field and exposes combat resume checkpoint selection")
+	check(app.view.find_child("CombatRewardCurve",true,false)==null,"Training reward graph is created only while a combat-training job is running")
+	var has_combat_training=false
+	for node in app.view.find_children("*","Label",true,false):
+		if node.text=="MALECNS COMBAT TRAINING":has_combat_training=true
+	check(has_combat_training,"MaleCNS Combat Training is integrated into the existing Readout Training page")
+	app.session.mode="combat_training";app.show_page("JobProgress");await process_frame
+	var curve=app.view.find_child("CombatRewardCurve",true,false)
+	check(curve!=null and app.view.find_child("PauseJob",true,false)!=null and app.view.find_child("SaveCheckpointNow",true,false)!=null,"Combat training progress includes a live reward chart, pause/resume and explicit checkpoint save")
+	var reward_samples:Array[float]=[0.0,1.0,-.25]
+	if curve!=null:curve.call("set_samples",reward_samples);await process_frame
+	app.session.mode="training"
 	for language in ["ru","en"]:
 		app.settings.language=language
 		for page in ["OpenDayMain","HowItWorks","Settings"]:
@@ -56,7 +84,7 @@ func run():
 	check(InputMap.action_get_events("od_fire").size()==1 and InputMap.action_get_events("od_zoom").size()==1,"R2 and L2 use standard Joypad trigger-axis events")
 	check(OpenDayController.shape_vector(Vector2(.1,.08))==Vector2.ZERO,"Radial stick deadzone suppresses small drift")
 	var slow_stick=OpenDayController.drive_command(Vector2(0,-.35),false);var full_stick=OpenDayController.drive_command(Vector2(0,-1),false)
-	check(slow_stick[0]<0.0 and slow_stick[0]>full_stick[0] and is_equal_approx(full_stick[0],-1.0),"Inverted physical left-stick vertical axis produces forward throttle while preserving analog scaling")
+	check(slow_stick[0]>0.0 and slow_stick[0]<full_stick[0] and is_equal_approx(full_stick[0],1.0),"Physical left-stick up produces forward throttle while preserving analog scaling")
 	var turn_right=OpenDayController.drive_command(Vector2(.8,0),true)
 	check(turn_right[2]<0.0 and turn_right[5]==1.0 and OpenDayController.drive_command(Vector2.ZERO,false)==[0.0,0.0,0.0,0.0,0.0,0.0],"Inverted physical left-stick horizontal axis is normalized and one-shot fire remains independent")
 	check(OpenDayController.normalize_trigger(-1.0,-1.0)==0.0 and is_equal_approx(OpenDayController.normalize_trigger(0.56,0.0),0.56) and OpenDayController.normalize_trigger(1.0,-1.0)==1.0,"Trigger normalization supports both -1..1 and 0..1 hardware ranges")
@@ -95,7 +123,7 @@ func run():
 		battle.paused=false;battle.demo_intro_left=0.0
 		Input.action_press("od_move_forward",.72)
 		var analog_drive=battle.demo_gamepad_commands(false)
-		check(analog_drive[0]<0.0 and analog_drive[0]>-1.0 and analog_drive[2]==0.0 and not player_vehicle.manual_hull_aim,"Inverted physical left-stick input is normalized at the gamepad boundary without hull autopilot")
+		check(analog_drive[0]>0.0 and analog_drive[0]<1.0 and analog_drive[2]==0.0 and not player_vehicle.manual_hull_aim,"Physical left-stick up advances the tank and preserves analog throttle without hull autopilot")
 		Input.action_release("od_move_forward")
 		Input.action_press("od_look_right",1.0)
 		var original_camera_yaw=battle.demo_camera_yaw

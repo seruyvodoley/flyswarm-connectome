@@ -1,6 +1,7 @@
 extends Node
 const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
+const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var session=Config.new()
 var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","dataset_path":""}
 var root_path=""
@@ -26,6 +27,7 @@ var marl_output=""
 var marl_replay_path=""
 var marl_progress={}
 func _ready():
+	OpenDayController.configure()
 	packaged_app=not OS.has_feature("editor")
 	if packaged_app:
 		bundle_resources=packaged_resources_path()
@@ -47,6 +49,38 @@ func _ready():
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	get_tree().auto_accept_quit=false
 	apply_settings()
+
+func _input(_event):
+	# Cross/A, D-pad and left-stick navigation work in every application
+	# window. Open Day's own menu keeps its compact vehicle-card focus order.
+	if current_page in ["OpenDayMain","HowItWorks","DemoResult"]:return
+	if current_page not in ["MainMenu","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
+	var back=Input.is_action_just_pressed("od_back")
+	var confirm=Input.is_action_just_pressed("od_confirm")
+	var direction=0
+	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):direction=-1
+	elif Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):direction=1
+	if current_page=="PauseMenu" and Input.is_action_just_pressed("od_pause"):back=true
+	if not back and not confirm and direction==0:return
+	var focus=get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:return
+	get_viewport().set_input_as_handled()
+	if back:
+		if current_page=="PauseMenu" and is_instance_valid(battle):resume()
+		else:menu()
+		return
+	var buttons:Array[BaseButton]=[]
+	if is_instance_valid(view):
+		for node in view.find_children("*","BaseButton",true,false):
+			if node is BaseButton and node.visible and not node.disabled and node.focus_mode!=Control.FOCUS_NONE:buttons.append(node)
+	if buttons.is_empty():return
+	var index=buttons.find(focus)
+	if index<0:index=0
+	if direction!=0:
+		index=(index+direction+buttons.size())%buttons.size()
+		buttons[index].grab_focus()
+	elif confirm:
+		buttons[index].emit_signal("pressed")
 func windows_host() -> bool:
 	return OS.get_name()=="Windows"
 func user_home_path() -> String:
@@ -215,6 +249,16 @@ func stop_backend():
 func stop_job():
 	if job_path!="" and job_pid>0 and OS.is_process_running(job_pid):
 		FileAccess.open(job_path.path_join("cancel"),FileAccess.WRITE).store_string("cancel")
+
+func toggle_job_pause():
+	if job_path=="" or job_pid<=0 or not OS.is_process_running(job_pid):return
+	var pause_path=job_path.path_join("pause")
+	if FileAccess.file_exists(pause_path):DirAccess.remove_absolute(pause_path)
+	else:FileAccess.open(pause_path,FileAccess.WRITE).store_string("pause")
+
+func request_job_checkpoint():
+	if job_path!="" and job_pid>0 and OS.is_process_running(job_pid):
+		FileAccess.open(job_path.path_join("save_checkpoint"),FileAccess.WRITE).store_string("save")
 func stop_session():
 	generation+=1
 	stop_job()
@@ -352,7 +396,7 @@ func start_job(evaluate=false):
 	var error=session.validate()
 	if error!="":view.notice(error);return
 	if not FileAccess.file_exists(python):view.notice("Python .venv is missing. Configure dependencies before starting this job.");return
-	job_path=new_output("training" if session.mode=="training" else "research")
+	job_path=new_output("combat-training" if session.mode=="combat_training" else ("training" if session.mode=="training" else "research"))
 	var config=session.as_dict()
 	config.output=job_path
 	config.evaluate=evaluate

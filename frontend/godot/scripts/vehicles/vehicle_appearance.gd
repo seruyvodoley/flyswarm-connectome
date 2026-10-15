@@ -26,7 +26,7 @@ static func apply(model: Node3D, vehicle_id: String, destroyed: bool = false) ->
 		var mesh_instance := node as MeshInstance3D
 		if mesh_instance.mesh == null:
 			continue
-		var mesh_to_model: Transform3D = model.global_transform.affine_inverse() * mesh_instance.global_transform
+		var mesh_to_model := relative_transform(model, mesh_instance)
 		for surface in mesh_instance.mesh.get_surface_count():
 			var source := mesh_instance.mesh.surface_get_material(surface)
 			var instance_source := mesh_instance.get_surface_override_material(surface)
@@ -77,6 +77,16 @@ static func apply(model: Node3D, vehicle_id: String, destroyed: bool = false) ->
 			mesh_instance.set_surface_override_material(surface, material)
 			count += 1
 	return count
+
+static func relative_transform(ancestor: Node3D, descendant: Node3D) -> Transform3D:
+	# Resource previews can render before their SubViewport joins the scene tree;
+	# local ancestry is stable in both that case and the live battle scene.
+	var result := Transform3D.IDENTITY
+	var current: Node3D = descendant
+	while current != ancestor and current != null:
+		result = current.transform * result
+		current = current.get_parent() as Node3D
+	return result
 
 static func set_destroyed(model: Node3D, vehicle_id: String, destroyed: bool) -> void:
 	apply(model, vehicle_id, destroyed)

@@ -2,6 +2,7 @@ extends Control
 @export var page="OpenDayMain"
 const FlyPreview=preload("res://scripts/app/fly_preview.gd")
 const VehiclePreview=preload("res://scripts/app/vehicle_preview.gd")
+const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var selected_vehicle="t34_85"
 var attract_elapsed=0.0
 var attract_active=false
@@ -35,6 +36,7 @@ const RU_COPY={
 }
 
 func _ready():
+	OpenDayController.configure()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var theme_resource=Theme.new();theme_resource.default_font_size=18
 	for kind in ["normal","hover","pressed","focus","disabled"]:
@@ -53,6 +55,7 @@ func _ready():
 		"OpenDayMain":build_main(root)
 		"HowItWorks":build_how(root)
 		"DemoResult":build_result(root)
+	call_deferred("focus_first_controller_button")
 
 func label(parent: Node,text: String,size=18) -> Label:
 	var value=Label.new();value.text=copy_text(text);value.add_theme_font_size_override("font_size",size);value.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;parent.add_child(value);return value
@@ -166,6 +169,42 @@ func _process(delta):
 		attract_label.text=copy_text(["A FLY CONTROLS A TANK","REAL MALECNS ACTIVITY","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT"][attract_phase])
 
 func _input(event):
+	if handle_controller_navigation():return
 	if page=="OpenDayMain" and attract_active and event is InputEventMouseButton and event.pressed:
 		get_viewport().set_input_as_handled()
 		AppState.start_demo(selected_vehicle)
+
+func focus_first_controller_button() -> void:
+	var buttons=controller_buttons()
+	if not buttons.is_empty():buttons[0].grab_focus()
+
+func controller_buttons() -> Array[Button]:
+	var buttons: Array[Button]=[]
+	for node in find_children("*","Button",true,false):
+		if node is Button and node.visible and not node.disabled and node.focus_mode!=Control.FOCUS_NONE:buttons.append(node)
+	return buttons
+
+func handle_controller_navigation() -> bool:
+	if page not in ["OpenDayMain","HowItWorks","DemoResult"]:return false
+	var back=Input.is_action_just_pressed("od_back")
+	var confirm=Input.is_action_just_pressed("od_confirm")
+	var direction=0
+	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):direction=-1
+	elif Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):direction=1
+	if not back and not confirm and direction==0:return false
+	get_viewport().set_input_as_handled()
+	if back:
+		if page=="OpenDayMain":AppState.research_menu()
+		else:AppState.open_day_menu()
+		return true
+	var buttons=controller_buttons()
+	if buttons.is_empty():return true
+	var focus=get_viewport().gui_get_focus_owner()
+	var current=buttons.find(focus)
+	if current<0:current=0
+	if direction!=0:
+		current=(current+direction+buttons.size())%buttons.size()
+		buttons[current].grab_focus()
+	elif confirm:
+		buttons[current].emit_signal("pressed")
+	return true

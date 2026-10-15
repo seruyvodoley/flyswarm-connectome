@@ -1,5 +1,6 @@
 extends SceneTree
 const Combat=preload("res://scripts/combat.gd")
+const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var app
 var failures=0
 var screenshot_dir=""
@@ -38,16 +39,94 @@ func run():
 		check(left!=null and center!=null and right!=null,"Three Open Day columns exist at "+str(size))
 		if left and center and right:
 			check(not left.get_global_rect().intersects(center.get_global_rect()) and not center.get_global_rect().intersects(right.get_global_rect()),"Open Day columns do not overlap at "+str(size))
+	app.show_page("HowItWorks");await process_frame
+	var how_page=app.view
+	var how_buttons=how_page.controller_buttons()
+	check(how_buttons.size()==2,"How It Works provides a compact controller focus order")
+	if how_buttons.size()==2:
+		how_buttons[0].grab_focus()
+		var dpad=InputEventJoypadButton.new();dpad.device=0;dpad.button_index=JoyButton.JOY_BUTTON_DPAD_DOWN;dpad.pressed=true;Input.parse_input_event(dpad);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"D-pad advances exactly one focused Open Day menu button")
+		dpad.pressed=false;Input.parse_input_event(dpad);await process_frame
+		var cross=InputEventJoypadButton.new();cross.device=0;cross.button_index=JoyButton.JOY_BUTTON_A;cross.pressed=true;Input.parse_input_event(cross);await process_frame
+		check(app.current_page=="OpenDayMain","Cross confirms one focused menu action without double activation")
+		cross.pressed=false;Input.parse_input_event(cross);await process_frame
+		for _frame in 4:await process_frame
+	check(InputMap.has_action("od_move_forward") and InputMap.has_action("od_look_right") and InputMap.has_action("od_fire") and InputMap.has_action("od_zoom"),"Open Day registers named DualSense InputMap actions")
+	check(InputMap.action_get_events("od_fire").size()==1 and InputMap.action_get_events("od_zoom").size()==1,"R2 and L2 use standard Joypad trigger-axis events")
+	check(OpenDayController.shape_vector(Vector2(.1,.08))==Vector2.ZERO,"Radial stick deadzone suppresses small drift")
+	var slow_stick=OpenDayController.drive_command(Vector2(0,-.35),false);var full_stick=OpenDayController.drive_command(Vector2(0,-1),false)
+	check(slow_stick[0]>0.0 and slow_stick[0]<full_stick[0] and is_equal_approx(full_stick[0],1.0),"Analog throttle scales smoothly from partial to full stick")
+	var turn_right=OpenDayController.drive_command(Vector2(.8,0),true)
+	check(turn_right[2]>0.0 and turn_right[5]==1.0 and OpenDayController.drive_command(Vector2.ZERO,false)==[0.0,0.0,0.0,0.0,0.0,0.0],"Right steering and one-shot fire are independent of neutral drive input")
+	check(OpenDayController.normalize_trigger(-1.0,-1.0)==0.0 and is_equal_approx(OpenDayController.normalize_trigger(0.56,0.0),0.56) and OpenDayController.normalize_trigger(1.0,-1.0)==1.0,"Trigger normalization supports both -1..1 and 0..1 hardware ranges")
+	var look_right=OpenDayController.advance_camera(0.0,0.0,Vector2(1,0),.1,false);var look_left=OpenDayController.advance_camera(0.0,0.0,Vector2(-1,0),.1,false)
+	var look_up=OpenDayController.advance_camera(0.0,0.0,Vector2(0,-1),.1,false);var look_down=OpenDayController.advance_camera(0.0,0.0,Vector2(0,1),.1,false)
+	check(look_right.x>0.0 and look_left.x<0.0 and look_up.y>0.0 and look_down.y<0.0,"Right-stick camera axes have non-inverted horizontal and vertical mapping")
+	var scoped_look=OpenDayController.advance_camera(0.0,0.0,Vector2(1,0),.1,true)
+	check(scoped_look.x>0.0 and scoped_look.x<look_right.x and OpenDayController.camera_forward(0.0,0.0).is_equal_approx(Vector3(0,0,1)),"ADS lowers camera sensitivity and camera ray points forward at neutral")
 	app.settings.language=original_language
 	app.clear_view();DisplayServer.window_set_size(Vector2i(1280,720));await process_frame
+	var stick_event=InputEventJoypadMotion.new();stick_event.device=0;stick_event.axis=JoyAxis.JOY_AXIS_LEFT_Y;stick_event.axis_value=-.75;Input.parse_input_event(stick_event);await process_frame
+	check(Input.get_action_strength("od_move_forward")>.7,"A standard negative left-stick Y event produces forward analog input")
+	stick_event=InputEventJoypadMotion.new();stick_event.device=0;stick_event.axis=JoyAxis.JOY_AXIS_LEFT_Y;stick_event.axis_value=.75;Input.parse_input_event(stick_event);await process_frame
+	check(Input.get_action_strength("od_move_reverse")>.7,"A standard positive left-stick Y event produces reverse analog input")
+	stick_event=InputEventJoypadMotion.new();stick_event.device=0;stick_event.axis=JoyAxis.JOY_AXIS_LEFT_Y;stick_event.axis_value=0.0;Input.parse_input_event(stick_event);await process_frame
+	var trigger_event=InputEventJoypadMotion.new();trigger_event.device=0;trigger_event.axis=JoyAxis.JOY_AXIS_TRIGGER_RIGHT;trigger_event.axis_value=.8;Input.parse_input_event(trigger_event);await process_frame
+	check(Input.get_action_strength("od_fire")>.7,"Standard R2 trigger-axis input is registered by the fire InputMap action")
+	trigger_event=InputEventJoypadMotion.new();trigger_event.device=0;trigger_event.axis=JoyAxis.JOY_AXIS_TRIGGER_RIGHT;trigger_event.axis_value=0.0;Input.parse_input_event(trigger_event);await process_frame
+	trigger_event=InputEventJoypadMotion.new();trigger_event.device=0;trigger_event.axis=JoyAxis.JOY_AXIS_TRIGGER_LEFT;trigger_event.axis_value=.8;Input.parse_input_event(trigger_event);await process_frame
+	check(Input.get_action_strength("od_zoom")>.7,"Standard L2 trigger-axis input is registered by the zoom InputMap action")
+	trigger_event=InputEventJoypadMotion.new();trigger_event.device=0;trigger_event.axis=JoyAxis.JOY_AXIS_TRIGGER_LEFT;trigger_event.axis_value=0.0;Input.parse_input_event(trigger_event);await process_frame
+	var pause_event=InputEventJoypadButton.new();pause_event.device=0;pause_event.button_index=JoyButton.JOY_BUTTON_START;pause_event.pressed=true;Input.parse_input_event(pause_event);await process_frame
+	check(Input.is_action_pressed("od_pause"),"DualSense OPTIONS is mapped to the pause action")
+	pause_event.pressed=false;Input.parse_input_event(pause_event);await process_frame
 	print("OPEN DAY validation: initializing demo arena")
 	app.configure_demo("t34_85")
 	var battle=load("res://scenes/Battle.tscn").instantiate();battle.session_config=app.session;root.add_child(battle)
 	for _frame in range(8):await process_frame
 	battle.paused=true
+	var connected_controllers=Input.get_connected_joypads()
+	check(battle.demo_gamepad_active==not connected_controllers.is_empty(),"Open Day automatically selects a connected joypad when present")
+	print("OPENDAY CONTROLLER connected=",connected_controllers," active=",battle.demo_gamepad_active," name=",Input.get_joy_name(battle.demo_controller_device) if battle.demo_controller_device>=0 else "mouse fallback")
+	if battle.demo_gamepad_active:
+		var player_vehicle=battle.vehicles[0]
+		var original_hull_yaw=player_vehicle.rotation.y
+		battle.paused=false;battle.demo_intro_left=0.0
+		Input.action_press("od_move_forward",.72)
+		var analog_drive=battle.demo_gamepad_commands(false)
+		check(analog_drive[0]>0.0 and analog_drive[0]<1.0 and analog_drive[2]==0.0 and not player_vehicle.manual_hull_aim,"DualSense left-stick analog input drives through tank physics without hull autopilot")
+		Input.action_release("od_move_forward")
+		Input.action_press("od_look_right",1.0)
+		var original_camera_yaw=battle.demo_camera_yaw
+		battle.update_demo_controller_input(.1)
+		battle._process(.016)
+		check(battle.demo_camera_yaw>original_camera_yaw and player_vehicle.rotation.y==original_hull_yaw and (-battle.camera.global_basis.z).angle_to(OpenDayController.camera_forward(battle.demo_camera_yaw,battle.demo_camera_pitch))<.01,"Right-stick look rotates the smooth camera and reticle aim independently of the hull")
+		var aimed_point=battle.demo_aim_world_point
+		var synthetic_mouse=InputEventMouseMotion.new();synthetic_mouse.position=Vector2(50,50);synthetic_mouse.relative=Vector2(40,40);battle._input(synthetic_mouse)
+		check(battle.demo_aim_world_point==aimed_point,"Mouse motion cannot overwrite active DualSense camera aim")
+		Input.action_release("od_look_right");battle.paused=true
+		player_vehicle.speed=6.0;player_vehicle.drive_throttle=.7;player_vehicle.yaw_rate=.4;player_vehicle.cmd=[.7,0.0,.4,0.0,0.0,1.0]
+		battle.demo_controller_safe_pause()
+		check(battle.paused and player_vehicle.speed==0.0 and player_vehicle.drive_throttle==0.0 and player_vehicle.yaw_rate==0.0 and player_vehicle.cmd==[0.0,0.0,0.0,0.0,0.0,0.0],"Controller-loss pause clears throttle, steering and pending fire")
+		battle.resume_active_clock()
+	# Keep the existing mouse regression suite deterministic even when a physical
+	# controller is paired with this Mac.
+	battle.demo_gamepad_active=false
+	battle.update_demo_control_hint()
 	check(battle.is_demo,"Demo runtime enabled")
 	check(battle.alive_count(0)==1 and battle.alive_count(1)==1,"Demo is isolated 1v1")
-	check(battle.vehicles[0].demo_health==6 and battle.vehicles[8].demo_health==3,"Open Day has isolated six-point player and three-point opponent durability")
+	check(battle.terrain.height_at(0.0,0.0)<1.0,"Open Day keeps the valley traversable after the opening screen clears")
+	check(battle.demo_smoke_screen!=null and battle.demo_smoke_screen.collision_layer==4 and battle.demo_smoke_screen.visible,"A visible collidable smoke curtain physically separates the teams at spawn")
+	check(battle.demo_sight_locked(battle.vehicles[0],battle.vehicles[8]),"Open Day enemy sensing is locked during the first ten seconds")
+	battle.sim_time=9.99
+	check(battle.demo_sight_locked(battle.vehicles[0],battle.vehicles[8]),"The opening sight lock remains active until ten seconds")
+	battle.sim_time=10.0
+	battle.update_demo_smoke_screen()
+	check(not battle.demo_sight_locked(battle.vehicles[0],battle.vehicles[8]),"Enemy sensing unlocks at ten seconds")
+	check(battle.demo_smoke_screen.collision_layer==0,"The physical opening smoke curtain clears at ten seconds")
+	battle.sim_time=0.0
+	check(battle.vehicles[0].demo_health==battle.vehicles[8].demo_health and battle.vehicles[0].demo_health_max==battle.vehicles[8].demo_health_max and battle.vehicles[0].demo_health_max==6,"Open Day gives the player and MaleCNS equal six-point durability")
 	var only_active_models=0
 	for i in battle.vehicles.size():
 		if battle.vehicles[i].model.get_child_count()>0:only_active_models+=1
@@ -58,8 +137,27 @@ func run():
 	check(idle_command[0]>.5 and idle_command.slice(1,5)==[0.0,0.0,0.0,0.0],"Open Day drives forward without autonomous hull or turret steering")
 	check(firing_command[5]==1.0 and battle.demo_mouse_commands(true)[5]==1.0,"Left mouse button maps to fire action")
 	check(battle.demo_mouse_commands(false)[0]>=.36,"Player autopilot keeps the tank moving while independently steering toward the engagement")
-	var fly=battle.vehicles[8];var fly_cmd=battle.apply_demo_tactical_aux(fly,[0.0,0.0,0.0,0.0,0.0,0.0])
-	check(fly_cmd[0]>=.36 and is_finite(float(fly_cmd[2])),"MaleCNS navigation assistance prevents the low-throttle stop while retaining a bounded steering command")
+	var fly=battle.vehicles[8];var fly_cmd=battle.apply_demo_tactical_aux(fly,[0.0,0.0,0.0,0.0,0.0,1.0])
+	check(fly_cmd[0]>=.42 and is_finite(float(fly_cmd[2])) and fly_cmd[5]==0.0,"Hard Open Day navigation maneuvers while hidden and rejects unsupported fire commands")
+	var saved_sim_time=battle.sim_time;var saved_seen=fly.seen;var saved_target=fly.target;var saved_turret=fly.turret_angle
+	battle.sim_time=12.0;fly.seen=true;fly.target=0;fly.turret_angle+=.45
+	var hard_fly_cmd=battle.apply_demo_tactical_aux(fly,[.2,0.0,0.0,0.0,0.0,1.0])
+	check(absf(hard_fly_cmd[2])>.05 and absf(hard_fly_cmd[3])>.1 and hard_fly_cmd[5]==0.0,"Hard gunnery predicts the visible target, improves traverse, and waits to fire until the ballistic solution is aligned")
+	var saved_gun=fly.gun_angle;var player_for_aim=battle.vehicles[0];var hard_shell_speed=float(fly.cfg.ammo_data.muzzle_velocity_m_s)
+	fly.turret_angle=0.0;fly.gun_angle=0.0;fly.rotation.y=PI
+	for _aim_iteration in 4:
+		var exact_aim=player_for_aim.global_position+Vector3(0,1.45,0)-fly.muzzle.global_position
+		var exact_horizontal=Vector2(exact_aim.x,exact_aim.z).length()
+		var exact_discriminant=hard_shell_speed**4-9.81*(9.81*exact_horizontal*exact_horizontal+2.0*exact_aim.y*hard_shell_speed*hard_shell_speed)
+		if exact_discriminant>=0.0:fly.gun_angle=atan((hard_shell_speed*hard_shell_speed-sqrt(exact_discriminant))/(9.81*maxf(1.0,exact_horizontal)))
+		fly.turret_angle=wrapf(atan2(exact_aim.x,exact_aim.z)-fly.rotation.y,-PI,PI)
+	battle.demo_fly_velocity_valid=false;fly.reload_left=0.0
+	var aligned_fire=battle.apply_demo_tactical_aux(fly,[.2,0.0,0.0,0.0,0.0,0.0])
+	check(aligned_fire[5]==1.0,"Hard gunnery releases fire when its predicted ballistic aim is aligned")
+	fly.gun_angle=saved_gun
+	battle.sim_time=saved_sim_time;fly.seen=saved_seen;fly.target=saved_target;fly.turret_angle=saved_turret
+	var fallback_source=FileAccess.get_file_as_string("res://scripts/battle.gd")
+	check(fallback_source.contains("if is_demo and v.agent_id==8:v.cmd=apply_demo_tactical_aux(v,v.cmd,delta)"),"Hard tactical and gunnery assistance also runs in the no-backend Open Day fallback")
 	var player=battle.vehicles[0];var saved_penetration=player.cfg.ammo_data.penetration_mm.duplicate(true)
 	player.cfg.ammo_data.penetration_mm=[[0.0,10000.0],[3000.0,10000.0]]
 	var health_before=fly.demo_health;var modules_before=fly.modules.duplicate(true)
@@ -70,7 +168,7 @@ func run():
 	check(result_page.result_outcome(true,true)=="draw","Surviving vehicles are never scored as a win")
 	check(result_page.result_outcome(true,false)=="human" and result_page.result_outcome(false,true)=="fly" and result_page.result_outcome(false,false)=="draw","A winner requires destruction of the opposing vehicle")
 	result_page.free()
-	check(not battle.camera_button.visible and is_instance_valid(battle.demo_controls) and (battle.demo_controls.text.contains("LMB") or battle.demo_controls.text.contains("ЛКМ")) and (battle.demo_controls.text.contains("RMB") or battle.demo_controls.text.contains("ПКМ")),"Open Day uses the simple mouse-only guide without a camera selector")
+	check(not battle.camera_button.visible and is_instance_valid(battle.demo_controls) and (battle.demo_controls.text.contains("LMB") or battle.demo_controls.text.contains("ЛКМ")) and (battle.demo_controls.text.contains("RMB") or battle.demo_controls.text.contains("ПКМ")),"Mouse fallback controls remain available without a camera selector")
 	check(is_instance_valid(battle.impact_killcam),"Non-blocking hit camera is available in the otherwise unused corner")
 	battle.gunner_reticle.set_aim_screen_position(Vector2(-25.0,420.0))
 	check(battle.gunner_reticle.has_aim_screen_position and battle.gunner_reticle.aim_screen_position.x<0.0,"Sight preserves offscreen impact coordinates instead of snapping to screen centre")
@@ -81,6 +179,8 @@ func run():
 	battle.camera_mode=1;await process_frame
 	check(battle.gunner_reticle.visible,"Shared gun sight is visible in third-person battle view")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
+	var battle_source=FileAccess.get_file_as_string("res://scripts/battle.gd")
+	check(battle_source.contains("demo_update_aim_from_world_point(vehicles[0],demo_aim_world_point)") and not battle_source.contains("demo_apply_mouse_motion(get_viewport().get_mouse_position())"),"Per-frame Open Day aim updates reuse a stable world point instead of raycasting from the moving camera")
 	battle.paused=false;battle.camera_mode=1
 	var right_click=InputEventMouseButton.new();right_click.button_index=MOUSE_BUTTON_RIGHT;right_click.pressed=true
 	battle._unhandled_input(right_click)
@@ -90,11 +190,35 @@ func run():
 	right_click.pressed=false;battle._unhandled_input(right_click)
 	check(not battle.demo_sniper_mode and battle.camera_mode==1,"Releasing RMB smoothly returns to the third-person view")
 	battle.demo_apply_mouse_motion(Vector2(900,360),false)
-	check(vehicle.manual_aim and battle.gunner_reticle.aim_screen_position==Vector2(900,360) and vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun,"Screen cursor positions the reticle and sets smooth turret/gun targets")
+	check(vehicle.manual_aim and battle.gunner_reticle.camera_center_marker and vehicle.rotation.y==original_yaw and vehicle.turret_angle==original_turret and vehicle.gun_angle==original_gun,"Mouse selects a target while the camera centre marker remains distinct from the moving gun sight")
+	var camera_forward_before=battle.demo_camera_forward(vehicle)
+	var saved_manual_yaw=vehicle.manual_turret_target
+	vehicle.manual_turret_target=wrapf(saved_manual_yaw+.55,-PI,PI)
+	check(camera_forward_before.angle_to(battle.demo_camera_forward(vehicle))>.4,"Open Day follow camera direction tracks the sight target independently of hull heading")
+	vehicle.manual_turret_target=saved_manual_yaw
+	var left_cursor=Vector2(160,360);var center_cursor=Vector2(640,360);var right_cursor=Vector2(1120,360)
+	battle.demo_apply_mouse_motion(left_cursor);var left_yaw=vehicle.manual_turret_target
+	battle.demo_apply_mouse_motion(center_cursor);var center_yaw=vehicle.manual_turret_target
+	battle.demo_apply_mouse_motion(right_cursor);var right_yaw=vehicle.manual_turret_target
+	check(absf(wrapf(left_yaw-center_yaw,-PI,PI))>deg_to_rad(2.0) and absf(wrapf(right_yaw-center_yaw,-PI,PI))>deg_to_rad(2.0),"Synthetic left, center and right cursor positions produce distinct turret aim targets")
+	check(battle.gunner_reticle.camera_center_marker and battle.demo_aim_world_valid,"The camera centre marker stays fixed while mouse movement updates the world aim point")
+	var stable_aim_point=battle.demo_aim_world_point
+	var stable_vehicle_local_aim=battle.demo_aim_vehicle_local_point
+	var camera_cursor=Vector2(900,360)
+	var aimed_basis=battle.demo_camera_basis_for_aim(camera_cursor,stable_aim_point)
+	var aimed_ray=(aimed_basis*Vector3.FORWARD).normalized()
+	check(aimed_ray.angle_to((stable_aim_point-battle.camera.global_position).normalized())<.001,"Camera centres the selected world point under the reticle without a moving-ray feedback loop")
+	check(absf(aimed_basis.x.dot(Vector3.UP))<.001,"Open Day camera keeps the horizon level while aiming")
+	for cursor_position in [Vector2(180,120),Vector2(640,360),Vector2(1100,620)]:
+		var cursor_basis=battle.demo_camera_basis_for_aim(cursor_position,stable_aim_point)
+		var center_ray=(cursor_basis*Vector3.FORWARD).normalized()
+		check(center_ray.angle_to((stable_aim_point-battle.camera.global_position).normalized())<.001 and absf(cursor_basis.x.dot(Vector3.UP))<.001,"Open Day camera keeps the target centred and horizon level after mouse movement")
 	vehicle.cmd=battle.demo_command(false)
 	vehicle.step(.1)
 	check(absf(vehicle.manual_turret_target-vehicle.turret_angle)<absf(original_turret-vehicle.manual_turret_target) and absf(vehicle.manual_gun_target-vehicle.gun_angle)<absf(original_gun-vehicle.manual_gun_target),"Turret and gun slew toward the selected cursor target at bounded speed")
+	check(battle.demo_aim_vehicle_local_point==stable_vehicle_local_aim,"Aim input remains fixed in vehicle-local space while the tank moves")
 	battle._process(.1)
+	check(battle.demo_aim_world_point.distance_to(vehicle.to_global(stable_vehicle_local_aim))<.001,"Camera target follows the vehicle smoothly instead of lagging behind as a fixed world point")
 	check(absf((-battle.camera.global_basis.z).x)<.99,"Third-person camera remains stable independently of turret traverse")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(360,360),false)
@@ -116,7 +240,7 @@ func run():
 	check(battle.demo_sniper_mode and battle.gunner_reticle.visible and battle.gunner_reticle.scoped and battle.camera.fov>30.0 and battle.camera.fov<62.0,"Third-person reticle remains visible during moderate optical zoom")
 	battle._process(.13)
 	var predicted_aim=Combat.predict_impact(battle.get_world_3d().direct_space_state,vehicle.muzzle.global_position,vehicle.muzzle.global_basis.z,vehicle.cfg.ammo_data,vehicle.excluded())
-	check(battle.gunner_reticle.aim_screen_position.x>=0.0 and battle.gunner_reticle.aim_screen_position.y>=0.0,"Open Day keeps the reticle at the active cursor position")
+	check(battle.gunner_reticle.camera_center_marker,"Open Day keeps a separate camera marker fixed at screen centre")
 	await capture("battle-mouse-zoom-1280x720")
 	battle.impact_killcam.show_impact({"source_id":0,"source_name":"B1 T-34-85","target_name":"R1 Panther G","vehicle":"Panther G","vehicle_id":"panther_g","turret_angle":.25,"shell":"test shell","shot_count":3,"module_positions":{"gunner":[0.0,1.0,1.0]},"destroyed_modules":["gunner"],"damaged_modules":["gunner","breech"],"fatal":true,"impact":{"penetrated":true,"zone":"turret_front","capability":180.0,"effective":90.0,"damaged":["gunner"],"crew_alive":1,"crew_total":5,"outcome":"lethal","point_local":[0.0,1.0,2.0],"incoming_local":[0.0,0.0,-1.0]}})
 	check(battle.impact_killcam.visible and battle.impact_killcam.body.text.contains("gunner"),"Impact report shows cumulative crew and module damage")

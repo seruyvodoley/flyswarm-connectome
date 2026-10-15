@@ -27,9 +27,8 @@ func height_at(x: float, z: float) -> float:
 	return hills+ridge+valley+river
 
 func demo_height_at(x: float,z: float) -> float:
-	# Small rolling ground keeps the 1v1 readable and gives the imported
-	# vegetation a believable footing without changing the research terrain.
-	return 1.35*sin(x/78.0)*cos(z/92.0)+.8*sin(z/46.0)*sin(x/61.0)+.25*cos(x/24.0+z/31.0)
+	# Keep the valley gently rolling so tanks can engage after the opening smoke lifts.
+	return .38*sin(x/78.0)*cos(z/92.0)+.22*sin(z/46.0)*sin(x/61.0)
 
 func material(c: Color) -> StandardMaterial3D:
 	var m=StandardMaterial3D.new()

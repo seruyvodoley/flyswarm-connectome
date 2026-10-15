@@ -54,6 +54,35 @@ func _ready():
 	label(col,"LOCAL RESEARCH BUILD     /     Historical geometry and armour data remain under validation",13).modulate=Color("7f9389")
 	var buttons=find_children("*","Button",true,false)
 	if not buttons.is_empty():buttons[0].grab_focus()
+
+func _input(_event):
+	if not AppState.open_day_mode or page!="PauseMenu":return
+	if Input.is_action_just_pressed("od_pause"):
+		get_viewport().set_input_as_handled()
+		AppState.resume()
+		return
+	var back=Input.is_action_just_pressed("od_back")
+	var confirm=Input.is_action_just_pressed("od_confirm")
+	var direction=0
+	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):direction=-1
+	elif Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):direction=1
+	if not back and not confirm and direction==0:return
+	get_viewport().set_input_as_handled()
+	if back:
+		AppState.resume()
+		return
+	var buttons: Array[Button]=[]
+	for node in find_children("*","Button",true,false):
+		if node is Button and node.visible and not node.disabled:buttons.append(node)
+	if buttons.is_empty():return
+	var focus=get_viewport().gui_get_focus_owner()
+	var index=buttons.find(focus)
+	if index<0:index=0
+	if direction!=0:
+		index=(index+direction+buttons.size())%buttons.size()
+		buttons[index].grab_focus()
+	elif confirm:
+		buttons[index].emit_signal("pressed")
 func label(parent: Node,text: String,size=19) -> Label:
 	var node=Label.new();node.text=AppState.tr_text(text);node.add_theme_font_size_override("font_size",size);parent.add_child(node);return node
 func text_block(text: String):

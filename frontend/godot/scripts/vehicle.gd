@@ -1,6 +1,7 @@
 extends CharacterBody3D
 const Combat=preload("res://scripts/combat.gd")
 const VehicleAppearance=preload("res://scripts/vehicles/vehicle_appearance.gd")
+const DEMO_HEALTH_POINTS=6
 var cfg: Dictionary
 var world
 var agent_id=0
@@ -58,7 +59,7 @@ func setup(config: Dictionary, index: int, battle):
 	world=battle
 	ammo_left=int(cfg.ammo_count)
 	if world.is_demo and index in [0,8]:
-		demo_health_max=6 if index==0 else 3
+		demo_health_max=DEMO_HEALTH_POINTS
 		demo_health=demo_health_max
 	collision_layer=2
 	collision_mask=3
@@ -380,7 +381,7 @@ func step(dt: float):
 	if cmd[5]>.5 and weapon_block_reason()=="":
 		world.fire(self)
 		gun.position-=Vector3(0,0,.22)
-		reload_left=(12.0 if world.is_demo and agent_id==8 else (3.0 if world.is_demo and agent_id==0 else float(cfg.reload_s)*(1 if modules.loader else 2.5)))
+		reload_left=(4.0 if world.is_demo and agent_id==8 else (3.0 if world.is_demo and agent_id==0 else float(cfg.reload_s)*(1 if modules.loader else 2.5)))
 		ammo_left-=1
 		metrics.shots+=1
 	metrics.distance_travelled+=moved

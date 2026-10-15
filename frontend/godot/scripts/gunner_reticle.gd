@@ -7,6 +7,7 @@ var weapon_block=""
 var aim_screen_position=Vector2(-1,-1)
 var has_aim_screen_position=false
 var aim_ready=false
+var camera_center_marker=false
 
 func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -41,6 +42,11 @@ func _draw():
 	var c=aim_screen_position if has_aim_screen_position else size*.5
 	var colour=Color("8ff0a4") if aim_ready else (Color("e5ddb5") if scoped else Color(0.88,0.92,0.82,0.92))
 	var shadow=Color(0.02,0.03,0.02,0.82)
+	if camera_center_marker:
+		var camera_center=size*.5
+		var marker_colour=Color("63d8d1",.9)
+		draw_arc(camera_center,8.0,0.0,TAU,32,marker_colour,1.5,true)
+		draw_circle(camera_center,1.5,marker_colour)
 	if scoped:
 		# Calibrated optic overlay: graduated marks and a strong bezel stay
 		# readable against both sky and terrain.

@@ -18,6 +18,7 @@ const Bridge=preload("res://scripts/bridge.gd")
 const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
 const ImpactKillcam=preload("res://scripts/impact_killcam.gd")
 const VehicleDamageStatus=preload("res://scripts/vehicle_damage_status.gd")
+const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
 const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
 const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
@@ -97,13 +98,29 @@ var demo_brain_text: Label
 var demo_brain_visible=true
 var demo_hud_clock=0.0
 var demo_sniper_mode=false
+var demo_aim_world_point=Vector3.ZERO
+var demo_aim_world_valid=false
+var demo_aim_vehicle_local_point=Vector3.ZERO
+var demo_fly_target_velocity=Vector3.ZERO
+var demo_fly_target_acceleration=Vector3.ZERO
+var demo_fly_velocity_valid=false
 var aim_prediction_timer=0.0
 var mouse_fire_pending=false
 var middle_drag_active=false
 var demo_nav_samples=0
 var demo_nav_intervention_sum=0.0
+var demo_neural_trace_samples=[]
 var demo_last_feedback=""
 var demo_camera_before_scope=1
+var demo_gamepad_active=false
+var demo_controller_lost=false
+var demo_controller_device=-1
+var demo_fire_held=false
+var demo_fire_rest=0.0
+var demo_zoom_rest=0.0
+var demo_camera_yaw=0.0
+var demo_camera_pitch=-.12
+var demo_controller_status: Label
 var impact_killcam: Control
 var vehicle_status_panel: PanelContainer
 var vehicle_status_text: Label
@@ -128,6 +145,8 @@ var range_killcam_panel: PanelContainer
 var range_killcam_title: Label
 var range_killcam_body: Label
 var range_killcam_path: MeshInstance3D
+var demo_smoke_screen: StaticBody3D
+var demo_smoke_material: StandardMaterial3D
 
 func option(name: String, fallback: String="") -> String:
 	var args=launch_args if session_config!=null else OS.get_cmdline_user_args()
@@ -277,6 +296,7 @@ func _ready():
 	terrain.vegetation_density=AppState.settings.vegetation if session_config!=null else 1.0
 	terrain.build(training,int(scenario.seed),float(scenario.size_m))
 	if is_demo:
+		create_demo_smoke_screen()
 		var demo_arena=DemoArena.instantiate()
 		demo_arena.configure(terrain,AppState.settings.vegetation if session_config!=null else 1.0)
 		add_child(demo_arena)
@@ -656,9 +676,13 @@ func _ready():
 
 func setup_demo_ui(canvas: CanvasLayer):
 	selected=0;camera_mode=1;last_camera_mode=-1;demo_intro_left=4.0;demo_sniper_mode=false
-	hud.visible=false;detail.visible=true;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=true;update_camera_button()
+	OpenDayController.configure()
+	initialize_demo_controller()
+	if not Input.joy_connection_changed.is_connected(_on_demo_joy_connection_changed):Input.joy_connection_changed.connect(_on_demo_joy_connection_changed)
+	hud.visible=false;detail.visible=true;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=true;gunner_reticle.camera_center_marker=true;update_camera_button()
 	demo_status=Label.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(420,150);demo_status.add_theme_font_size_override("font_size",22);demo_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_status.add_theme_constant_override("shadow_offset_x",2);demo_status.add_theme_constant_override("shadow_offset_y",2);canvas.add_child(demo_status)
-	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.text="MOVE CURSOR: AIM · LMB: FIRE · HOLD RMB: ZOOM\nTANK DRIVES AND POSITIONS ITSELF" if str(AppState.settings.language)!="ru" else "ДВИГАЙТЕ КУРСОР: ПРИЦЕЛИВАНИЕ · ЛКМ: ВЫСТРЕЛ · УДЕРЖИВАЙТЕ ПКМ: ПРИБЛИЖЕНИЕ\nТАНК САМ ДВИЖЕТСЯ И МЕНЯЕТ ПОЗИЦИЮ";demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls)
+	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls);update_demo_control_hint()
+	demo_controller_status=Label.new();demo_controller_status.set_anchors_preset(Control.PRESET_CENTER);demo_controller_status.offset_left=-350;demo_controller_status.offset_right=350;demo_controller_status.offset_top=-75;demo_controller_status.offset_bottom=75;demo_controller_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_controller_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_controller_status.add_theme_font_size_override("font_size",26);demo_controller_status.add_theme_color_override("font_color",Color("ead58f"));demo_controller_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controller_status.add_theme_constant_override("shadow_offset_x",2);demo_controller_status.add_theme_constant_override("shadow_offset_y",2);demo_controller_status.visible=false;demo_controller_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controller_status)
 	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-410;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=66;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
 	demo_brain_panel=PanelContainer.new();demo_brain_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE);demo_brain_panel.offset_left=-410;demo_brain_panel.offset_right=-24;demo_brain_panel.offset_top=78;demo_brain_panel.offset_bottom=-24
 	var style=StyleBoxFlat.new();style.bg_color=Color(.035,.06,.055,.93);style.border_color=Color("bba16c");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;demo_brain_panel.add_theme_stylebox_override("panel",style)
@@ -668,11 +692,141 @@ func setup_demo_ui(canvas: CanvasLayer):
 	demo_intro=Label.new();demo_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);demo_intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_intro.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_intro.add_theme_font_size_override("font_size",42);demo_intro.add_theme_color_override("font_color",Color("ead58f"));demo_intro.add_theme_color_override("font_shadow_color",Color.BLACK);demo_intro.add_theme_constant_override("shadow_offset_x",3);demo_intro.add_theme_constant_override("shadow_offset_y",3);demo_intro.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_intro)
 	vehicles[8].get_node("Identification").text="🪰 FLY-01"
 
+func initialize_demo_controller() -> void:
+	demo_controller_device=find_preferred_demo_controller()
+	demo_gamepad_active=demo_controller_device>=0
+	demo_controller_lost=false
+	demo_camera_yaw=vehicles[0].rotation.y if not vehicles.is_empty() else 0.0
+	demo_camera_pitch=-.12
+	demo_fire_held=false
+	if demo_gamepad_active:
+		demo_fire_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT)
+		demo_zoom_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_LEFT)
+		print("OPENDAY DUALSENSE id=",demo_controller_device," name=",Input.get_joy_name(demo_controller_device)," L2_rest=",demo_zoom_rest," R2_rest=",demo_fire_rest," stick=",[Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_LEFT_X),Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_LEFT_Y),Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_RIGHT_X),Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_RIGHT_Y)])
+
+func update_demo_control_hint() -> void:
+	if not is_instance_valid(demo_controls):return
+	if str(AppState.settings.language)=="ru":
+		demo_controls.text="ЛЕВЫЙ СТИК: ДВИЖЕНИЕ · ПРАВЫЙ СТИК: ВЗГЛЯД И ПРИЦЕЛ · L2: ПРИБЛИЖЕНИЕ · R2: ВЫСТРЕЛ · OPTIONS: ПАУЗА · ○: НАЗАД" if demo_gamepad_active else "МЫШЬ: ПРИЦЕЛИВАНИЕ · ЛКМ: ВЫСТРЕЛ · УДЕРЖИВАЙТЕ ПКМ: ПРИБЛИЖЕНИЕ · ПРОБЕЛ: ПАУЗА · ESC: МЕНЮ\nПОДКЛЮЧИТЕ DUALSENSE ДЛЯ РУЧНОГО УПРАВЛЕНИЯ"
+	else:
+		demo_controls.text="LEFT STICK: DRIVE · RIGHT STICK: LOOK AND AIM · L2: ZOOM · R2: FIRE · OPTIONS: PAUSE · ○: BACK" if demo_gamepad_active else "MOUSE: AIM · LMB: FIRE · HOLD RMB: ZOOM · SPACE: PAUSE · ESC: MENU\nCONNECT DUALSENSE FOR MANUAL DRIVE"
+
+func _on_demo_joy_connection_changed(device: int, connected: bool) -> void:
+	if not is_demo:return
+	if connected:
+		var connected_name=Input.get_joy_name(device).to_lower()
+		var active_name=Input.get_joy_name(demo_controller_device).to_lower() if demo_controller_device>=0 else ""
+		if demo_controller_lost or not demo_gamepad_active or (connected_name.contains("dualsense") and not active_name.contains("dualsense")):
+			var reconnecting=demo_controller_lost
+			demo_gamepad_active=true
+			demo_controller_lost=false
+			demo_controller_device=device
+			demo_fire_rest=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT)
+			demo_zoom_rest=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_TRIGGER_LEFT)
+			demo_fire_held=false
+			if is_instance_valid(demo_controller_status) and reconnecting:
+				demo_controller_status.text="КОНТРОЛЛЕР ПОДКЛЮЧЁН · НАЖМИТЕ OPTIONS ДЛЯ ПРОДОЛЖЕНИЯ" if str(AppState.settings.language)=="ru" else "CONTROLLER CONNECTED · PRESS OPTIONS TO RESUME"
+				demo_controller_status.visible=true
+			elif is_instance_valid(demo_controller_status):demo_controller_status.visible=false
+			update_demo_control_hint()
+		return
+	if device!=demo_controller_device:return
+	var next_device=find_preferred_demo_controller(device)
+	if next_device>=0:
+		demo_controller_device=next_device
+		demo_fire_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT)
+		demo_zoom_rest=Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_LEFT)
+		demo_fire_held=false
+		return
+	demo_fire_held=false
+	mouse_fire_pending=false
+	demo_sniper_mode=false
+	demo_controller_lost=true
+	demo_controller_safe_pause()
+	if is_instance_valid(demo_controller_status):
+		demo_controller_status.text="КОНТРОЛЛЕР ОТКЛЮЧЁН · БОЙ НА ПАУЗЕ" if str(AppState.settings.language)=="ru" else "CONTROLLER DISCONNECTED · BATTLE PAUSED"
+		demo_controller_status.visible=true
+	update_demo_control_hint()
+
+func demo_controller_safe_pause() -> void:
+	suspend_active_clock()
+	paused=true
+	if vehicles.is_empty():return
+	vehicles[0].cmd=[0.0,0.0,0.0,0.0,0.0,0.0]
+	vehicles[0].drive_throttle=0.0
+	vehicles[0].speed=0.0
+	vehicles[0].yaw_rate=0.0
+
+func find_preferred_demo_controller(exclude_device: int=-1) -> int:
+	var devices=Input.get_connected_joypads()
+	for device in devices:
+		if int(device)!=exclude_device and Input.get_joy_name(int(device)).to_lower().contains("dualsense"):return int(device)
+	for device in devices:
+		if int(device)!=exclude_device:return int(device)
+	return -1
+
+func update_demo_controller_input(delta: float) -> void:
+	if not demo_gamepad_active or demo_controller_lost:return
+	if Input.is_action_just_pressed("od_pause"):
+		if paused and is_instance_valid(demo_controller_status) and demo_controller_status.visible:
+			resume_active_clock()
+			paused=false
+			if is_instance_valid(demo_controller_status):demo_controller_status.visible=false
+		elif demo_intro_left<=0.0:
+			pause_requested.emit()
+		return
+	if paused or demo_intro_left>0.0:return
+	var zoom_value=OpenDayController.normalize_trigger(Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_LEFT),demo_zoom_rest)
+	demo_set_sniper_mode(zoom_value>=OpenDayController.TRIGGER_THRESHOLD)
+	var fire_value=OpenDayController.normalize_trigger(Input.get_joy_axis(demo_controller_device,JoyAxis.JOY_AXIS_TRIGGER_RIGHT),demo_fire_rest)
+	var fire_now=fire_value>=OpenDayController.TRIGGER_THRESHOLD
+	if fire_now and not demo_fire_held:mouse_fire_pending=true
+	demo_fire_held=fire_now
+	var look_x=Input.get_action_strength("od_look_right")-Input.get_action_strength("od_look_left")
+	var look_y=Input.get_action_strength("od_look_down")-Input.get_action_strength("od_look_up")
+	var angles=OpenDayController.advance_camera(demo_camera_yaw,demo_camera_pitch,Vector2(look_x,look_y),delta,demo_sniper_mode)
+	demo_camera_yaw=angles.x
+	demo_camera_pitch=angles.y
+
 func demo_health(vehicle) -> float:
 	if not vehicle.alive:return 0.0
 	var total=maxi(1,vehicle.modules.size());var working=0
 	for value in vehicle.modules.values():working+=1 if value else 0
 	return float(working)/float(total)
+
+func demo_male_cns_trace_summary() -> Dictionary:
+	var channel_names=["DNp09_L","DNp09_R","DNa02_L","DNa02_R","DNp01","wing_song"]
+	var trace_summary={};var channel_values=[]
+	for _channel in channel_names:channel_values.append([])
+	var decoded_values=[]
+	var pursuit_active=0;var turn_active=0;var turret_active=0;var escape_active=0;var count=demo_neural_trace_samples.size()
+	for sample in demo_neural_trace_samples:
+		var trace=sample.get("trace",[])
+		while trace.size()<channel_names.size():trace.append(0.0)
+		for channel in channel_names.size():channel_values[channel].append(float(trace[channel]))
+		if float(trace[0])+float(trace[1])>2.0:pursuit_active+=1
+		if absf(float(trace[1])-float(trace[0]))>.05:turn_active+=1
+		if absf(float(trace[3])-float(trace[2]))>.05:turret_active+=1
+		if float(trace[4])>.05:escape_active+=1
+		var decoded=sample.get("decoder_action",[])
+		if decoded is Array and decoded.size()>=6:decoded_values.append(decoded)
+	for channel in channel_names.size():
+		var values: Array=channel_values[channel]
+		var ordered=values.duplicate();ordered.sort()
+		var sum=0.0;var nonzero=0
+		for value in values:
+			sum+=float(value)
+			if absf(float(value))>.05:nonzero+=1
+		var p95=float(ordered[mini(ordered.size()-1,int(floor((ordered.size()-1)*.95)))]) if not ordered.is_empty() else 0.0
+		trace_summary[channel_names[channel]]={"mean":sum/maxf(1.0,float(values.size())),"p95":p95,"max":float(ordered.back()) if not ordered.is_empty() else 0.0,"nonzero_fraction":float(nonzero)/maxf(1.0,float(values.size()))}
+	var decoded_summary=[]
+	for channel in 6:
+		var sum=0.0;var nonzero=0
+		for action in decoded_values:
+			sum+=float(action[channel])
+			if absf(float(action[channel]))>.05:nonzero+=1
+		decoded_summary.append({"mean":sum/maxf(1.0,float(decoded_values.size())),"nonzero_fraction":float(nonzero)/maxf(1.0,float(decoded_values.size()))})
+	return {"source":"fresh FlyBrain(batch=1) replies only","samples":count,"channels_hz":trace_summary,"baseline_decoder_actions":["throttle","brake","steer","turret","elevation","fire"],"baseline_decoder_stats":decoded_summary,"above_threshold_fraction":{"DNp09_sum_gt_2_hz":float(pursuit_active)/maxf(1.0,float(count)),"DNp09_turn_delta_gt_0p05_hz":float(turn_active)/maxf(1.0,float(count)),"DNa02_turret_delta_gt_0p05_hz":float(turret_active)/maxf(1.0,float(count)),"DNp01_escape_gt_0p05_hz":float(escape_active)/maxf(1.0,float(count))}}
 
 func update_vehicle_status():
 	if not is_instance_valid(vehicle_status_panel):return
@@ -756,8 +910,10 @@ func update_demo_hud():
 	if intent.size()>=3 and decoded.size()>=3 and navigation.size()>=3:
 		lines.append("RAW T %.2f S %.2f · DEC T %.2f S %.2f" % [float(intent[0]),float(intent[2]),float(decoded[0]),float(decoded[2])])
 		lines.append("NAV Δ T %.2f S %.2f" % [float(navigation[0]),float(navigation[2])])
-	var nav_share=100.0*demo_nav_intervention_sum/maxf(1.0,float(demo_nav_samples)*6.0)
-	lines.append("NAV ASSIST · %.0f%%" % nav_share)
+	var nav_assist=control.get("navigation_assistance",[])
+	var gun_assist=control.get("gunnery_assistance",[])
+	if nav_assist.size()>=3:lines.append("NAV Δ T %.2f · S %.2f" % [float(nav_assist[0]),float(nav_assist[2])])
+	if gun_assist.size()>=3:lines.append("AIM Δ T %.2f · E %.2f · FIRE %.2f" % [float(gun_assist[0]),float(gun_assist[1]),float(gun_assist[2])])
 	var command_age_ms=(Time.get_ticks_usec()-bridge.last_response_at_usec)/1000.0 if bridge.last_response_at_usec>0 else -1.0
 	if command_age_ms>=0:
 		lines.append("%s: %.1f ms · #%d · age %.0f ms" % [AppState.tr_text("Tick"),float(bridge.last_reply.get("tick_ms",0)),bridge.responses_received,command_age_ms])
@@ -768,7 +924,6 @@ func update_demo_hud():
 func demo_apply_mouse_motion(cursor: Vector2,_hull_turning: bool=false):
 	if not is_demo or vehicles.is_empty() or paused or camera_mode!=1:return
 	var vehicle=vehicles[0]
-	if is_instance_valid(gunner_reticle):gunner_reticle.set_aim_screen_position(cursor)
 	if not vehicle.manual_aim:
 		vehicle.manual_aim=true
 	var origin=camera.project_ray_origin(cursor)
@@ -783,11 +938,17 @@ func demo_apply_mouse_motion(cursor: Vector2,_hull_turning: bool=false):
 		var denominator=ray.y
 		var ray_distance=(floor_y-origin.y)/denominator if absf(denominator)>.04 else 110.0
 		target=origin+ray*clampf(ray_distance,25.0,180.0)
+	demo_aim_world_point=target
+	demo_aim_vehicle_local_point=vehicle.to_local(target)
+	demo_aim_world_valid=true
+	demo_update_aim_from_world_point(vehicle,target)
+
+func demo_update_aim_from_world_point(vehicle,target: Vector3):
 	var muzzle=vehicle.muzzle.global_position
 	var offset=target-muzzle
 	var horizontal=Vector2(offset.x,offset.z).length()
 	if horizontal<2.0:
-		target=muzzle+ray*70.0;offset=target-muzzle;horizontal=maxf(2.0,Vector2(offset.x,offset.z).length())
+		target=muzzle+demo_camera_forward(vehicle)*70.0;offset=target-muzzle;horizontal=maxf(2.0,Vector2(offset.x,offset.z).length())
 	var world_yaw=atan2(offset.x,offset.z)
 	var relative_yaw=wrapf(world_yaw-vehicle.rotation.y,-PI,PI)
 	var traverse=deg_to_rad(float(vehicle.cfg.traverse_limit_deg))
@@ -827,28 +988,178 @@ func demo_player_command(fire_pressed: bool=false) -> Array:
 func demo_mouse_commands(fire_pressed: bool) -> Array:
 	return demo_player_command(fire_pressed)
 
-func apply_demo_tactical_aux(vehicle,source: Array) -> Array:
-	# Navigation is a low-level assist layered over the real decoded CNS command.
+func demo_gamepad_commands(fire_pressed: bool) -> Array:
+	var movement=Input.get_vector("od_move_left","od_move_right","od_move_forward","od_move_reverse",0.0)
+	var vehicle=vehicles[0]
+	vehicle.manual_hull_aim=false
+	return OpenDayController.drive_command(movement,fire_pressed)
+
+func demo_apply_gamepad_aim() -> void:
+	if not is_demo or vehicles.is_empty() or paused or demo_controller_lost or camera_mode!=1:return
+	var vehicle=vehicles[0]
+	vehicle.manual_aim=true
+	vehicle.manual_hull_aim=false
+	var centre=get_viewport().get_visible_rect().size*.5
+	var origin=camera.project_ray_origin(centre)
+	var ray=camera.project_ray_normal(centre)
+	var query=PhysicsRayQueryParameters3D.create(origin,origin+ray*260.0,7,vehicle.excluded())
+	var hit=get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Vector3
+	if not hit.is_empty():
+		target=hit.position
+	else:
+		var floor_y=terrain.height_at(vehicle.position.x,vehicle.position.z)+1.0
+		var distance=(floor_y-origin.y)/ray.y if absf(ray.y)>.035 else 120.0
+		target=origin+ray*clampf(distance,25.0,220.0)
+	demo_aim_world_point=target
+	demo_aim_vehicle_local_point=vehicle.to_local(target)
+	demo_aim_world_valid=true
+	demo_update_aim_from_world_point(vehicle,target)
+
+func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
+	# Keep the decoded CNS channels intact, then add separately recorded
+	# locomotion and gunnery assistance for a vehicle not designed to drive tanks.
 	var command=source.duplicate()
 	while command.size()<6:command.append(0.0)
 	if not vehicle.alive or not vehicles[0].alive:return [0,0,0,0,0,0]
-	var delta=vehicles[0].global_position-vehicle.global_position;delta.y=0
-	var desired=atan2(delta.x,delta.z)
-	if delta.length()<58.0:desired+=.48 if int(vehicle.world.sim_time/14.0)%2==0 else -.48
+	var player=vehicles[0]
+	var delta=player.global_position-vehicle.global_position;delta.y=0
+	var distance=delta.length()
+	var waypoint: Vector3
+	# Circle to a changing standoff point; periodically reverse the flank.
+	var radial=Vector2(vehicle.position.x-player.position.x,vehicle.position.z-player.position.z)
+	if radial.length()<.01:radial=Vector2(0.0,1.0)
+	var flank_sign=1.0 if int(sim_time/12.0)%2==0 else -1.0
+	var flank_angle=flank_sign*deg_to_rad(58.0+18.0*sin(sim_time*.23))
+	var standoff=clampf(48.0+7.0*sin(sim_time*.29),40.0,58.0)
+	var player_to_fly=(vehicle.global_position-player.global_position).normalized()
+	var player_gun_forward=Vector3(sin(player.rotation.y+player.turret_angle),0.0,cos(player.rotation.y+player.turret_angle))
+	if player_gun_forward.dot(player_to_fly)>.94:
+		# Break the firing line when the opponent has settled its gun on us.
+		flank_angle=flank_sign*deg_to_rad(82.0)
+		standoff+=10.0
+	var offset=radial.normalized().rotated(flank_angle)*standoff
+	waypoint=Vector3(player.position.x+offset.x,player.position.y,player.position.z+offset.y)
+	if distance<32.0:
+		waypoint=player.position+Vector3(radial.normalized().x*44.0,0.0,radial.normalized().y*44.0)
+	var to_waypoint=waypoint-vehicle.global_position;to_waypoint.y=0
+	var desired=atan2(to_waypoint.x,to_waypoint.z)
 	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
-	var nav_steer=clampf(error*1.25,-.82,.82)
+	var nav_steer=clampf(error*1.6,-1.0,1.0)
+	# A short look-ahead ray adds obstacle avoidance without overriding the CNS.
+	var forward=Vector3(sin(vehicle.rotation.y),0.0,cos(vehicle.rotation.y))
+	var ray_start=vehicle.global_position+Vector3(0,1.8,0)
+	var obstacle_query=PhysicsRayQueryParameters3D.create(ray_start,ray_start+forward*22.0,1,vehicle.excluded())
+	var obstacle=get_world_3d().direct_space_state.intersect_ray(obstacle_query)
+	if not obstacle.is_empty():nav_steer=1.0 if int(vehicle.agent_id+sim_time/3.0)%2==0 else -1.0
 	var neural_throttle=float(command[0]);var neural_steer=float(command[2])
-	command[0]=maxf(neural_throttle,.36)
-	command[2]=clampf(neural_steer*.65+nav_steer*.35,-1.0,1.0)
+	var approach_throttle=.72 if to_waypoint.length()>20.0 else .42
+	command[0]=maxf(neural_throttle,approach_throttle)
+	command[2]=clampf(neural_steer*.35+nav_steer*.65,-1.0,1.0)
+	# The CNS keeps influencing motor commands, but a firing impulse alone may
+	# never discharge the gun. Only the ballistic solution below can release it.
+	command[5]=0.0
+	if sim_time>=10.0 and vehicle.seen and vehicle.target==0 and distance<280.0:
+		var velocity_delta=maxf(.001,dt)
+		var measured_velocity=player.velocity
+		if demo_fly_velocity_valid:
+			var measured_acceleration=(measured_velocity-demo_fly_target_velocity)/velocity_delta
+			measured_acceleration.y=0.0
+			demo_fly_target_acceleration=demo_fly_target_acceleration.lerp(measured_acceleration.limit_length(7.0),.28)
+		else:
+			demo_fly_target_acceleration=Vector3.ZERO
+		demo_fly_target_velocity=measured_velocity
+		demo_fly_velocity_valid=true
+		var projectile_speed=float(vehicle.cfg.ammo_data.muzzle_velocity_m_s)
+		var flight_time=distance/maxf(1.0,projectile_speed)
+		var predicted_target=player.global_position+Vector3(0,1.45,0)
+		var aim_delta=Vector3.ZERO
+		# Iteratively lead the target using shell flight time and smoothed
+		# acceleration, so a steering change does not leave the solution behind.
+		for _iteration in 4:
+			var lead_velocity=demo_fly_target_velocity+demo_fly_target_acceleration*flight_time
+			predicted_target=player.global_position+Vector3(0,1.45,0)+lead_velocity*flight_time+demo_fly_target_acceleration*.5*flight_time*flight_time
+			aim_delta=predicted_target-vehicle.muzzle.global_position
+			flight_time=aim_delta.length()/maxf(1.0,projectile_speed)
+		var horizontal=Vector2(aim_delta.x,aim_delta.z).length()
+		var desired_yaw=atan2(aim_delta.x,aim_delta.z)
+		var turret_error=wrapf(desired_yaw-vehicle.rotation.y-vehicle.turret_angle,-PI,PI)
+		var grav=9.81
+		var disc=projectile_speed**4-grav*(grav*horizontal*horizontal+2.0*aim_delta.y*projectile_speed*projectile_speed)
+		var desired_elevation=atan2(aim_delta.y,maxf(1.0,horizontal))
+		if disc>=0.0:desired_elevation=atan((projectile_speed*projectile_speed-sqrt(disc))/(grav*maxf(1.0,horizontal)))
+		var elevation_error=wrapf(desired_elevation-vehicle.gun_angle,-PI,PI)
+		var neural_turret=float(command[3]);var neural_elevation=float(command[4])
+		command[3]=clampf(neural_turret*.18+clampf(turret_error*2.8,-1.0,1.0)*.82,-1.0,1.0)
+		command[4]=clampf(neural_elevation*.18+clampf(elevation_error*3.6,-1.0,1.0)*.82,-1.0,1.0)
+		if disc>=0.0 and absf(turret_error)<deg_to_rad(.85) and absf(elevation_error)<deg_to_rad(.8) and vehicle.weapon_block_reason()=="":
+			command[5]=1.0
+	elif not vehicle.seen or vehicle.target!=0:
+		demo_fly_velocity_valid=false
+		demo_fly_target_acceleration=Vector3.ZERO
 	return command
 
 func has_los(a,b) -> bool:
+	if demo_sight_locked(a,b):return false
 	var start=a.global_position+Vector3(0,2.5,0)
 	var end=b.global_position+Vector3(0,1.7,0)
 	if terrain.forest_blocks(start,end):return false
 	var q=PhysicsRayQueryParameters3D.create(start,end,5,a.excluded())
 	var hit=get_world_3d().direct_space_state.intersect_ray(q)
 	return hit.is_empty() or (hit.collider.has_meta("vehicle") and hit.collider.get_meta("vehicle")==b)
+
+func demo_sight_locked(a,b) -> bool:
+	return is_demo and sim_time<10.0 and a.team!=b.team
+
+func create_demo_smoke_screen():
+	demo_smoke_screen=StaticBody3D.new()
+	demo_smoke_screen.name="OpeningSmokeScreen"
+	demo_smoke_screen.collision_layer=4
+	demo_smoke_screen.collision_mask=0
+	add_child(demo_smoke_screen)
+	var shape=CollisionShape3D.new()
+	var slab=BoxShape3D.new()
+	slab.size=Vector3(600.0,24.0,3.0)
+	shape.shape=slab
+	shape.position=Vector3(0,11.0,0)
+	demo_smoke_screen.add_child(shape)
+	var visual=MeshInstance3D.new()
+	var mesh=BoxMesh.new()
+	mesh.size=slab.size
+	visual.mesh=mesh
+	demo_smoke_material=StandardMaterial3D.new()
+	demo_smoke_material.albedo_color=Color(.50,.55,.55,.82)
+	demo_smoke_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	demo_smoke_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	demo_smoke_material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED
+	visual.material_override=demo_smoke_material
+	visual.position=shape.position
+	demo_smoke_screen.add_child(visual)
+
+func update_demo_smoke_screen():
+	if not is_instance_valid(demo_smoke_screen):return
+	if sim_time<10.0:return
+	demo_smoke_screen.collision_layer=0
+	demo_smoke_material.albedo_color.a=clampf(1.0-(sim_time-10.0)/2.0,0.0,.82)
+	if sim_time>=12.0:demo_smoke_screen.visible=false
+
+func demo_camera_forward(vehicle) -> Vector3:
+	var turret_target=vehicle.manual_turret_target if vehicle.manual_aim else vehicle.turret_angle
+	var gun_target=vehicle.manual_gun_target if vehicle.manual_aim else vehicle.gun_angle
+	var yaw=vehicle.rotation.y+turret_target
+	return Vector3(sin(yaw)*cos(gun_target),sin(gun_target),cos(yaw)*cos(gun_target)).normalized()
+
+func demo_camera_basis_for_aim(_cursor: Vector2,target: Vector3) -> Basis:
+	var forward=(target-camera.global_position).normalized()
+	if forward.length_squared()<.001:forward=Vector3.FORWARD
+	# Mouse motion selects a world point; the camera brings that point to the
+	# screen centre. Build a fresh horizon-level basis instead of rotating the
+	# previous camera basis, which accumulated roll and caused the carousel.
+	var right=forward.cross(Vector3.UP)
+	if right.length_squared()<.001:right=Vector3.RIGHT
+	else:right=right.normalized()
+	var up=right.cross(forward).normalized()
+	return Basis(right,up,-forward).orthonormalized()
 
 func _physics_process(delta):
 	if paused:return
@@ -951,15 +1262,17 @@ func _physics_process(delta):
 
 			if is_demo and i==8 and bridge.last_valid_commands.size()==16 and is_malecns_controller(vehicles[i]):
 				var before_tactical=command.duplicate()
-				command=apply_demo_tactical_aux(vehicles[i],command)
+				command=apply_demo_tactical_aux(vehicles[i],command,delta)
 				layer["neural_intent"]=layer.get("raw_neural_action",layer.get("neural_intent",[]))
 				var decoded_layer=layer.get("decoder_action",null)
 				layer["decoded_commands"]=decoded_layer if decoded_layer is Array else before_tactical.duplicate()
 				layer["navigation_assistance"]=[]
+				layer["gunnery_assistance"]=[]
 				var intervention=0.0
 				for j in range(6):
 					var amount=command[j]-before_tactical[j]
-					layer["navigation_assistance"].append(amount)
+					if j<=2:layer["navigation_assistance"].append(amount)
+					else:layer["gunnery_assistance"].append(amount)
 					intervention+=absf(amount)
 				demo_nav_samples+=1
 				demo_nav_intervention_sum+=intervention
@@ -979,7 +1292,11 @@ func _physics_process(delta):
 
 			if not is_demo or brain_response_fresh:
 				var traces=bridge.last_reply.get("traces",[])
-				if traces.size()==16:vehicles[i].dn=traces[i]
+				if traces.size()==16:
+					vehicles[i].dn=traces[i]
+					if is_demo and i==8 and brain_response_fresh:
+						var decoded=layer.get("decoder_action",[])
+						demo_neural_trace_samples.append({"trace":traces[i].duplicate(),"decoder_action":decoded.duplicate() if decoded is Array else []})
 				var heard=bridge.last_reply.get("heard",[])
 				if heard.size()==16:vehicles[i].audio_input=heard[i]
 			if layer.size()>0:
@@ -993,11 +1310,12 @@ func _physics_process(delta):
 		if not requires_brain:
 			if frame%5==0:v.sense(delta*5)
 			v.cmd=v.teacher()
+			if is_demo and v.agent_id==8:v.cmd=apply_demo_tactical_aux(v,v.cmd,delta)
 		if is_range:
 			v.cmd=manual_commands() if v.agent_id==0 else [0,0,0,0,0,0]
 		if is_demo:
-			if v.agent_id==0:v.cmd=demo_mouse_commands(mouse_fire_pending)
-			elif v.agent_id==8 and sim_time<8.0:v.cmd[5]=0.0
+			if v.agent_id==0:v.cmd=demo_gamepad_commands(mouse_fire_pending) if demo_gamepad_active else demo_mouse_commands(mouse_fire_pending)
+			elif v.agent_id==8 and sim_time<10.0:v.cmd[5]=0.0
 			elif v.agent_id!=8:v.cmd=[0,0,0,0,0,0]
 		if training:
 			v.cmd[0]=0
@@ -1010,6 +1328,7 @@ func _physics_process(delta):
 	step_shells(delta)
 	if not is_range and not is_demo:step_objectives(delta)
 	sim_time+=delta
+	if is_demo:update_demo_smoke_screen()
 	frame+=1
 	physics_usec+=Time.get_ticks_usec()-started
 	if frame%5==0:
@@ -1833,6 +2152,7 @@ func finish(notify_result=true):
 		report.demo_navigation_samples=demo_nav_samples
 		report.demo_navigation_intervention_mean=demo_nav_intervention_sum/maxf(1.0,float(demo_nav_samples)*6.0)
 		report.demo_no_silent_fallback=true
+		report.demo_male_cns_trace_summary=demo_male_cns_trace_summary()
 	report.male_cns_tick_ms=sample_statistics(bridge.tick_ms_samples)
 	report.ipc_latency_ms=sample_statistics(bridge.latency_ms_samples)
 	report.shot_distances=shot_distances
@@ -1886,11 +2206,15 @@ func write_research_exports(report: Dictionary):
 	write_csv(record_path.path_join("per_agent.csv"),["sim_time","agent_id","team","vehicle","position","speed_m_s","alive","target","modules","metrics"],agents)
 	write_csv(record_path.path_join("actions.csv"),["sim_time","agent_id","raw_neural_action","decoder_action","objective_aux_action","gunnery_aux_action","adapter_action","final_action"],actions)
 func _process(dt):
+	if is_demo:update_demo_controller_input(dt)
 	if is_demo and demo_intro_left>0:
 		demo_intro_left=maxf(0,demo_intro_left-dt)
 		if demo_intro_left>3.0:demo_intro.text=demo_intro_copy("NERVOUS SYSTEM MODEL CONNECTED")
 		elif demo_intro_left>2.0:
-			if str(AppState.settings.language)=="ru":
+			if demo_gamepad_active:
+				var intro_format="ТВОЙ ТАНК: %s\nЛЕВЫЙ СТИК — ДВИЖЕНИЕ · ПРАВЫЙ — ВЗГЛЯД И ПРИЦЕЛ · L2 — ПРИБЛИЖЕНИЕ · R2 — ВЫСТРЕЛ" if str(AppState.settings.language)=="ru" else "Your tank: %s\nLeft stick drive · right stick look and aim · L2 zoom · R2 fire"
+				demo_intro.text=intro_format % [vehicles[0].cfg.display_name]
+			elif str(AppState.settings.language)=="ru":
 				demo_intro.text="ТВОЙ ТАНК: %s\nКУРСОР — НАВЕДЕНИЕ · ЛКМ — ВЫСТРЕЛ · УДЕРЖИВАЙ ПКМ — ПРИБЛИЖЕНИЕ\nТАНК САМ ДВИЖЕТСЯ И МЕНЯЕТ ПОЗИЦИЮ" % vehicles[0].cfg.display_name
 			else:
 				var intro_format=AppState.tr_text("demo.intro.vehicle")
@@ -2019,12 +2343,40 @@ func _process(dt):
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		var target_fov=42.0 if is_demo and demo_sniper_mode else 62.0
 		camera.fov=move_toward(camera.fov,target_fov,45.0*dt) if is_demo else 62.0
-		var demo_heading=v.rotation.y if is_demo else v.rotation.y+v.turret_angle
-		var demo_forward=Vector3(sin(demo_heading),0,cos(demo_heading))
-		var follow=v.position-demo_forward*(15.0 if is_demo else 16.0)+Vector3(0,8 if is_demo else 8,0)
-		camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,minf(1,dt*4))
-		var look_target=v.position+Vector3(0,2,0)+demo_forward*(20 if is_demo else 0)
-		camera.look_at(look_target)
+		var demo_forward=demo_camera_forward(v) if is_demo else Vector3(sin(v.rotation.y+v.turret_angle),0,cos(v.rotation.y+v.turret_angle))
+		# Keep the selected aim point attached to the vehicle's local frame. A
+		# fixed world point drifts behind a moving tank and makes the camera
+		# swing around to chase it, which reads as jitter and loses the vehicle.
+		if is_demo and demo_gamepad_active:
+			var forward=OpenDayController.camera_forward(demo_camera_yaw,demo_camera_pitch)
+			var flat_forward=Vector3(sin(demo_camera_yaw),0.0,cos(demo_camera_yaw)).normalized()
+			var focus=v.global_position+Vector3(0,2.5,0)
+			var desired_position=focus-flat_forward*14.0+Vector3(0,5.2,0)
+			var camera_ray=PhysicsRayQueryParameters3D.create(focus,desired_position,7,v.excluded())
+			var obstruction=get_world_3d().direct_space_state.intersect_ray(camera_ray)
+			if not obstruction.is_empty():desired_position=obstruction.position+(focus-desired_position).normalized()*.45
+			camera.position=desired_position if last_camera_mode!=camera_mode else camera.position.lerp(desired_position,1.0-exp(-dt*7.0))
+			camera.look_at(camera.position+forward,Vector3.UP)
+			demo_apply_gamepad_aim()
+		else:
+			if is_demo and demo_aim_world_valid:demo_aim_world_point=v.to_global(demo_aim_vehicle_local_point)
+			var follow_forward=Vector3(sin(v.rotation.y),0,cos(v.rotation.y)) if is_demo else demo_forward
+			if is_demo and demo_aim_world_valid:
+				var aim_heading=demo_aim_world_point-v.position
+				aim_heading.y=0.0
+				if aim_heading.length_squared()>.01:follow_forward=aim_heading.normalized()
+			var follow=v.position-follow_forward*(15.0 if is_demo else 16.0)+Vector3(0,8,0)
+			var follow_weight=1.0-exp(-dt*3.5)
+			camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,follow_weight)
+			if is_demo and demo_aim_world_valid:
+				# Mouse aim moves the camera target; gamepad aim owns the view direction.
+				var cursor=get_viewport().get_mouse_position()
+				var desired_basis=demo_camera_basis_for_aim(cursor,demo_aim_world_point)
+				var rotation_weight=1.0-exp(-dt*3.5)
+				camera.global_basis=camera.global_basis.slerp(desired_basis,rotation_weight).orthonormalized()
+			else:
+				var look_target=v.position+Vector3(0,2,0)+demo_forward*(20 if is_demo else 0)
+				camera.look_at(look_target)
 	elif camera_mode==2:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		camera.fov=62.0
@@ -2048,15 +2400,15 @@ func _process(dt):
 		if aim_prediction_timer<=0.0:
 			aim_prediction_timer=.12
 			if is_demo:
-				var cursor=get_viewport().get_mouse_position()
-				if not demo_sniper_mode:gunner_reticle.set_aim_screen_position(cursor)
+				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
+				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
 				var aligned=absf(wrapf(v.manual_turret_target-v.turret_angle,-PI,PI))<deg_to_rad(.8) and absf(v.manual_gun_target-v.gun_angle)<deg_to_rad(.6)
 				gunner_reticle.set_aim_ready(aligned and v.reload_left<=0.0)
 			else:
 				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
 				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
-	if is_demo and not paused and demo_intro_left<=0.0 and vehicles.size()>0:
-		demo_apply_mouse_motion(Vector2.ZERO)
+	if is_demo and not demo_gamepad_active and not paused and demo_intro_left<=0.0 and vehicles.size()>0 and demo_aim_world_valid:
+		demo_update_aim_from_world_point(vehicles[0],demo_aim_world_point)
 	update_identification_labels()
 	var connection=AppState.tr_text("BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL")
 	if requires_brain:
@@ -2114,10 +2466,10 @@ func _process(dt):
 		get_viewport().get_texture().get_image().save_png(screenshot_path)
 		screenshot_path=""
 func _unhandled_input(event):
-	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed and not (is_demo and demo_gamepad_active):
 		if (is_demo or is_range) and camera_mode in [1,2] and not paused and not (is_range and range_killcam_active):
 			mouse_fire_pending=true
-	if is_demo and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT:
+	if is_demo and not demo_gamepad_active and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT:
 		demo_set_sniper_mode(event.pressed)
 	if event is InputEventMouseButton and event.pressed and camera_mode==0:
 		if event.button_index==MOUSE_BUTTON_LEFT:
@@ -2129,7 +2481,7 @@ func _unhandled_input(event):
 			battlefield_zoom=clampf(battlefield_zoom*.86,280,1800)
 		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
 			battlefield_zoom=clampf(battlefield_zoom*1.16,280,1800)
-	if is_demo and event is InputEventMouseButton and event.pressed and demo_intro_left>0:
+	if is_demo and not demo_gamepad_active and event is InputEventMouseButton and event.pressed and demo_intro_left>0:
 		demo_intro_left=0;demo_intro.visible=false
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
@@ -2171,16 +2523,16 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
 
 func _input(event):
-	if is_demo and event is InputEventMouseMotion:
+	if is_demo and not demo_gamepad_active and event is InputEventMouseMotion:
 		demo_apply_mouse_motion(event.position,false)
 		return
 	if not (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed):return
-	if is_demo and demo_intro_left>0:
+	if is_demo and not demo_gamepad_active and demo_intro_left>0:
 		demo_intro_left=0.0
 		if is_instance_valid(demo_intro):demo_intro.visible=false
 		get_viewport().set_input_as_handled()
 		return
-	if not (is_demo or is_range) or camera_mode not in [1,2] or paused or (is_range and range_killcam_active):return
+	if (is_demo and demo_gamepad_active) or not (is_demo or is_range) or camera_mode not in [1,2] or paused or (is_range and range_killcam_active):return
 	# Capture before GUI controls can consume a quick click. Interactive buttons
 	# retain their behavior; decorative HUD labels must not swallow playfield fire.
 	var hovered=get_viewport().gui_get_hovered_control()

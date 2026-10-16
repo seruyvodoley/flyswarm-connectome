@@ -143,5 +143,16 @@ func run() -> void:
 	for node in arena.find_children("*","StaticBody3D",true,false):
 		if node.collision_layer==1:interactive_count+=1
 	check(interactive_count<40,"Interactive environment colliders stay under the arena object budget")
+	for flank in ["Left","Right"]:
+		var building=arena.get_node_or_null("FlankFarmstead"+flank)
+		check(building is StaticBody3D,"Each outer farmstead has a real collision body")
+		if building is StaticBody3D:
+			var probe:=BoxShape3D.new();probe.size=Vector3(.5,.5,.5)
+			var building_query:=PhysicsShapeQueryParameters3D.new();building_query.shape=probe;building_query.transform=Transform3D(Basis(),building.global_position+Vector3(0,2.0,0));building_query.collision_mask=1
+			var hits=root.get_world_3d().direct_space_state.intersect_shape(building_query,16)
+			var found=false
+			for hit in hits:
+				if hit.collider==building:found=true;break
+			check(found,"Farmstead proxy blocks vehicle movement through its building footprint")
 	print("ENVIRONMENT PHYSICS validation failures=",failures)
 	quit(1 if failures>0 else 0)

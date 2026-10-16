@@ -35,8 +35,9 @@ func run():
 	check(types.size()==6,"six models")
 	var a=scene.vehicles[0]
 	var b=scene.vehicles[8]
-	a.position=Vector3(500,100,100)
-	b.position=Vector3(500,100,200)
+	# Use the authored centre lane, away from the newly placed farmsteads.
+	a.position=Vector3(0,100,100)
+	b.position=Vector3(0,100,200)
 	a.rotation.y=0
 	b.rotation.y=PI
 	await physics_frame
@@ -65,7 +66,7 @@ func run():
 	check(b.impact_history.is_empty(),"range reset clears accumulated impact report history")
 	var stopped=Combat.impact(Catalog.read_json("ammunition/zis53_ap.json"),1500,Vector3.FORWARD,Vector3.BACK,{"thickness_mm":100})
 	check(not stopped.penetrated and not stopped.ricochet,"insufficient penetration stops at vertical Tiger armor")
-	var blocker=scene.terrain.box(Vector3(500,102,150),Vector3(20,10,5),Color.GRAY)
+	var blocker=scene.terrain.box(Vector3(0,102,150),Vector3(20,10,5),Color.GRAY)
 	await physics_frame
 	check(not scene.has_los(a,b),"building blocks LOS")
 	blocker.queue_free()

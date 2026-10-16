@@ -51,14 +51,16 @@ func _ready():
 	get_tree().auto_accept_quit=false
 	apply_settings()
 
-func _input(_event):
+func _input(event):
 	# Cross/A, D-pad and left-stick navigation work in every application
-	# window. Open Day's own menu keeps its compact vehicle-card focus order.
-	if current_page in ["OpenDayMain","HowItWorks","DemoResult"]:return
-	if current_page not in ["MainMenu","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
+	# window. Open Day's vehicle-select page and result panel own their controls.
+	if current_page in ["OpenDayMain","DemoResult"]:return
+	if current_page not in ["MainMenu","HowItWorks","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
 	var back=Input.is_action_just_pressed("od_back")
 	var confirm=Input.is_action_just_pressed("od_confirm")
-	var direction=menu_navigation_direction()
+	var direction=menu_navigation_direction(event)
+	var left_stick_motion=event is InputEventJoypadMotion and event.axis in [JoyAxis.JOY_AXIS_LEFT_X,JoyAxis.JOY_AXIS_LEFT_Y]
+	if left_stick_motion:get_viewport().set_input_as_handled()
 	if current_page=="PauseMenu" and Input.is_action_just_pressed("od_pause"):back=true
 	if not back and not confirm and direction==0:return
 	var focus=get_viewport().gui_get_focus_owner()
@@ -81,23 +83,34 @@ func _input(_event):
 	elif confirm:
 		buttons[index].emit_signal("pressed")
 
-func menu_navigation_direction() -> int:
-	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):return -1
-	if Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):return 1
+func menu_navigation_direction(event:InputEvent=null) -> int:
 	var strongest=0.0
 	var direction=0
 	var has_controller=false
-	for device in Input.get_connected_joypads():
+	var motion_event=event is InputEventJoypadMotion and event.axis in [JoyAxis.JOY_AXIS_LEFT_X,JoyAxis.JOY_AXIS_LEFT_Y]
+	# Use the actual motion event as well as polling connected devices. This keeps
+	# focus navigation reliable for controllers whose transient axis event arrives
+	# before Godot refreshes get_joy_axis(), and makes it testable without hardware.
+	if motion_event:
 		has_controller=true
-		var horizontal=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_X)
-		var vertical=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_Y)
-		if absf(horizontal)>absf(strongest):
-			strongest=horizontal
-			direction=1 if horizontal>0.0 else -1
-		if absf(vertical)>absf(strongest):
-			strongest=vertical
-			direction=1 if vertical>0.0 else -1
-	if not has_controller or absf(strongest)<.24:
+		strongest=event.axis_value
+		direction=1 if strongest>0.0 else -1
+	else:
+		for device in Input.get_connected_joypads():
+			has_controller=true
+			var horizontal=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_X)
+			var vertical=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_Y)
+			if absf(horizontal)>absf(strongest):
+				strongest=horizontal
+				direction=1 if horizontal>0.0 else -1
+			if absf(vertical)>absf(strongest):
+				strongest=vertical
+				direction=1 if vertical>0.0 else -1
+	if not motion_event:
+		if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):return -1
+		if Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):return 1
+	if not has_controller:return 0
+	if absf(strongest)<.24:
 		menu_stick_latched=false
 		return 0
 	if menu_stick_latched or absf(strongest)<.58:return 0

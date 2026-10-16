@@ -12,6 +12,23 @@ else TASK_GODOT=/Applications/Godot.app/Contents/MacOS/Godot
 fi
 TASK_ACTION=${1:-run-demo}
 if [ "$#" -gt 0 ]; then shift; fi
+run_godot_validation() {
+ TASK_LOG=$(mktemp "${TMPDIR:-/tmp}/flyswarm-godot-validation.XXXXXX")
+ if "$TASK_GODOT" "$@" >"$TASK_LOG" 2>&1; then
+  if grep -E 'SCRIPT ERROR:|Parse Error:|Failed to load script' "$TASK_LOG" >/dev/null; then
+   cat "$TASK_LOG" >&2
+   rm -f "$TASK_LOG"
+   return 1
+  fi
+  cat "$TASK_LOG"
+  rm -f "$TASK_LOG"
+ else
+  TASK_EXIT=$?
+  cat "$TASK_LOG" >&2
+  rm -f "$TASK_LOG"
+  return "$TASK_EXIT"
+ fi
+}
 # A fresh checkout has GLBs but no local Godot import cache.
 case "$TASK_ACTION" in
  run-demo|run-open-day|run-battle|run-training|run-tests|run-ballistics-test|run-profile|headless)
@@ -27,10 +44,11 @@ case "$TASK_ACTION" in
  run-training) exec "$TASK_PYTHON" tools/training_smoke.py --godot "$TASK_GODOT" "$@" ;;
  run-tests)
   "$TASK_PYTHON" -m unittest discover -s tests -v
-  "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd
-  "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/environment_physics_validation.gd
-  "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
-  exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd ;;
+  run_godot_validation --headless --path frontend/godot --script res://scripts/validation.gd
+  run_godot_validation --headless --path frontend/godot --script res://scripts/app/environment_physics_validation.gd
+  run_godot_validation --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
+  run_godot_validation --headless --path frontend/godot --script res://scripts/app/historical_map_validation.gd
+  run_godot_validation --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd ;;
  run-ballistics-test) exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;
  run-profile) exec "$TASK_GODOT" --path frontend/godot --script res://scripts/app/performance_profile.gd -- "$@" ;;
  headless) exec "$TASK_GODOT" --headless --path frontend/godot -- --legacy-battle "$@" ;;

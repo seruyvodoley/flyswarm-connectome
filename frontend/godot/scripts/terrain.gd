@@ -8,6 +8,9 @@ var map_seed = 1944
 var extent = 750.0
 var forest_center = Vector2(-380, -20)
 var forest_radius = 170.0
+var forest_zones:Array=[]
+var relief_mounds:Array[Dictionary]=[]
+const HistoricalEnvironmentScript=preload("res://scripts/maps/historical_environment.gd")
 
 func height_at(x: float, z: float) -> float:
 	if demo_mode:
@@ -18,17 +21,26 @@ func height_at(x: float, z: float) -> float:
 	if training:
 		return 7.0 * exp(-pow((x-120)/55,2)) * exp(-pow(z/150,2))
 	var phase = float(map_seed % 37) * .03
-	var hills = 9*sin(x/170+phase)*cos(z/200) + 5*sin(z/83)*sin(x/150)
-	var ridge = 28*exp(-pow((x-330)/95,2))*(.6+.4*cos(z/310))
-	var valley = -7*exp(-pow(x/170,2))
-	var river = -4*exp(-pow((z-25*sin(x/180))/15,2))
-	# broad, gently graded crossing; no water volume in this dry riverbed scenario
-	if absf(x)<30: river = -1
-	return hills+ridge+valley+river
+	var rolling = 3.7*sin(x/205.0+phase)*cos(z/218.0)+2.8*sin(z/126.0+phase*.7)*sin(x/188.0)
+	var ridge_axis=13.0*sin(x/360.0+phase)
+	var north_ridge=9.0*exp(-pow((z-(132.0+ridge_axis))/82.0,2))
+	var south_ridge=8.0*exp(-pow((z-(-132.0+ridge_axis))/88.0,2))
+	var central_hollow=-3.5*exp(-pow(z/91.0,2))
+	var river=-2.2*exp(-pow((z-22.0*sin(x/230.0+phase))/31.0,2))
+	var landform=0.0
+	for mound in relief_mounds:
+		var dx=(x-float(mound.x))/float(mound.rx);var dz=(z-float(mound.z))/float(mound.rz)
+		landform+=float(mound.height)*exp(-.5*(dx*dx+dz*dz))
+	return rolling+north_ridge+south_ridge+central_hollow+river+landform
 
 func demo_height_at(x: float,z: float) -> float:
-	# Keep the valley gently rolling so tanks can engage after the opening smoke lifts.
-	return .38*sin(x/78.0)*cos(z/92.0)+.22*sin(z/46.0)*sin(x/61.0)
+	# Low, broad shoulders give hull-down approaches without putting a hard wall
+	# across the short 1v1 sight line or making any vehicle-class slope unsafe.
+	var base=.38*sin(x/78.0)*cos(z/92.0)+.22*sin(z/46.0)*sin(x/61.0)
+	var shoulders=2.4*exp(-pow((x+105.0)/48.0,2.0)-pow((z-32.0)/40.0,2.0))
+	shoulders+=2.6*exp(-pow((x-105.0)/50.0,2.0)-pow((z+34.0)/40.0,2.0))
+	var swales=-.9*exp(-pow(x/42.0,2.0)-pow((z-54.0)/33.0,2.0))-.8*exp(-pow(x/44.0,2.0)-pow((z+54.0)/33.0,2.0))
+	return base+shoulders+swales
 
 func material(c: Color) -> StandardMaterial3D:
 	var m=StandardMaterial3D.new()
@@ -58,12 +70,19 @@ func build(is_training: bool, seed_value: int, size: float):
 	training=is_training
 	map_seed=seed_value
 	extent=size/2
+	relief_mounds.clear();forest_zones.clear()
+	var relief_rng=RandomNumberGenerator.new();relief_rng.seed=map_seed^0x4b56594
+	if not training and not range_flat:
+		for i in 10:
+			var mx=relief_rng.randf_range(-extent*.72,extent*.72);var mz=relief_rng.randf_range(-260.0,260.0)
+			if absf(mx)<78.0:mx=signf(mx if not is_zero_approx(mx) else 1.0)*relief_rng.randf_range(100.0,260.0)
+			relief_mounds.append({"x":mx,"z":mz,"rx":relief_rng.randf_range(105.0,195.0),"rz":relief_rng.randf_range(75.0,145.0),"height":relief_rng.randf_range(2.8,7.5)*(1.0 if i%2==0 else -0.62)})
 	if demo_mode:
 		build_demo_ground(size)
 		return
 	var st=SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var steps=100
+	var steps=128
 	var spacing=size/steps
 	for zi in range(steps):
 		for xi in range(steps):
@@ -83,50 +102,23 @@ func build(is_training: bool, seed_value: int, size: float):
 	var terrain_mesh=MeshInstance3D.new()
 	terrain_mesh.mesh=st.commit()
 	var m=ShaderMaterial.new()
-	m.shader=load("res://shaders/ground.gdshader")
+	m.shader=load("res://shaders/historical_ground.gdshader")
+	for key in ["grass_diffuse","grass_normal","grass_roughness","dirt_diffuse","dirt_normal","dirt_roughness","road_diffuse","road_normal","road_roughness"]:
+		var suffix="diffuse" if key.ends_with("diffuse") else ("normal" if key.ends_with("normal") else "roughness")
+		m.set_shader_parameter(key,load("res://assets/environment/textures/"+key.replace("_"+suffix,"")+"_"+suffix+"_1k.jpg"))
+	m.set_shader_parameter("yard_a",Vector2(-424.0,-82.0));m.set_shader_parameter("yard_b",Vector2(-460.0,72.0));m.set_shader_parameter("yard_c",Vector2(536.0,132.0));m.set_shader_parameter("yard_d",Vector2(118.0,-193.0))
 	terrain_mesh.material_override=m
 	add_child(terrain_mesh)
 	terrain_mesh.create_trimesh_collision()
 	if range_flat:return
 	var rng=RandomNumberGenerator.new()
 	rng.seed=map_seed
-	for i in range(18 if not training else 4):
-		var x=(55+i%3*25)*(-1 if i%2==0 else 1)
-		var z=-180+int(i/3)*60
-		var base=Vector3(x,height_at(x,z)+4,z)
-		box(base,Vector3(13,8,18),Color(.55,.49,.37))
-		var roof=box(base+Vector3(0,5,0),Vector3(10,2,20),Color(.27,.19,.14),false)
-		roof.rotation.z=.15
-		box(base+Vector3(0,-2,10),Vector3(19,3,.6),Color(.38,.37,.31))
-		for wx in [-4,4]: box(base+Vector3(wx,0,9.05),Vector3(2,2,.1),Color(.09,.12,.13),false)
-	for i in range(26 if not training else 5):
-		var x=rng.randf_range(-extent*.85,extent*.85)
-		var z=rng.randf_range(-extent*.65,extent*.65)
-		if absf(x)<45: continue
-		var rock=box(Vector3(x,height_at(x,z)+2,z),Vector3(8,5,6),Color(.35,.36,.32))
-		rock.rotation.y=rng.randf_range(-PI,PI)
-	var mm=MultiMesh.new()
-	mm.transform_format=MultiMesh.TRANSFORM_3D
-	var cone=CylinderMesh.new()
-	cone.top_radius=0
-	cone.bottom_radius=3.4
-	cone.height=13
-	cone.radial_segments=7
-	mm.mesh=cone
-	mm.instance_count=int(350*vegetation_density) if not training else 0
-	for i in range(mm.instance_count):
-		var a=rng.randf()*TAU
-		var r=sqrt(rng.randf())*forest_radius
-		var x=forest_center.x+cos(a)*r
-		var z=forest_center.y+sin(a)*r
-		mm.set_instance_transform(i,Transform3D(Basis(),Vector3(x,height_at(x,z)+6.5,z)))
-	var trees=MultiMeshInstance3D.new()
-	trees.multimesh=mm
-	trees.material_override=material(Color(.11,.19,.10))
-	trees.visibility_range_end=1100
-	add_child(trees)
-	# Decorative bridge deck follows crossing, solid approach slopes remain terrain.
-	box(Vector3(0,height_at(0,0)-.1,0),Vector3(22,.3,42),Color(.28,.25,.19),false)
+	if not training:
+		var scenery:Node3D=HistoricalEnvironmentScript.new()
+		add_child(scenery)
+		scenery.build(self,vegetation_density,map_seed)
+	else:
+		_build_training_cover()
 
 func build_demo_ground(size: float):
 	var surface=SurfaceTool.new()
@@ -164,6 +156,14 @@ func forest_blocks(a: Vector3,b: Vector3) -> bool:
 	var length_inside=0.0
 	for i in range(20):
 		var p=a.lerp(b,(i+.5)/20.0)
-		if Vector2(p.x,p.z).distance_to(forest_center)<forest_radius:
+		var inside=Vector2(p.x,p.z).distance_to(forest_center)<forest_radius
+		for zone in forest_zones:
+			if Vector2(p.x,p.z).distance_to(zone.center)<float(zone.radius):inside=true;break
+		if inside:
 			length_inside+=a.distance_to(b)/20
 	return length_inside>55
+
+func _build_training_cover()->void:
+	for i in 5:
+		var x=55.0+float(i%2)*18.0;var z=-150.0+float(i)*52.0
+		box(Vector3(x,height_at(x,z)+2.5,z),Vector3(6.0,5.0,9.0),Color(.43,.39,.31))

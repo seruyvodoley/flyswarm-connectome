@@ -37,6 +37,11 @@ func build_layout():
 	# visually damaged with separate rubble and a broken masonry wall section.
 	add_building(FARM_ASSET,Vector3(-48,ground(-48,-14),-14),deg_to_rad(22),Vector3(13.4,7.02,6.8))
 	add_building(COTTAGE_ASSET,Vector3(48,ground(48,10),10),deg_to_rad(198),Vector3(6.22,5.36,5.08))
+	# Two outlying farm buildings add flank cover while keeping both spawn points
+	# and the central approach clear. Their conservative box proxies share a
+	# single collider each to stay within the arena physics-body budget.
+	add_collision_building(COTTAGE_ASSET,Vector3(-108,ground(-108,-58),-58),deg_to_rad(34),Vector3(6.22,5.36,5.08))
+	add_collision_building(FARM_ASSET,Vector3(108,ground(108,58),58),deg_to_rad(214),Vector3(11.6,6.4,6.0))
 	add_barrier(RUIN_ASSET,Vector3(-38,ground(-38,37),37),deg_to_rad(90),Vector3(2.0,1.91,.36),true)
 	add_barrier(WALL_ASSET,Vector3(42,ground(42,42),42),deg_to_rad(0),Vector3(8.0,2.4,.25),true)
 	add_instanced(RUBBLE_ASSET,_rubble_points(),false)
@@ -63,6 +68,23 @@ func add_building(path: String,position: Vector3,rotation: float,dimensions: Vec
 		_add_destructible_box(body,Vector3(0,wall_y,-dimensions.z*.5),Vector3(dimensions.x,wall_h,wall_t),"MASONRY",2_400_000.0,Color("b5a781"))
 		_add_destructible_box(body,Vector3(-dimensions.x*.5,wall_y,0),Vector3(wall_t,wall_h,dimensions.z),"MASONRY",2_400_000.0,Color("b5a781"))
 		_add_destructible_box(body,Vector3(dimensions.x*.5,wall_y,0),Vector3(wall_t,wall_h,dimensions.z),"MASONRY",2_400_000.0,Color("b5a781"))
+
+func add_collision_building(path:String,position:Vector3,yaw:float,dimensions:Vector3)->void:
+	var body:=StaticBody3D.new()
+	body.name="FlankFarmsteadLeft" if position.x<0.0 else "FlankFarmsteadRight"
+	body.position=position
+	body.rotation.y=yaw
+	body.collision_layer=1
+	body.collision_mask=0
+	add_child(body)
+	var model:=_instantiate_model(path)
+	if model!=null:body.add_child(model)
+	var collision:=CollisionShape3D.new()
+	var proxy:=BoxShape3D.new()
+	proxy.size=Vector3(dimensions.x*.9,dimensions.y*.78,dimensions.z*.88)
+	collision.shape=proxy
+	collision.position.y=dimensions.y*.39
+	body.add_child(collision)
 
 func add_barrier(path: String,position: Vector3,rotation: float,dimensions: Vector3,with_collision: bool):
 	var root=Node3D.new()

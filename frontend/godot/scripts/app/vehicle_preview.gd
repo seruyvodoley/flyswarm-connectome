@@ -5,6 +5,9 @@ const VEHICLE_PATHS = {
 	"t34_85": "res://assets/vehicles/t34_85.glb",
 	"panther_g": "res://assets/vehicles/panther_g.glb",
 	"tiger_i": "res://assets/vehicles/tiger_i.glb",
+	"is2_1944": "res://assets/vehicles/is2_1944.glb",
+	"jagdpanther": "res://assets/vehicles/jagdpanther.glb",
+	"su100": "res://assets/vehicles/su100.glb",
 }
 
 @export var vehicle_id := "t34_85"

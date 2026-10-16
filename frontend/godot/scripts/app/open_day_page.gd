@@ -87,9 +87,9 @@ func build_main(root: VBoxContainer):
 	label(center,"This is Drosophila.",20)
 	var summary=label(center,"We use a reconstructed nervous system model to control an agent in a virtual world.",14);summary.modulate=Color("aebcb4")
 	label(center,"CHOOSE YOUR VEHICLE",13).modulate=Color("c1a573")
-	var choices=HBoxContainer.new();choices.add_theme_constant_override("separation",6);center.add_child(choices)
-	for choice in [["T-34-85","t34_85"],["PANTHER G","panther_g"],["TIGER I","tiger_i"]]:
-		var choice_button=button(choices,choice[0],func(id=choice[1]):select_vehicle(id));choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;choice_button.custom_minimum_size.y=40
+	var choices=GridContainer.new();choices.columns=3;choices.add_theme_constant_override("h_separation",6);choices.add_theme_constant_override("v_separation",4);center.add_child(choices)
+	for choice in [["T-34-85","t34_85"],["IS-2 (44)","is2_1944"],["PANTHER G","panther_g"],["TIGER I","tiger_i"],["JAGDPANTHER","jagdpanther"],["SU-100","su100"]]:
+		var choice_button=button(choices,choice[0],func(id=choice[1]):select_vehicle(id));choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;choice_button.custom_minimum_size.y=36;choice_button.add_theme_font_size_override("font_size",15)
 		vehicle_buttons[choice[1]]=choice_button
 	selected_vehicle_label=label(center,"T-34-85",12);selected_vehicle_label.modulate=Color("c1a573")
 	vehicle_preview=VehiclePreview.new();vehicle_preview.custom_minimum_size=Vector2(400,155);vehicle_preview.size_flags_horizontal=Control.SIZE_EXPAND_FILL;vehicle_preview.vehicle_id=selected_vehicle;center.add_child(vehicle_preview)
@@ -113,7 +113,7 @@ func select_vehicle(vehicle_id: String) -> void:
 
 func _update_vehicle_selection() -> void:
 	if is_instance_valid(selected_vehicle_label):
-		selected_vehicle_label.text={"t34_85":"T-34-85","panther_g":"PANTHER G","tiger_i":"TIGER I"}.get(selected_vehicle,selected_vehicle)
+		selected_vehicle_label.text={"t34_85":"T-34-85","is2_1944":"IS-2 (1944)","panther_g":"PANTHER G","tiger_i":"TIGER I","jagdpanther":"JAGDPANTHER","su100":"SU-100"}.get(selected_vehicle,selected_vehicle)
 	for id in vehicle_buttons:
 		var choice_button: Button=vehicle_buttons[id]
 		choice_button.modulate=Color("ead58f") if id==selected_vehicle else Color.WHITE

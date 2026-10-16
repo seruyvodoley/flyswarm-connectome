@@ -3,12 +3,12 @@ class_name DestructibleSection
 
 ## Shared, energy-based damage model for the small set of interactive arena
 ## structures. Energy thresholds are gameplay approximations, not material data.
-const DEBRIS_LIMIT := 18
+const DEBRIS_LIMIT := 12
 static var active_debris := 0
 
 var material_kind := "MASONRY"
-var resistance_j := 1_800_000.0
-var remaining_j := 1_800_000.0
+var resistance_j := 620_000.0
+var remaining_j := 620_000.0
 var broken := false
 var dust_color := Color("bba982")
 var ram_cooldowns: Dictionary = {}
@@ -46,7 +46,10 @@ func damage_ram(vehicle_id: int, mass_kg: float, velocity: Vector3, point: Vecto
 	# Only a real CharacterBody slide contact calls this, and low-speed contact
 	# cannot accumulate repeated damage while a tank rests against a wall.
 	var energy := 0.5 * maxf(1000.0, mass_kg) * velocity.length_squared() * incidence
-	_apply_energy(energy * 0.36, point)
+	# A tracked vehicle couples most of its forward kinetic energy into a rigid
+	# obstacle. This lets one fast, square-on impact topple a tree or break the
+	# struck wall section, while oblique and low-speed contacts remain weaker.
+	_apply_energy(energy * 0.82, point)
 
 func _apply_energy(energy_j: float, point: Vector3) -> void:
 	if broken or energy_j <= 0.0:
@@ -69,38 +72,43 @@ func _break_section(point: Vector3) -> void:
 	set_meta("destroyed", true)
 
 func _spawn_debris(point: Vector3) -> void:
-	if not is_inside_tree():
+	if not is_inside_tree() or not is_instance_valid(visual_piece) or visual_piece.mesh == null:
 		return
-	for index in 3:
-		if active_debris >= DEBRIS_LIMIT:
-			break
-		var fragment := RigidBody3D.new()
-		fragment.name = "EnvironmentDebris"
-		fragment.mass = 90.0 if material_kind in ["WOOD", "BRICK"] else 180.0
-		fragment.gravity_scale = 1.0
-		fragment.can_sleep = true
-		fragment.linear_damp = 1.4
-		fragment.angular_damp = 1.8
-		var shape := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(.42 + index * .08, .3 + index * .04, .38)
-		shape.shape = box
-		fragment.add_child(shape)
-		var mesh_node := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = box.size
-		mesh_node.mesh = mesh
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = dust_color.darkened(.12)
-		mesh_node.material_override = mat
-		fragment.add_child(mesh_node)
-		get_parent().add_child(fragment)
-		fragment.global_position = point + Vector3(randf_range(-.35,.35),.35 + index*.12,randf_range(-.35,.35))
-		fragment.linear_velocity = Vector3(randf_range(-2.0,2.0),randf_range(1.0,4.0),randf_range(-2.0,2.0))
-		active_debris += 1
-		var timer := get_tree().create_timer(7.0)
-		timer.timeout.connect(func():
-			if is_instance_valid(fragment):
-				fragment.queue_free()
-			active_debris = maxi(0, active_debris - 1)
-		)
+	if active_debris >= DEBRIS_LIMIT:
+		return
+	# Release the actual struck wall/roof/wood piece as one heavy chunk instead
+	# of replacing it with several identical cubes. The remaining structure stays
+	# in place until its own sections take damage, producing a partial collapse.
+	var fragment := RigidBody3D.new()
+	fragment.name = "EnvironmentDebris"
+	fragment.mass = 90.0 if material_kind in ["WOOD", "BRICK"] else 180.0
+	fragment.gravity_scale = 1.0
+	fragment.can_sleep = true
+	fragment.linear_damp = 1.4
+	fragment.angular_damp = 1.8
+	var mesh_node := MeshInstance3D.new()
+	mesh_node.mesh = visual_piece.mesh
+	mesh_node.material_override = visual_piece.material_override
+	mesh_node.material_overlay = visual_piece.material_overlay
+	mesh_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var bounds := visual_piece.mesh.get_aabb()
+	mesh_node.position = -bounds.get_center()
+	fragment.add_child(mesh_node)
+	var collision := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = bounds.size.max(Vector3(.2, .2, .2))
+	collision.shape = box
+	collision.position = -bounds.get_center()
+	fragment.add_child(collision)
+	get_parent().add_child(fragment)
+	fragment.global_transform = visual_piece.global_transform
+	fragment.global_position += Vector3(0.0, 0.04, 0.0)
+	fragment.linear_velocity = Vector3(randf_range(-1.5,1.5),randf_range(1.0,2.5),randf_range(-1.5,1.5))
+	fragment.apply_torque_impulse(Vector3(randf_range(-250,250),randf_range(-180,180),randf_range(-250,250)))
+	active_debris += 1
+	var timer := get_tree().create_timer(9.0)
+	timer.timeout.connect(func():
+		if is_instance_valid(fragment):
+			fragment.queue_free()
+		active_debris = maxi(0, active_debris - 1)
+	)

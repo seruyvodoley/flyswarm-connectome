@@ -282,6 +282,7 @@ func settings_menu():
 	toggle("Fullscreen",s.fullscreen,func(v):s.fullscreen=v)
 	toggle("Shadows",s.shadows,func(v):s.shadows=v)
 	dropdown("Vegetation density",["Sparse","Balanced","Full"],[.25,.6,1.0],s.vegetation,func(v):s.vegetation=v)
+	dropdown("Environment profile",["Enhanced visuals","Enhanced physical","Legacy experiment"],["enhanced_visual","enhanced_physical","legacy"],str(s.get("environment_profile","enhanced_visual")),func(v):s.environment_profile=v)
 	dropdown("LOD bias",["Performance","Balanced","Detail"],[2.0,1.0,.5],s.lod,func(v):s.lod=v)
 	dropdown("Effects quality",["Low","Medium","High"],[.3,.6,1.0],s.effects,func(v):s.effects=v)
 	toggle("Debug overlays by default",s.debug,func(v):s.debug=v)
@@ -289,9 +290,9 @@ func settings_menu():
 	number("Brain server port",s.port,1024,65535,func(v):s.port=int(v))
 	malecns_dataset_settings()
 	dropdown("Default communication",["No Audio","Team Audio","All Audio"],["no_audio","team_audio","all_audio"],s.audio,func(v):s.audio=v)
-	text_block("The launcher manages localhost only. Audio communication is a neural signal; application sound playback is not implemented. LOD bias uses imported mesh LODs where present.")
+	text_block("Enhanced visuals preserve the old heightfield collision and forest visibility. Enhanced physical changes terrain and obstacle collision and is a separate experiment condition. Legacy restores the previous scenery. Replays keep the profile they recorded. LOD bias uses imported mesh LODs where present.")
 	button(body,"SAVE SETTINGS",func():AppState.save_settings();AppState.menu())
-	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"dataset_path":str(AppState.settings.get("dataset_path",""))};AppState.save_settings();AppState.show_page("Settings"))
+	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"dataset_path":str(AppState.settings.get("dataset_path","")),"environment_profile":"enhanced_visual"};AppState.save_settings();AppState.show_page("Settings"))
 	back()
 
 func malecns_dataset_settings() -> void:

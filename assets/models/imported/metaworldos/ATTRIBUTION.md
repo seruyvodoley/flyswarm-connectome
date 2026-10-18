@@ -1,8 +1,8 @@
-# IS-2 and Panther G model attribution
+# IS-2 and Panther G source models
 
 - **Creator:** MetaWorldOS.
 - **Pack:** [WWII Tank Pack GLB Models](https://metaworldos.itch.io/wwii-tank-pack-glb-models).
-- **License:** CC0 1.0 Universal, as stated by the creator on the pack page.
+- **License:** CC0 1.0, stated by the creator on the pack page.
 - **IS-2 source file:** `tank-battle-is-2.glb`; source SHA-256
   `b93a3002f5e03ed54c157deb9c085380d25e133ab8320e5d1609e29f0bbf8be3`.
 - **IS-2 FlySwarm GLB SHA-256:**
@@ -12,15 +12,18 @@
 - **Panther FlySwarm GLB SHA-256:**
   `2ebfbd91eac1f8643fb107396b99e24c577345e3edfc239b5fa178b0a1211846`.
 
-The source files are each a single mesh with embedded PBR maps. They were
-downloaded from the creator's public pack and split into hull, turret, gun,
-left/right track belts, and left/right running-gear meshes. Each scene exposes
-the standard FlySwarm hull, turret, gun-elevation, and muzzle pivots. The
-resulting models contain approximately 174k triangles for IS-2 and 191k for
-Panther G; 4K source maps were reduced to 2K in the editable Blender scenes.
-The official source files are not copied into this repository because they are
-large; the optimized editable scenes and their source hashes are retained.
+The project uses the full CC0 source vehicles already imported in the tracked
+runtime GLBs. Their complete hull, turret, running gear, tracks, barrel, and
+surface materials are retained. This revision removes the temporary FlySwarm
+turret substitutions and restores the source GLBs from the project history.
+The editable Blender scenes are regenerated from those same GLBs without
+changing mesh geometry. The model hierarchy keeps the hull and turret as
+separate siblings; the gun-elevation pivot and muzzle are children of the
+turret rig. No visual remodelling or new mesh geometry is used.
 
-These are visual approximations. The conversion preserves the source silhouette
-and materials while supplying mechanical pivots; it does not claim factory-level
-historical accuracy.
+The creator's pack page describes the delivered GLBs as single-mesh, 1-unit-per-
+meter assets with embedded PBR materials, and explicitly grants CC0. FlySwarm
+uses the established model names and pivots for combat controls. Source pack
+files are not included because the complete downloadable archive is 809 MB.
+The model GLBs used here are the project versions of those CC0 sources; this
+task changes no source mesh data on either vehicle.

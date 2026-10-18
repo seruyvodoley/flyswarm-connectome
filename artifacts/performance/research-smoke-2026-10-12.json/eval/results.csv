@@ -1,0 +1,2 @@
+sim_time,wall_seconds,blue_tickets,red_tickets,blue_alive,red_alive,realtime_factor,brain_tick_ms
+"1.0","2.781309","250.0","275.0","6","7","0.35954293463977","80.845250049606"

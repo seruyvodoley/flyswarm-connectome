@@ -1,0 +1,13 @@
+{
+  "id": "t34_85",
+  "seed": 19,
+  "resolution": 2048,
+  "seconds": 14.548253297805786,
+  "ao": "four-ray short-range per-mesh structural occlusion; no directional light baked",
+  "geometry": "unchanged",
+  "textures": [
+    "albedo.png",
+    "orm.png",
+    "normal.png"
+  ]
+}

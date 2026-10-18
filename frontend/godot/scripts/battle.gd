@@ -23,6 +23,7 @@ const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
 const FlyBrainPreview=preload("res://scripts/app/fly_brain_preview.gd")
 const DemoHealthHud=preload("res://scripts/app/demo_health_hud.gd")
 const DemoArena=preload("res://scenes/demo/DemoArena.tscn")
+const BattlefieldEnvironment=preload("res://scenes/BattlefieldEnvironment.tscn")
 const EffectSpriteShader=preload("res://shaders/vfx/radial_sprite.gdshader")
 var terrain
 var tracks
@@ -32,6 +33,7 @@ var tickets=[300.0,300.0]
 var shells=[]
 var effects=[]
 var scenario={}
+var environment_profile := "legacy"
 var bridge=Bridge.new()
 var sim_time=0.0
 var frame=0
@@ -71,6 +73,12 @@ var training=false
 var time_limit=600.0
 var record_path=""
 var recorder: FileAccess
+var research_record: FileAccess
+var neural_record: FileAccess
+var research_event_record: FileAccess
+var research_event_seq: int = 0
+var research_shot_seq: int = 0
+var cosmetic_rng := RandomNumberGenerator.new()
 var start_wall=0
 var simulation_clock_started=false
 var pause_start_usec=0
@@ -268,8 +276,10 @@ func _ready():
 	if session_config!=null and not has("--camera"):
 		camera_mode=1 if is_range else 0
 	requires_brain=has("--connect")
+	bridge.research_mode=has("--research-record")
 	audio_mode=option("--audio","no_audio")
 	scenario=Catalog.read_json("scenarios/"+("training_range" if training else "krasny_valley")+".json")
+	environment_profile=str(option("--environment-profile",scenario.get("environment_profile","legacy")))
 	if is_demo:
 		scenario.size_m=420
 		scenario.spawn_z=100
@@ -281,6 +291,8 @@ func _ready():
 	if has("--replay"):
 		var manifest_path=option("--replay").get_base_dir().path_join("manifest.json")
 		if FileAccess.file_exists(manifest_path):replay_manifest=JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+		if not has("--environment-profile"):
+			environment_profile=str(replay_manifest.get("environment_profile","legacy"))
 		audio_mode=str(replay_manifest.get("audio",audio_mode))
 		if replay_manifest.get("map","").contains("Training"):
 			training=true
@@ -290,8 +302,15 @@ func _ready():
 				scenario.blue[i]=replay_manifest.vehicles[i].id
 				scenario.red[i]=replay_manifest.vehicles[i+8].id
 		scenario.seed=int(replay_manifest.get("map_seed",scenario.seed))
+	if environment_profile not in ["legacy","enhanced_visual","enhanced_physical"]:
+		push_warning("Unknown environment profile '%s'; using legacy." % environment_profile)
+		environment_profile="legacy"
+	scenario.environment_profile=environment_profile
 	time_limit=float(option("--seconds",str(scenario.time_limit_s)))
 	rng.seed=int(option("--battle-seed",str(scenario.seed)))
+	# Keep stochastic combat (shell dispersion) independent of visual debris and
+	# particle generation. Rendering cadence must never perturb weapon outcomes.
+	cosmetic_rng.seed=int(option("--battle-seed",str(scenario.seed))) ^ 0x5F3759DF
 	demo_opening_flank_sign=1.0 if (rng.seed & 1)==0 else -1.0
 	tickets=[float(scenario.tickets),float(scenario.tickets)]
 	terrain=Terrain.new()
@@ -299,6 +318,7 @@ func _ready():
 	terrain.range_flat=is_range
 	terrain.mobility_course=is_range and session_config!=null and session_config.range_mode=="mobility"
 	terrain.demo_mode=is_demo
+	terrain.environment_profile=environment_profile
 	terrain.vegetation_density=AppState.settings.vegetation if session_config!=null else 1.0
 	terrain.build(training,int(scenario.seed),float(scenario.size_m))
 	if is_demo:
@@ -306,6 +326,10 @@ func _ready():
 		var demo_arena=DemoArena.instantiate()
 		demo_arena.configure(terrain,AppState.settings.vegetation if session_config!=null else 1.0)
 		add_child(demo_arena)
+	elif environment_profile != "legacy":
+		var field_environment=BattlefieldEnvironment.instantiate()
+		field_environment.configure_world(terrain,AppState.settings.vegetation if session_config!=null else 1.0,environment_profile,is_range or training)
+		add_child(field_environment)
 	tracks=load("res://scripts/tracks.gd").new()
 	add_child(tracks)
 	tracks.setup(self)
@@ -325,7 +349,7 @@ func _ready():
 	env.sky=sky_res
 	env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color=Color(.62,.69,.75)
-	env.ambient_light_energy=.65 if not is_demo else .86
+	env.ambient_light_energy=.65 if not is_demo else .62
 	env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled=true
 	env.fog_density=.00018 if not is_demo else .00065
@@ -405,6 +429,7 @@ func _ready():
 		if session_config!=null:
 			for mesh in tank.model.find_children("*","GeometryInstance3D",true,false):mesh.lod_bias=AppState.settings.lod
 
+	for tank in vehicles:tank.reset_physics_interpolation()
 	sensor_debug=MeshInstance3D.new()
 	add_child(sensor_debug)
 	camera=Camera3D.new()
@@ -650,10 +675,17 @@ func _ready():
 
 	if requires_brain: bridge.connect_backend(int(option("--port","8765")))
 	record_path=option("--record","")
+	var research_path=option("--research-record","")
+	if research_path!="":
+		DirAccess.make_dir_recursive_absolute(research_path.get_base_dir())
+		research_record=FileAccess.open(research_path,FileAccess.WRITE)
+		neural_record=FileAccess.open(research_path.get_base_dir().path_join("neural_steps.jsonl"),FileAccess.WRITE)
+		research_event_record=FileAccess.open(research_path.get_base_dir().path_join("combat_events.jsonl"),FileAccess.WRITE)
 	if record_path!="":
 		DirAccess.make_dir_recursive_absolute(record_path)
 		if (session_config==null and not has("--no-replay")) or (session_config!=null and session_config.record):recorder=FileAccess.open(record_path.path_join("replay.jsonl"),FileAccess.WRITE)
-		var manifest={"date":Time.get_datetime_string_from_system(true),"map":scenario.name,"map_seed":scenario.seed,"battle_seed":rng.seed,"mode":"NORMALIZED" if normalized else "HISTORICAL","audio":audio_mode,"controller":"backend" if requires_brain else "RULE_BASED_CONTROL","side_swap":has("--swap"),"vehicles":[],"seconds":time_limit}
+		var environment_generator := "open_day_arena_v1" if is_demo else ("field_environment_v1" if environment_profile != "legacy" else "legacy")
+		var manifest={"date":Time.get_datetime_string_from_system(true),"map":scenario.name,"map_seed":scenario.seed,"battle_seed":rng.seed,"mode":"NORMALIZED" if normalized else "HISTORICAL","audio":audio_mode,"controller":"backend" if requires_brain else "RULE_BASED_CONTROL","side_swap":has("--swap"),"vehicles":[],"seconds":time_limit,"map_size_m":scenario.size_m,"vegetation_density":AppState.settings.vegetation if session_config!=null else 1.0,"environment_profile":environment_profile,"environment_generator":environment_generator,"destruction_enabled":is_demo or environment_profile=="enhanced_physical"}
 		var output=[]
 		OS.execute("git",["-C",ProjectSettings.globalize_path("res://../.."),"rev-parse","HEAD"],output)
 		manifest.git_commit="".join(output).strip_edges()
@@ -663,8 +695,9 @@ func _ready():
 		if session_config!=null:manifest.session=session_config.as_dict()
 		manifest.engine=Engine.get_version_info()
 		manifest.source_hashes={}
-		for source in ["battle.gd","vehicle.gd","terrain.gd","tracks.gd","combat.gd","bridge.gd","catalog.gd"]:
+		for source in ["battle.gd","vehicle.gd","terrain.gd","battlefield_environment.gd","tracks.gd","combat.gd","bridge.gd","catalog.gd"]:
 			manifest.source_hashes[source]=FileAccess.get_sha256("res://scripts/"+source)
+		manifest.source_hashes["field_ground.gdshader"]=FileAccess.get_sha256("res://shaders/field_ground.gdshader")
 		for v in vehicles:manifest.vehicles.append(v.cfg)
 		FileAccess.open(record_path.path_join("manifest.json"),FileAccess.WRITE).store_string(JSON.stringify(manifest,"  "))
 	var replay_file=option("--replay","")
@@ -1274,8 +1307,9 @@ func _physics_process(delta):
 				var observations=[]
 				for v in vehicles:
 					v.sense(.02)
-					observations.append(v.observation())
-				bridge.request(observations,audio_mode)
+					var observation=v.observation();observation["simulation_time_s"]=sim_time;observation["physics_step_id"]=frame
+					observations.append(observation)
+				bridge.request(observations,audio_mode,sim_time,frame)
 			if (Time.get_ticks_usec()-start_wall)>180000000 and sim_time==0:
 				push_error("Brain backend timeout")
 				if session_config!=null:paused=true;backend_failed.emit("Backend connection timed out.")
@@ -1357,6 +1391,25 @@ func _physics_process(delta):
 		vehicles[0].target_range=vehicles[0].position.distance_to(vehicles[8].position)
 	step_shells(delta)
 	if not is_range and not is_demo:step_objectives(delta)
+	if research_record:
+		var game_agents=[]
+		var controller_observations=bridge.last_reply.get("observations",[]) if requires_brain else []
+		for i in vehicles.size():
+			var v=vehicles[i]
+			var observed=controller_observations[i] if controller_observations.size()==vehicles.size() else v.observation()
+			var applied_layer=control_layers[i].duplicate(true) if control_layers.size()==vehicles.size() else {"final_action":v.cmd.duplicate()}
+			game_agents.append({"agent_id":v.agent_id,"team":"blue" if v.team==0 else "red","vehicle":v.cfg.id,"observation":observed,"position":[v.position.x,v.position.y,v.position.z],"speed_m_s":v.speed,"hull_yaw_rad":v.rotation.y,"turret_yaw_rad":v.turret_angle,"gun_elevation_rad":v.gun_angle,"visible":v.seen,"target_agent_id":v.target,"target_range_m":v.target_range,"alive":v.alive,"modules":v.modules.duplicate(true),"module_damage":v.module_damage.duplicate(true),"metrics":v.metrics.duplicate(true),"impact":v.last_impact.duplicate(true),"neural_trace":v.dn.duplicate(),"heard_input":v.audio_input,"control_layers":applied_layer,"final_action":v.cmd.duplicate()})
+		var game_zones=[]
+		for z in objectives:game_zones.append({"position":[z.position.x,z.position.y,z.position.z],"owner":z.owner,"progress":z.progress,"contested":z.contested,"inside":z.inside.duplicate()})
+		var request_time=float(bridge.last_reply.get("simulation_time_s",sim_time)) if requires_brain else sim_time
+		var game_row={"schema":"flyswarm.godot_malecns.game_step.v1","experiment_id":option("--experiment-id"),"run_id":option("--run-id"),"condition":option("--condition","RULE_BASED"),"seed":int(option("--battle-seed",option("--seed","0"))),"game_step_id":frame+1,"physics_step_id":frame,"neural_step_id":bridge.last_reply_seq if requires_brain else 0,"new_neural_response":brain_response_fresh if requires_brain else false,"request_simulation_time_s":request_time,"simulation_time_s":sim_time,"response_simulation_lag_s":sim_time-request_time if requires_brain else 0.0,"wall_time_unix_s":Time.get_unix_time_from_system(),"wall_time_monotonic_s":Time.get_ticks_usec()/1000000.0,"agents":game_agents,"tickets":tickets.duplicate(),"zones":game_zones,"projectiles":shell_snapshot()}
+		research_record.store_line(JSON.stringify(game_row))
+		research_record.flush()
+		if requires_brain and brain_response_fresh and neural_record:
+			var reply=bridge.last_reply
+			var neural_row={"schema":"flyswarm.godot_malecns.neural_step.v1","experiment_id":option("--experiment-id"),"run_id":option("--run-id"),"condition":option("--condition","MALECNS_REAL"),"seed":int(option("--battle-seed",option("--seed","0"))),"neural_step_id":bridge.last_reply_seq,"simulation_time_s":reply.get("simulation_time_s",sim_time),"neural_time_s":float((bridge.last_reply_seq-1)*reply.get("dt",.02)),"physics_step_id":reply.get("physics_step_id",frame),"wall_time_unix_s":Time.get_unix_time_from_system(),"wall_time_monotonic_s":Time.get_ticks_usec()/1000000.0,"dt_s":reply.get("dt",.02),"sensory_inputs":reply.get("sensory_inputs",{}),"observations":reply.get("observations",[]),"neural_traces":reply.get("traces",[]),"effective_traces":reply.get("effective_traces",[]),"heard":reply.get("heard",[]),"backend_control_layers":reply.get("control_layers",[]),"control_layers":control_layers.duplicate(true),"actions":reply.get("actions",[]),"applied_actions":vehicles.map(func(vehicle):return vehicle.cmd.duplicate()),"tick_ms":reply.get("tick_ms",0.0),"metadata":reply.get("metadata",{})}
+			neural_record.store_line(JSON.stringify(neural_row))
+			neural_record.flush()
 	sim_time+=delta
 	if is_demo:update_demo_smoke_screen()
 	frame+=1
@@ -1386,8 +1439,9 @@ func _physics_process(delta):
 		var observations=[]
 		for v in vehicles:
 			v.sense(delta)
-			observations.append(v.observation())
-		bridge.request(observations,audio_mode)
+			var observation=v.observation();observation["simulation_time_s"]=sim_time;observation["physics_step_id"]=frame
+			observations.append(observation)
+		bridge.request(observations,audio_mode,sim_time,frame)
 
 func suspend_active_clock() -> void:
 	if is_demo and simulation_clock_started and pause_start_usec==0:
@@ -1398,6 +1452,18 @@ func resume_active_clock() -> void:
 		start_wall+=Time.get_ticks_usec()-pause_start_usec
 		pause_start_usec=0
 
+func record_research_event(event_type: String, details: Dictionary) -> void:
+	if research_event_record == null:return
+	research_event_seq+=1
+	var row={"schema":"flyswarm.combat_event.v1","event_id":research_event_seq,"event":event_type,
+		"experiment_id":option("--experiment-id"),"run_id":option("--run-id"),
+		"condition":option("--condition","RULE_BASED"),"seed":int(option("--battle-seed",option("--seed","0"))),
+		"simulation_time_s":sim_time,"physics_step_id":frame,"wall_time_unix_s":Time.get_unix_time_from_system(),
+		"wall_time_monotonic_s":Time.get_ticks_usec()/1000000.0}
+	row.merge(details,true)
+	research_event_record.store_line(JSON.stringify(row))
+	research_event_record.flush()
+
 func fire(v):
 	var p=v.muzzle.global_position
 	var heading=v.rotation.y+v.turret_angle
@@ -1407,6 +1473,8 @@ func fire(v):
 	angle+=rng.randfn(0,dispersion)
 	var dir=v.muzzle.global_basis.z.normalized()
 	dir=dir.rotated(Vector3.UP,rng.randfn(0,dispersion)).rotated(v.global_basis.x,rng.randfn(0,dispersion))
+	research_shot_seq+=1
+	var shot_id="%s:%08d" % [option("--run-id","interactive"),research_shot_seq]
 	var vis=MeshInstance3D.new()
 	var mesh=CapsuleMesh.new()
 	mesh.radius=.045
@@ -1422,7 +1490,13 @@ func fire(v):
 	vis.position=p
 	vis.look_at(p+dir,Vector3.UP)
 	vis.rotate_object_local(Vector3.RIGHT,-PI/2.0)
-	shells.append({"position":p,"velocity":dir*v.cfg.ammo_data.muzzle_velocity_m_s,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"origin":p,"distance":0.0,"age":0.0,"visual":vis})
+	var ammunition_muzzle_speed=float(v.cfg.ammo_data.muzzle_velocity_m_s)
+	var platform_velocity=Vector3(v.velocity.x,0.0,v.velocity.z)
+	# Muzzle velocity is relative to the vehicle. Preserve the tank's horizontal
+	# translational velocity so moving fire follows inertial ballistics.
+	var initial_velocity=dir*ammunition_muzzle_speed+platform_velocity
+	shells.append({"shot_id":shot_id,"position":p,"velocity":initial_velocity,"ammo":v.cfg.ammo_data,"owner":v.agent_id,"origin":p,"distance":0.0,"age":0.0,"visual":vis})
+	record_research_event("shot",{"shot_id":shot_id,"shooter_id":v.agent_id,"projectile":str(v.cfg.ammo_data.get("id","unknown")),"initial_position":[p.x,p.y,p.z],"initial_velocity":[initial_velocity.x,initial_velocity.y,initial_velocity.z],"muzzle_velocity_m_s":ammunition_muzzle_speed,"platform_velocity_m_s":platform_velocity.length(),"initial_projectile_speed_m_s":initial_velocity.length(),"target_id":v.target,"target_range_m":v.target_range,"hull_yaw_rad":v.rotation.y,"turret_yaw_rad":v.turret_angle,"gun_elevation_rad":v.gun_angle})
 	if v.agent_id==selected and not replay_mode:rumble_gamepad(.12,.22,.10)
 	if is_demo and v.agent_id==8 and is_instance_valid(demo_brain_preview):demo_brain_preview.pulse_event("fire")
 	effect(p,Color(1,.65,.16),.7,.10)
@@ -1456,17 +1530,33 @@ func step_shells(dt: float):
 			if hit.collider.has_method("damage_projectile"):
 				hit.collider.call("damage_projectile",s.ammo,s.velocity,hit.normal,hit.position)
 			var victim=hit.collider.get_meta("vehicle") if hit.collider.has_meta("vehicle") else null
+			var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
+			var target_id=int(victim.agent_id) if victim!=null else -1
+			record_research_event("hit",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"target_id":target_id,"target_alive":bool(victim.alive) if victim!=null else false,"target_kind":"vehicle" if victim!=null else (str(hit.collider.name) if is_instance_valid(hit.collider) else "world"),"position":[hit.position.x,hit.position.y,hit.position.z],"surface_normal":[hit.normal.x,hit.normal.y,hit.normal.z],"flight_distance_m":float(s.distance),"flight_time_s":float(s.age),"projectile_velocity":[s.velocity.x,s.velocity.y,s.velocity.z]})
 
 			if victim!=null and victim.alive:
+				var old_damage=victim.module_damage.duplicate(true)
+				var was_alive=victim.alive
 				victim.hit(
 					s,
 					hit.position,
 					hit.normal,
 					hit.collider.get_meta("zone")
 				)
+				var impact=victim.last_impact.duplicate(true)
+				record_research_event("armour_result",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"target_id":target_id,"zone":str(impact.get("zone","unknown")),"penetrated":bool(impact.get("penetrated",false)),"ricochet":bool(impact.get("ricochet",false)),"impact_angle_deg":float(impact.get("angle",0.0)),"armour_thickness_mm":float(impact.get("nominal",0.0)),"effective_armour_mm":float(impact.get("effective",0.0)),"penetration_mm":float(impact.get("capability",0.0)),"remaining_penetration_mm":float(impact.get("remaining_penetration_mm",0.0)),"outcome":str(impact.get("outcome","unknown"))})
+				if bool(impact.get("penetrated",false)):
+					record_research_event("penetration",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"target_id":target_id,"zone":str(impact.get("zone","unknown")),"angle_rad":float(impact.get("angle",0.0)),"armour_thickness_mm":float(impact.get("nominal",0.0)),"effective_armour_mm":float(impact.get("effective",0.0)),"penetration_mm":float(impact.get("capability",0.0))})
+				var damage_delta={}
+				for module_key in victim.module_damage:
+					var change=float(victim.module_damage[module_key])-float(old_damage.get(module_key,0.0))
+					if change>0.0:damage_delta[module_key]=change
+				if not damage_delta.is_empty() or impact.get("demo_health",null)!=null:
+					record_research_event("damage",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"target_id":target_id,"module_damage_delta":damage_delta,"disabled_modules":impact.get("disabled",[]),"crew_alive":impact.get("crew_alive",null),"crew_total":impact.get("crew_total",null),"demo_health":impact.get("demo_health",null),"outcome":str(impact.get("outcome","unknown"))})
+				if was_alive and not victim.alive:
+					record_research_event("kill",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"target_id":target_id,"reason":str(impact.get("kill_reason","unknown"))})
 				if victim.agent_id==selected and not replay_mode:rumble_gamepad(.48,.88,.30)
 				if is_demo and victim.agent_id==8 and is_instance_valid(demo_brain_preview):demo_brain_preview.pulse_event("hit")
-				var shooter=vehicles[int(s.owner)] if int(s.owner)>=0 and int(s.owner)<vehicles.size() else null
 				if should_show_impact(shooter,victim):
 					var cumulative_damaged=[]
 					for module_key in victim.module_damage:
@@ -1481,6 +1571,8 @@ func step_shells(dt: float):
 					)
 			effect(hit.position,Color(.69,.51,.27),1.3,.6)
 		if not hit.is_empty() or s.age>8 or s.distance>2500:
+			if hit.is_empty():
+				record_research_event("projectile_expired",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"flight_distance_m":float(s.distance),"flight_time_s":float(s.age),"reason":"age_limit" if s.age>8 else "range_limit"})
 			s.visual.queue_free()
 			shells.remove_at(i)
 		else:
@@ -2136,22 +2228,22 @@ func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
 	var smoke_count=5 if catastrophic else 4
 
 	for i in range(smoke_count):
-		var angle=rng.randf_range(0.0,TAU)
-		var radius=rng.randf_range(.25,1.25)
+		var angle=cosmetic_rng.randf_range(0.0,TAU)
+		var radius=cosmetic_rng.randf_range(.25,1.25)
 
 		var offset=Vector3(
 			cos(angle)*radius,
-			rng.randf_range(.8,2.0),
+			cosmetic_rng.randf_range(.8,2.0),
 			sin(angle)*radius
 		)
 
 		effect(
 			p+offset,
 			Color(.13,.12,.105,.72),
-			rng.randf_range(.65,.95)*intensity,
-			rng.randf_range(2.0,2.8),
+			cosmetic_rng.randf_range(.65,.95)*intensity,
+			cosmetic_rng.randf_range(2.0,2.8),
 			.85,
-			rng.randf_range(.45,.75)
+			cosmetic_rng.randf_range(.45,.75)
 		)
 
 
@@ -2171,6 +2263,8 @@ func shell_snapshot() -> Array:
 func finish(notify_result=true):
 	if finished_report:return
 	if is_instance_valid(impact_killcam):impact_killcam.dismiss()
+	for shell in shells:
+		record_research_event("projectile_in_flight_at_end",{"shot_id":str(shell.get("shot_id","")),"shooter_id":int(shell.get("owner",-1)),"position":[shell.position.x,shell.position.y,shell.position.z],"flight_distance_m":float(shell.get("distance",0.0)),"flight_time_s":float(shell.get("age",0.0)),"reason":"battle_end"})
 	finished_report=true
 	ended=true
 	var wall=(Time.get_ticks_usec()-start_wall)/1000000.0
@@ -2213,6 +2307,15 @@ func finish(notify_result=true):
 		FileAccess.open(record_path.path_join("summary.json"),FileAccess.WRITE).store_string(JSON.stringify(report,"  "))
 		write_research_exports(report)
 		if recorder:recorder.flush()
+	if research_record:
+		research_record.flush()
+		research_record.close()
+	if neural_record:
+		neural_record.flush()
+		neural_record.close()
+	if research_event_record:
+		research_event_record.flush()
+		research_event_record.close()
 	print("SUMMARY ",JSON.stringify({"sim_s":sim_time,"wall_s":wall,"xRT":report.realtime_factor,"physics_ms":report.mean_physics_ms,"brain_tick_ms":report.brain_tick_ms,"alive":[alive_count(0),alive_count(1)]}))
 	report_cache=report
 	if session_config!=null and notify_result:completed.emit(report)
@@ -2339,6 +2442,10 @@ func _process(dt):
 
 	var v=vehicles[selected] if not vehicles.is_empty() else null
 	if v==null:return
+	# Rendering follows the same interpolated physics pose shown by the tank mesh.
+	# Combat and collision queries continue using fixed-tick transforms.
+	var render_transform: Transform3D=v.get_global_transform_interpolated()
+	var render_position: Vector3=render_transform.origin
 	update_vehicle_status()
 	if is_instance_valid(impact_killcam) and impact_killcam.visible and (finished_report or ended or camera_mode not in [1,2] or impact_killcam.source_id!=selected):
 		impact_killcam.dismiss()
@@ -2388,14 +2495,15 @@ func _process(dt):
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		var target_fov=42.0 if is_demo and demo_sniper_mode else 62.0
 		camera.fov=move_toward(camera.fov,target_fov,45.0*dt) if is_demo else 62.0
-		var demo_forward=demo_camera_forward(v) if is_demo else Vector3(sin(v.rotation.y+v.turret_angle),0,cos(v.rotation.y+v.turret_angle))
+		var rendered_turret: Transform3D=v.turret.get_global_transform_interpolated()
+		var demo_forward=demo_camera_forward(v) if is_demo else Vector3(rendered_turret.basis.z.x,0,rendered_turret.basis.z.z).normalized()
 		# Keep the selected aim point attached to the vehicle's local frame. A
 		# fixed world point drifts behind a moving tank and makes the camera
 		# swing around to chase it, which reads as jitter and loses the vehicle.
 		if is_demo and demo_gamepad_active:
 			var forward=OpenDayController.camera_forward(demo_camera_yaw,demo_camera_pitch)
 			var flat_forward=Vector3(sin(demo_camera_yaw),0.0,cos(demo_camera_yaw)).normalized()
-			var focus=v.global_position+Vector3(0,2.5,0)
+			var focus=render_position+Vector3(0,2.5,0)
 			var desired_position=focus-flat_forward*14.0+Vector3(0,5.2,0)
 			var camera_ray=PhysicsRayQueryParameters3D.create(focus,desired_position,7,v.excluded())
 			var obstruction=get_world_3d().direct_space_state.intersect_ray(camera_ray)
@@ -2404,13 +2512,13 @@ func _process(dt):
 			camera.look_at(camera.position+forward,Vector3.UP)
 			demo_apply_gamepad_aim()
 		else:
-			if is_demo and demo_aim_world_valid:demo_aim_world_point=v.to_global(demo_aim_vehicle_local_point)
-			var follow_forward=Vector3(sin(v.rotation.y),0,cos(v.rotation.y)) if is_demo else demo_forward
+			if is_demo and demo_aim_world_valid:demo_aim_world_point=render_transform*demo_aim_vehicle_local_point
+			var follow_forward=Vector3(render_transform.basis.z.x,0,render_transform.basis.z.z).normalized() if is_demo else demo_forward
 			if is_demo and demo_aim_world_valid:
-				var aim_heading=demo_aim_world_point-v.position
+				var aim_heading=demo_aim_world_point-render_position
 				aim_heading.y=0.0
 				if aim_heading.length_squared()>.01:follow_forward=aim_heading.normalized()
-			var follow=v.position-follow_forward*(15.0 if is_demo else 16.0)+Vector3(0,8,0)
+			var follow=render_position-follow_forward*(15.0 if is_demo else 16.0)+Vector3(0,8,0)
 			var follow_weight=1.0-exp(-dt*3.5)
 			camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,follow_weight)
 			if is_demo and demo_aim_world_valid:
@@ -2420,14 +2528,14 @@ func _process(dt):
 				var rotation_weight=1.0-exp(-dt*3.5)
 				camera.global_basis=camera.global_basis.slerp(desired_basis,rotation_weight).orthonormalized()
 			else:
-				var look_target=v.position+Vector3(0,2,0)+demo_forward*(20 if is_demo else 0)
+				var look_target=render_position+Vector3(0,2,0)+demo_forward*(20 if is_demo else 0)
 				camera.look_at(look_target)
 	elif camera_mode==2:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		camera.fov=62.0
-		camera.position=v.muzzle.global_position+Vector3(0,.4,0)
-		var a=v.rotation.y+v.turret_angle
-		camera.look_at(camera.position+Vector3(sin(a)*cos(v.gun_angle),sin(v.gun_angle),cos(a)*cos(v.gun_angle))*100)
+		var muzzle_render: Transform3D=v.muzzle.get_global_transform_interpolated()
+		camera.position=muzzle_render.origin+Vector3(0,.4,0)
+		camera.look_at(camera.position+muzzle_render.basis.z.normalized()*100)
 	else:
 		camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 		var movement=Vector3.ZERO
@@ -3154,10 +3262,11 @@ func update_range_killcam(dt: float):
 
 	var target=vehicles[range_killcam_target]
 
-	var centre = target.global_position + Vector3(0, 1.5, 0)
+	var target_render: Transform3D=target.get_global_transform_interpolated()
+	var centre = target_render.origin + Vector3(0, 1.5, 0)
 
 	# Slow cinematic orbit around the wreck.
-	var angle = target.rotation.y + 2.35 + range_killcam_elapsed * 0.32
+	var angle = target_render.basis.get_euler().y + 2.35 + range_killcam_elapsed * 0.32
 
 	var radius=11.5
 

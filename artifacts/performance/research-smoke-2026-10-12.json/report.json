@@ -1,0 +1,12 @@
+{
+  "task": "stage 3 turret imitation smoke",
+  "train_seed": 100,
+  "test_seed": 200,
+  "policy": "shared/policy.npz",
+  "dataset_samples": 800,
+  "frozen_evaluation": true,
+  "train_neural_tick_ms": 68.4781669988297,
+  "eval_neural_tick_ms": 80.845250049606,
+  "eval_realtime_factor": 0.359542934639769,
+  "limitations": "tiny demonstration, no claim of learning quality/role emergence"
+}

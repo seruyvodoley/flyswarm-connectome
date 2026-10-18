@@ -2,6 +2,7 @@ extends RefCounted
 var tcp=StreamPeerTCP.new()
 var buffer=""
 var enabled=false
+var research_mode=false
 var pending=false
 var commands=[]
 var last_reply={}
@@ -67,7 +68,8 @@ func poll():
 	# are deliberately excluded so their neural/world stepping semantics remain
 	# unchanged and reproducible.
 	if (
-		not fresh_response
+		not research_mode
+		and not fresh_response
 		and pending
 		and commands.is_empty()
 		and not last_reply.is_empty()
@@ -88,10 +90,10 @@ func _valid_reply(data) -> bool:
 		for value in action:
 			if not (value is int or value is float) or not is_finite(float(value)):return false
 	return true
-func request(observations: Array, audio_mode: String):
+func request(observations: Array, audio_mode: String, simulation_time_s: float=0.0, physics_step_id: int=0):
 	if pending or tcp.get_status()!=StreamPeerTCP.STATUS_CONNECTED:return
 	tick+=1
-	var packet={"version":1,"seq":tick,"audio":audio_mode,"observations":observations}
+	var packet={"version":1,"seq":tick,"audio":audio_mode,"simulation_time_s":simulation_time_s,"physics_step_id":physics_step_id,"observations":observations}
 	tcp.put_data((JSON.stringify(packet)+"\n").to_utf8_buffer())
 	sent_at=Time.get_ticks_usec()
 	pending=true

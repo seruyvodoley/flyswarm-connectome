@@ -1,0 +1,13 @@
+{
+  "id": "jagdpanther",
+  "seed": 23,
+  "resolution": 2048,
+  "seconds": 14.739796876907349,
+  "ao": "four-ray short-range per-mesh structural occlusion; no directional light baked",
+  "geometry": "unchanged",
+  "textures": [
+    "albedo.png",
+    "orm.png",
+    "normal.png"
+  ]
+}

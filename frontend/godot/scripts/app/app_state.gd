@@ -3,7 +3,7 @@ const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var session=Config.new()
-var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","dataset_path":""}
+var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","dataset_path":"","environment_profile":"enhanced_visual"}
 var root_path=""
 var python=""
 var packaged_app=false
@@ -226,6 +226,7 @@ func configure(mode: String):
 	open_day_mode=false
 	session=Config.new()
 	session.mode=mode
+	if mode!="replay":session.environment_profile=str(settings.get("environment_profile","enhanced_visual"))
 	session.audio_mode=settings.audio
 	session.host=settings.host
 	session.port=int(settings.port)

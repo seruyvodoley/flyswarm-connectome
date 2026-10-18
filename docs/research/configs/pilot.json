@@ -1,0 +1,22 @@
+{
+  "schema": "flyswarm.research.config.v1",
+  "description": "Short operational pilot only; not a powered or confirmatory experiment.",
+  "map_seed": 1944,
+  "seconds": 3,
+  "seeds": [41001, 41002],
+  "conditions": [
+    "RULE_BASED",
+    "MALECNS_REAL",
+    "MALECNS_ABLATED",
+    "MALECNS_SHUFFLED"
+  ],
+  "ablate_channels": [
+    "DNp09_L",
+    "DNp09_R",
+    "DNa02_L",
+    "DNa02_R",
+    "DNp01"
+  ],
+  "reference_condition": "RULE_BASED",
+  "output_root": "results/research"
+}

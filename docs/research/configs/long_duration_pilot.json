@@ -1,0 +1,11 @@
+{
+  "schema": "flyswarm.research.config.v1",
+  "description": "30-second paired technical pilot; real MaleCNS synchronization and combat-event audit only, not powered or confirmatory.",
+  "map_seed": 1944,
+  "seconds": 30,
+  "seeds": [61001, 61002],
+  "conditions": ["RULE_BASED", "MALECNS_REAL"],
+  "ablate_channels": ["DNp09_L", "DNp09_R", "DNa02_L", "DNa02_R", "DNp01"],
+  "reference_condition": "RULE_BASED",
+  "output_root": "results/research"
+}

@@ -1,0 +1,97 @@
+{
+  "backend_state": "NOT REQUIRED",
+  "battle_simulation_seconds": null,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "headless",
+  "draw_calls": {
+    "max": 0.0,
+    "mean": 0.0,
+    "p99": 0.0
+  },
+  "frame_ms": {
+    "max": 82.673,
+    "mean": 6.96772346368715,
+    "p99": 8.52
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "ipc_latency_ms_series": {
+    "available": false
+  },
+  "male_cns": "not applicable",
+  "male_cns_request_count": null,
+  "male_cns_response_count": null,
+  "male_cns_tick_ms": null,
+  "male_cns_tick_ms_series": {
+    "available": false
+  },
+  "mode": "menu",
+  "physics_ms": {
+    "max": 0.886,
+    "mean": 0.313508379888266,
+    "p99": 0.886
+  },
+  "presentation_fps": 143.09176538866,
+  "preview_rate_hz": 30.0,
+  "process_ms": {
+    "max": 2.33,
+    "mean": 1.27678910614524,
+    "p99": 2.33
+  },
+  "rendered_objects": {
+    "max": 0.0,
+    "mean": 0.0,
+    "p99": 0.0
+  },
+  "rendered_primitives": {
+    "max": 0.0,
+    "mean": 0.0,
+    "p99": 0.0
+  },
+  "renderer": "",
+  "requested_sample_seconds": 5.0,
+  "root_viewport_px": [
+    64,
+    64
+  ],
+  "sample_neural_response_rate_hz": 0.0,
+  "sample_neural_responses": 0,
+  "sample_physics_steps": 0,
+  "sample_realtime_factor": 0.0,
+  "sample_simulation_elapsed_seconds": 0.0,
+  "sample_wall_elapsed_seconds": 5.003783,
+  "sampled_frames": 716,
+  "screen_pixels": [
+    0,
+    0
+  ],
+  "screen_scale": 1.0,
+  "static_memory_bytes": {
+    "max": 52935711.0,
+    "mean": 52814041.6592179,
+    "p99": 52867551.0
+  },
+  "subviewport_count": 2,
+  "video_memory_bytes": {
+    "max": 0.0,
+    "mean": 0.0,
+    "p99": 0.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    0,
+    0
+  ]
+}

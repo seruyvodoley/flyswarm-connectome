@@ -19,3 +19,4 @@ textures/vram_compression/import_etc2_astc=true
 lights_and_shadows/directional_shadow/size=2048
 [physics]
 common/physics_ticks_per_second=50
+common/physics_interpolation=true

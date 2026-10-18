@@ -1,0 +1,21 @@
+{
+	"device": "Apple M2 (Apple8)",
+	"failures": 0,
+	"renderer": "mobile",
+	"scenarios": {
+		"after": {
+			"draw_calls": 456.0,
+			"median_ms": 16.679,
+			"p99_ms": 17.232,
+			"texture_bytes": 288438912.0
+		},
+		"before": {
+			"draw_calls": 456.0,
+			"median_ms": 16.669,
+			"p99_ms": 17.295,
+			"texture_bytes": 19774080.0
+		}
+	},
+	"timing": "CPU-observed frame intervals; not isolated GPU timing",
+	"viewport": "1200x800"
+}

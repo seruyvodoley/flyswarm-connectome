@@ -1,0 +1,13 @@
+{
+  "id": "su100",
+  "seed": 24,
+  "resolution": 2048,
+  "seconds": 11.755836248397827,
+  "ao": "four-ray short-range per-mesh structural occlusion; no directional light baked",
+  "geometry": "unchanged",
+  "textures": [
+    "albedo.png",
+    "orm.png",
+    "normal.png"
+  ]
+}

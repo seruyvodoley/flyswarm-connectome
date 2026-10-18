@@ -15,7 +15,10 @@ class DualBrain:
         if status:status('Loading RED MaleCNS · FlyBrain(batch=8)')
         self.red=FlyBrain(device='cpu',batch=8,seed=seed+1000)
         assert self.blue is not self.red
-        assert not np.shares_memory(self.blue.weights,self.red.weights)
+        shared_arrays=[name for name,value in vars(self.blue).items()
+                       if isinstance(value,np.ndarray) and isinstance(getattr(self.red,name,None),np.ndarray)
+                       and np.shares_memory(value,getattr(self.red,name))]
+        if shared_arrays:raise RuntimeError(f'BLUE/RED FlyBrain arrays unexpectedly alias: {shared_arrays}')
         assert self.blue.dt==self.red.dt==.02
         self.brains=[self.blue,self.red]
         self.groups=[]
@@ -40,6 +43,7 @@ class DualBrain:
         self.song=np.zeros(16)
         self.trace=np.zeros((16,6))
         self.ticks=0
+        self.last_sensory_inputs={}
         self.last_communication={
             'sample':-1,
             'song_out':[0.0]*16,
@@ -58,6 +62,8 @@ class DualBrain:
             audio,
         )
         stimulus=visual(observations)
+        self.last_sensory_inputs={key:np.asarray(value,dtype=float).tolist() for key,value in stimulus.items()}
+        self.last_sensory_inputs['audio']=heard.astype(float).tolist()
         self.song[:]=0
         for team,(b,g) in enumerate(zip(self.brains,self.groups)):
             span=slice(team*8,(team+1)*8)

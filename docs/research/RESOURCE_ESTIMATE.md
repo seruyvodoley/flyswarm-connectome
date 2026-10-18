@@ -1,0 +1,11 @@
+# Pilot-scale resource estimate
+
+This is a throughput/storage extrapolation, not a sample-size recommendation. It assumes five 30-second conditions (`MALECNS_REAL`, `MALECNS_ABLATED`, `MALECNS_SHUFFLED`, `NON_NEURAL_TRAINED`, `RULE_BASED`), two side assignments per independent seed, and the current normalized T-34-85 setup. The trained non-neural arm has not been measured, so its cost is not known.
+
+The current-source 30.02-second pilot measured MaleCNS RTF 0.188 (about 159 seconds wall time per 30 simulated seconds) and Rule RTF 0.939 (about 32 seconds per 30 simulated seconds). At 60 simulated seconds, the longer pilot measured MaleCNS RTF 0.186 (about 323 seconds/run) and Rule RTF 0.952 (about 63 seconds/run). For a five-condition design (three real-brain conditions, one Rule, one future trained controller), two side assignments imply about 36.5 minutes/seed at 60 seconds if the trained controller runs near Rule speed. This illustrative scenario would take about 6.1, 12.2 and 24.3 hours for 10, 20 and 40 seeds respectively, before training, startup, failed-run retries, final analysis, or operational pauses. No sample size is selected here.
+
+The current 8-run 30-second archive occupies about 769 MiB including logs, tables, and plots (roughly 96 MiB/run). The 4-run 60-second archive occupies about 796 MiB (roughly 199 MiB/run). Linear storage for 200 runs of the 60-second scenario (20 seeds × five conditions × both sides) would be about 38.9 GiB. This is approximate: compression, event density, analysis outputs, and longer recordings change the total. The short 16-run, 3-second four-condition pilot occupies about 245 MiB.
+
+During one active MaleCNS run, sampled resident memory was about 466 MiB for Python and 56 MiB for Godot (about 522 MiB combined). This is a point-in-time sample, not a high-water mark. Peak memory has not been measured. Keep archives on a filesystem with substantial headroom and preserve each run's checksums.
+
+No seed count is selected here. A task-specific sensorimotor benchmark and a defined smallest meaningful effect are still missing, and two independent pilot seeds do not estimate variance reliably enough to preregister a confirmatory sample.

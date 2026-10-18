@@ -1,5 +1,5 @@
 """python -m flyswarm.bridge.server --port 8765 [--collect DATASET.npz]."""
-import argparse,hashlib,json,socket,time,os,signal,threading,sys
+import argparse,hashlib,json,socket,time,os,signal,threading,sys,platform,importlib.metadata,subprocess
 from pathlib import Path
 import numpy as np
 from flyswarm.brain import DualBrain
@@ -25,6 +25,29 @@ class CombatPPOPolicy:
     def act(self,observation):
         action,_=self.model.predict(np.asarray(observation,dtype=np.float32),deterministic=True)
         return np.asarray(action,dtype=float),None
+
+class NonNeuralAdapter:
+    """Frozen linear adapter whose schema forbids neural features."""
+    FEATURE_SCHEMA='game_proprioception_v1'
+    def __init__(self,path):
+        with np.load(path,allow_pickle=False) as data:
+            self.weights=np.asarray(data['weights'],dtype=float)
+            self.metadata=json.loads(str(data['metadata']))
+        if self.metadata.get('feature_schema')!=self.FEATURE_SCHEMA or self.weights.shape!=(23,6):
+            raise ValueError('Non-neural checkpoint must use 22 game/proprioception features and a 23x6 readout')
+        if self.metadata.get('training_seeds') is None or not self.metadata.get('training_samples'):
+            raise ValueError('Non-neural checkpoint is missing training provenance')
+        self.weights.flags.writeable=False
+    @staticmethod
+    def inputs(observation):
+        proprio=np.asarray(observation.get('proprio',[]),dtype=float)
+        task=np.asarray(observation.get('rl_task',[]),dtype=float)
+        if proprio.shape!=(6,) or task.shape!=(16,):raise ValueError('Non-neural input schema mismatch')
+        return np.concatenate([proprio,task])
+    def predict(self,values):
+        x=np.asarray(values,dtype=float)
+        if x.shape!=(22,):raise ValueError('Non-neural policy input must contain 22 non-neural features')
+        return np.clip(np.append(x,1.)@self.weights,-1.,1.)
 
 def combat_features(trace,observation):
     from flyswarm.training.combat import NEURAL_CHANNELS
@@ -83,6 +106,13 @@ def main():
     p.add_argument('--demo',action='store_true',help='Run one real MaleCNS batch=1 opponent for the isolated 1v1 demo')
     p.add_argument('--check-data',action='store_true',help='Validate an existing MaleCNS dataset directory and exit')
     p.add_argument('--data-dir',type=Path,help='Dataset folder containing brain.npz and weights.npz')
+    p.add_argument('--condition',choices=['MALECNS_REAL','MALECNS_ABLATED','MALECNS_SHUFFLED','NON_NEURAL_TRAINED','RULE_BASED'],default='MALECNS_REAL')
+    p.add_argument('--ablate-channels',default='DNp09_L,DNp09_R,DNa02_L,DNa02_R,DNp01')
+    p.add_argument('--research-log',type=Path)
+    p.add_argument('--experiment-id',default='')
+    p.add_argument('--run-id',default='')
+    p.add_argument('--non-neural-policy',type=Path)
+    p.add_argument('--collect-nonneural',type=Path)
     a=p.parse_args()
     if a.check_data:
         from flybrain.data import FILES,has_data
@@ -129,8 +159,54 @@ def main():
         if file:
             try:team_policies[team]=load_policy(file)
             except Exception as exc:status('ERROR',str(exc));return
+    non_neural_policy=None
+    if a.condition=='NON_NEURAL_TRAINED':
+        if not a.non_neural_policy:
+            print('NON_NEURAL_TRAINED requires a separately trained non-neural checkpoint',file=sys.stderr);return 2
+        try:non_neural_policy=NonNeuralAdapter(a.non_neural_policy)
+        except Exception as exc:status('ERROR',str(exc));return 2
+        if a.seed in set(non_neural_policy.metadata.get('training_seeds',[])) | set(non_neural_policy.metadata.get('validation_seeds',[])):
+            print('Evaluation seed overlaps non-neural training/validation data',file=sys.stderr);return 2
     xs=[];ys=[];vehicles=[];seeds=[]
+    shared_brain_arrays=[name for name,value in vars(brain.brains[0]).items()
+                         if len(brain.brains)>1 and isinstance(value,np.ndarray)
+                         and isinstance(getattr(brain.brains[1],name,None),np.ndarray)
+                         and np.shares_memory(value,getattr(brain.brains[1],name))]
     metadata={'brain_seeds':[a.seed] if a.demo else [a.seed,a.seed+1000],'neuron_count':sum(b.n*b.batch for b in brain.brains),'feature_mode':a.feature_mode,'mode':'imitation' if a.collect else 'evaluation','runtime':'single_agent_demo' if a.demo else 'dual_8v8','controllers':{'blue':a.blue_controller,'red':a.red_controller},'policy_ids':{key:value.metadata for key,value in policies.items()},'policy_sha256':policy_hashes,'team_policy_ids':{key:value.metadata for key,value in team_policies.items()},'team_policy_sha256':{team:hashlib.sha256(Path(getattr(a,team+'_policy')).read_bytes()).hexdigest() for team in team_policies}}
+    dataset_path=Path(os.environ.get('FLY_DATA',Path.home()/'fly-data'))
+    from flybrain.data import FILES
+    dataset_hashes={}
+    for name in FILES:
+        digest=hashlib.sha256()
+        with (dataset_path/name).open('rb') as source:
+            for block in iter(lambda:source.read(1<<20),b''):digest.update(block)
+        dataset_hashes[name]=digest.hexdigest()
+    try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).resolve().parents[3],text=True,stderr=subprocess.DEVNULL).strip()
+    except Exception:commit=None
+    metadata['shared_array_names']=shared_brain_arrays
+    if non_neural_policy:
+        metadata['non_neural_policy']=non_neural_policy.metadata
+        metadata['non_neural_checkpoint_sha256']=hashlib.sha256(a.non_neural_policy.read_bytes()).hexdigest()
+    metadata.update({'neurons_per_instance':[int(b.n) for b in brain.brains],
+        'instance_count':len(brain.brains),'instance_batches':[int(b.batch) for b in brain.brains],
+        'instances_independent':len(brain.brains)==2 and brain.brains[0] is not brain.brains[1] and not shared_brain_arrays,
+        'neural_timestep_s':float(brain.brains[0].dt),'flybrain_version':importlib.metadata.version('flybrain'),
+        'dataset_sha256':dataset_hashes,'dataset_path':str(dataset_path),'python_version':platform.python_version(),
+        'platform':platform.platform(),'git_commit':commit,'condition':a.condition,
+        'ablate_channels':a.ablate_channels.split(',') if a.condition=='MALECNS_ABLATED' else [],
+        'shuffle_procedure':'fixed one-agent cyclic signal reassignment within each team; exact six-channel signal multiset preserved per team and neural step' if a.condition=='MALECNS_SHUFFLED' else None,
+        'experiment_id':a.experiment_id,'run_id':a.run_id})
+    channel_ids={'DNp09_L':0,'DNp09_R':1,'DNa02_L':2,'DNa02_R':3,'DNp01':4,'wing':5}
+    try:ablate_indices=[channel_ids[name.strip()] for name in a.ablate_channels.split(',') if name.strip()]
+    except KeyError as exc:raise SystemExit(f'Unknown ablation channel: {exc}')
+    shuffle_source=[(i+1)%8 for i in range(8)]+[8+(i+1)%8 for i in range(8)]
+    research_stream=None
+    if a.research_log:
+        a.research_log.parent.mkdir(parents=True,exist_ok=True)
+        research_stream=a.research_log.open('x',encoding='utf-8',buffering=1)
+    nn_x=[];nn_y=[];nn_seed=[]
+    if a.collect_nonneural and a.collect_nonneural.exists():
+        raise FileExistsError(a.collect_nonneural)
     with socket.socket() as server:
         server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         server.bind(('127.0.0.1',a.port));server.listen(1)
@@ -145,19 +221,27 @@ def main():
                         if packet['seq']<=last:raise ValueError('Non-monotonic sequence')
                         last=packet['seq'];obs=packet['observations']
                         traces,heard,ms=brain.step(obs,packet['audio'])
+                        neural_traces=np.asarray(traces,dtype=float)
+                        effective_traces=neural_traces.copy()
+                        if a.condition=='MALECNS_ABLATED':effective_traces[:8,ablate_indices]=0.0
+                        if a.condition=='MALECNS_SHUFFLED':effective_traces[:8]=neural_traces[shuffle_source[:8]]
                         actions=[];control_layers=[]
-                        for o,t in zip(obs,traces):
+                        for agent_index,(o,t) in enumerate(zip(obs,effective_traces)):
                             team='blue' if o['id']<8 else 'red'
-                            policy=team_policies.get(team,policies.get(o['vehicle'],policies.get('shared')))
+                            is_non_neural=(a.condition=='NON_NEURAL_TRAINED' and agent_index<8)
+                            policy=non_neural_policy if is_non_neural else team_policies.get(team,policies.get(o['vehicle'],policies.get('shared')))
                             if policies and policy is None:raise ValueError(f"No policy for {o['vehicle']}")
                             is_combat_ppo=isinstance(policy,CombatPPOPolicy)
                             is_ppo=isinstance(policy,SharedPPOPolicy)
-                            mode=policy.mode if policy and not (is_ppo or is_combat_ppo) else a.feature_mode
-                            x=combat_features(t,o) if is_combat_ppo else (ppo_features(policy,t,o) if is_ppo else features(t,o['proprio'],mode))
+                            is_non_neural=isinstance(policy,NonNeuralAdapter)
+                            mode=policy.mode if policy and hasattr(policy,'mode') else a.feature_mode
+                            x=NonNeuralAdapter.inputs(o) if is_non_neural else (combat_features(t,o) if is_combat_ppo else (ppo_features(policy,t,o) if is_ppo else features(t,o['proprio'],mode)))
                             decoded=brain.baseline(t)
-                            raw_neural=np.asarray(t,dtype=float)
+                            raw_neural=np.asarray(neural_traces[agent_index],dtype=float)
                             objective_aux=np.zeros(6);gunnery_aux=np.zeros(6)
                             adapter_action=None
+                            if a.collect_nonneural:
+                                nn_x.append(NonNeuralAdapter.inputs(o));nn_y.append(np.asarray(o['teacher'],dtype=float));nn_seed.append(a.seed)
                             if a.collect:
                                 xs.append(x);ys.append(o['teacher']);vehicles.append(o['vehicle']);seeds.append(a.seed)
                                 action=np.array(o['teacher'])
@@ -188,13 +272,19 @@ def main():
                             actions.append(action.tolist())
                             control_layers.append({
                                 'raw_neural_action':raw_neural.tolist(),
+                                'raw_neural_trace':raw_neural.tolist(),
+                                'effective_neural_trace':np.asarray(t,dtype=float).tolist(),
+                                'neural_source_agent':shuffle_source[agent_index] if a.condition=='MALECNS_SHUFFLED' and agent_index<8 else agent_index,
                                 'decoder_action':None if decoded is None else decoded.tolist(),
                                 'objective_aux_action':objective_aux.tolist(),
                                 'gunnery_aux_action':gunnery_aux.tolist(),
                                 'adapter_action':None if adapter_action is None else adapter_action.tolist(),
                                 'final_action':action.tolist(),
                             })
-                        result=dict(version=1,seq=last,actions=actions,control_layers=control_layers,traces=traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=.02,mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies or team_policies else 'BIOLOGICAL_BASELINE'),metadata=metadata,communication=brain.last_communication)
+                        result=dict(version=1,seq=last,actions=actions,control_layers=control_layers,traces=neural_traces.tolist(),effective_traces=effective_traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=float(brain.brains[0].dt),mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies or team_policies else 'BIOLOGICAL_BASELINE'),metadata=metadata,communication=brain.last_communication,observations=[{k:v for k,v in o.items() if k!='teacher'} for o in obs],sensory_inputs=getattr(brain,'last_sensory_inputs',{}),simulation_time_s=float(packet.get('simulation_time_s',0.0)),physics_step_id=int(packet.get('physics_step_id',0)))
+                        if research_stream:
+                            record={'schema':'flyswarm.godot_malecns.neural_step.v1','experiment_id':a.experiment_id,'run_id':a.run_id,'condition':a.condition,'seed':a.seed,'neural_step_id':last,'simulation_time_s':result['simulation_time_s'],'neural_time_s':float((last-1)*result['dt']),'physics_step_id':result['physics_step_id'],'wall_time_unix_s':time.time(),'wall_time_monotonic_s':time.monotonic(),'dt_s':result['dt'],'sensory_inputs':result['sensory_inputs'],'observations':result['observations'],'neural_traces':neural_traces.tolist(),'effective_traces':effective_traces.tolist(),'heard':heard.tolist(),'control_layers':control_layers,'actions':actions,'tick_ms':ms,'metadata':metadata}
+                            research_stream.write(json.dumps(record,separators=(',',':'),allow_nan=False)+'\n')
                         connection.sendall(encode(result))
             except (ConnectionError,ValueError) as e:print(type(e).__name__,str(e),flush=True)
             finally:
@@ -202,6 +292,11 @@ def main():
                     path=Path(a.collect);path.parent.mkdir(parents=True,exist_ok=True)
                     np.savez(path,x=xs,y=ys,vehicle=vehicles,seed=seeds,mode=a.feature_mode,metadata=json.dumps(metadata))
                     print('SAVED',len(xs),'imitation samples',a.collect,flush=True)
+                if a.collect_nonneural and nn_x:
+                    path=a.collect_nonneural;path.parent.mkdir(parents=True,exist_ok=True)
+                    np.savez(path,x=np.asarray(nn_x,dtype=float),y=np.asarray(nn_y,dtype=float),seed=np.asarray(nn_seed,dtype=int),feature_schema=NonNeuralAdapter.FEATURE_SCHEMA)
+                    print('SAVED',len(nn_x),'non-neural samples',path,flush=True)
             if a.once:break
             brain.reset(a.seed)
+    if research_stream:research_stream.close()
 if __name__=='__main__':raise SystemExit(main() or 0)

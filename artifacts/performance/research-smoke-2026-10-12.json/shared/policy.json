@@ -1,0 +1,7 @@
+{
+  "training_mse": 0.04205410270980897,
+  "samples": 192,
+  "policy": "/Volumes/RisingSail/\u043e\u0441\u043d\u043e\u0432\u044b \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f/flytank/artifacts/performance/research-smoke-2026-10-12.json/shared/policy.npz",
+  "stage": 3,
+  "method": "imitation; not emergence"
+}

@@ -1,17 +1,18 @@
 {
-  "asset": "T-34/85 low-poly pilot",
+  "asset": "T-34/85 full-source articulated model",
   "source_author": "Lotnik",
   "source_license": "CC0 1.0",
   "source_url": "https://opengameart.org/content/t-3485",
-  "source_blend": "Rudy.blend",
-  "mesh_object_count": 41,
-  "triangles": 4113,
-  "added_simplified_wheels": 14,
-  "runtime_mesh_node_count": 55,
-  "runtime_triangles": 4953,
-  "scale": 3.3,
-  "runtime_axes": "right +X, forward +Z in Godot (authored Blender -Y), up +Y in Godot",
+  "source_blend": "candidates/Rudy.blend",
+  "source_mesh_objects": 41,
+  "source_triangles": 4113,
+  "runtime_mesh_objects": 41,
+  "runtime_triangles": 4113,
+  "runtime_glb_bytes": 215396,
+  "source_geometry_modified": false,
+  "source_geometry_sha256": "cb35f6123699736644fdfaa0392bd3766bd7b0183ad46b1ca501662c9fee04da",
   "nodes": {
+    "root": "VehicleModel",
     "hull": "HullPivot",
     "turret": "TurretPivot",
     "gun": "GunElevationPivot",
@@ -22,11 +23,9 @@
     ]
   },
   "notes": [
-    "No source geometry was cut or repaired.",
-    "Turret/gun pivots are manually placed from measured source bounds.",
-    "Track loops are separate static meshes; their motion is static.",
-    "Fourteen simple cylindrical rollers were added as separate wheel-animation nodes.",
-    "The source does not establish factory, year, or exact 1944 configuration."
-  ],
-  "runtime_glb_bytes": 256732
+    "All 41 original source meshes are retained; no geometry, material, or wheel was added, deleted, redrawn, rescaled, or reshaped.",
+    "Only a uniform root scale/ground offset and mechanical parenting pivots were added.",
+    "Track loops and all original road-wheel meshes remain exactly as authored by Lotnik.",
+    "The source does not claim a verified factory/year configuration."
+  ]
 }

@@ -135,11 +135,15 @@ func _validate_all_liveries() -> void:
 			_fail("Livery changed a mechanical pivot on %s" % id)
 		elif id in ["t34_85", "tiger_i", "is2_1944", "panther_g"]:
 			var muzzle_before: Vector3 = muzzle.global_position
+			var hull_mesh := model.find_child("HullGeometry", true, false) as MeshInstance3D
+			var hull_before: Vector3 = hull_mesh.global_position if hull_mesh else Vector3.ZERO
 			turret.rotation.y += 0.25
 			turret.force_update_transform()
 			muzzle.force_update_transform()
 			if muzzle.global_position.distance_to(muzzle_before) < 0.05:
 				_fail("Turret does not move the muzzle on %s" % id)
+			if hull_mesh and hull_mesh.global_position.distance_to(hull_before) > 0.001:
+				_fail("Turret rotation moves the source hull on %s" % id)
 			turret.transform = pivots[0]
 			var before_elevation: Vector3 = muzzle.global_position
 			gun.rotation.x += 0.12
@@ -150,43 +154,43 @@ func _validate_all_liveries() -> void:
 			gun.transform = pivots[1]
 		if id == "t34_85":
 			if model.find_child("TrackLeft", true, false) == null or model.find_child("TrackRight", true, false) == null:
-				_fail("Separate track loops are missing on the T-34/85 pilot")
-			if model.find_children("WheelGeometry*", "MeshInstance3D", true, false).size() < 12:
-				_fail("Individual T-34/85 wheel rollers are missing")
+				_fail("T-34/85 track loops are missing")
 		if id in ["tiger_i", "is2_1944", "panther_g"]:
 			for part_name in ["HullGeometry", "GunBarrel", "TrackLeft", "TrackRight"]:
 				if model.find_child(part_name, true, false) == null:
 					_fail("Required mechanical mesh %s is missing on %s" % [part_name, id])
 		if id == "tiger_i" and model.find_children("Wheel*", "MeshInstance3D", true, false).size() < 12:
 			_fail("Individual Tiger I wheel meshes are missing")
-		if id in ["is2_1944", "panther_g"] and (model.find_child("RoadWheelsLeft", true, false) == null or model.find_child("RoadWheelsRight", true, false) == null):
-			_fail("Separate left and right running gear is missing on %s" % id)
-		var materials := {}
+		if id in ["t34_85", "is2_1944", "panther_g"]:
+			var expected_wheels = {"t34_85":24, "is2_1944":34, "panther_g":36}
+			if model.find_children("Wheel*", "MeshInstance3D", true, false).size() != expected_wheels[id]:
+				_fail("Rebuilt running gear wheel count is incorrect on %s" % id)
+		if id in ["is2_1944", "panther_g"]:
+			var vehicle_root := model.find_child("VehicleModel", true, false)
+			if turret.get_parent() != vehicle_root or gun.get_parent() != turret:
+				_fail("%s source turret and gun pivots are not independent model nodes" % id)
 		for node in model.find_children("*", "MeshInstance3D", true, false):
-			var mesh := node as MeshInstance3D
-			for surface in mesh.mesh.get_surface_count():
-				var material := mesh.get_surface_override_material(surface)
-				if material is ShaderMaterial:
-					materials[material.get_instance_id()] = true
-		if materials.size() < 2:
-			_fail("Materials are shared instead of per-surface on %s" % id)
+			for surface in node.mesh.get_surface_count():
+				var material = node.get_surface_override_material(surface)
+				if not material is StandardMaterial3D or material.albedo_texture == null or material.normal_texture == null or material.roughness_texture == null:
+					_fail("Imported PBR maps missing on %s/%s" % [id,node.name])
 		Appearance.set_destroyed(model, id, true)
 		var destroyed_mat := _first_override(model)
-		if destroyed_mat == null or not destroyed_mat.get_shader_parameter("charred"):
+		if destroyed_mat == null or destroyed_mat.albedo_color.r > .3:
 			_fail("Destroyed appearance missing for %s" % id)
 		Appearance.set_destroyed(model, id, false)
 		var restored_mat := _first_override(model)
-		if restored_mat == null or restored_mat.get_shader_parameter("charred"):
-			_fail("Livery did not restore after reset for %s" % id)
+		if restored_mat == null or restored_mat.albedo_color.r < .95:
+			_fail("PBR did not restore after reset for %s" % id)
 		model.queue_free()
 	await process_frame
 
-func _first_override(model: Node3D) -> ShaderMaterial:
+func _first_override(model: Node3D) -> StandardMaterial3D:
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
 		for surface in mesh.mesh.get_surface_count():
 			var material := mesh.get_surface_override_material(surface)
-			if material is ShaderMaterial:
+			if material is StandardMaterial3D:
 				return material
 	return null
 

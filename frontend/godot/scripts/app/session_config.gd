@@ -3,6 +3,7 @@ class_name SessionConfig
 var mode="battle"
 var map="krasny_valley"
 var map_seed=1944
+var environment_profile=""
 var battle_seed=200
 var blue_controller="rule"
 var red_controller="rule"
@@ -68,6 +69,7 @@ func cli_args() -> PackedStringArray:
 	if mode=="range":args.append("--range")
 	if mode=="demo":args.append("--demo")
 	if map=="training_range":args.append("--training")
+	if environment_profile!="":args.append_array(["--environment-profile",environment_profile])
 	if mode=="replay":args.append_array(["--replay",replay_path])
 	if output!="":args.append_array(["--record",output])
 	return args

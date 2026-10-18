@@ -30,8 +30,20 @@ static func apply(model: Node3D, vehicle_id: String, destroyed: bool = false) ->
 		for surface in mesh_instance.mesh.get_surface_count():
 			var source := mesh_instance.mesh.surface_get_material(surface)
 			var instance_source := mesh_instance.get_surface_override_material(surface)
-			if instance_source != null and not instance_source is ShaderMaterial:
+			if instance_source != null and not instance_source is ShaderMaterial and not source.resource_name.begins_with("FlySwarmPBR_"):
 				source = instance_source
+			# Authored glTF PBR atlases already contain the vehicle-specific paint and
+			# distinct rubber/steel/paint response. Never replace them with livery.
+			if source is StandardMaterial3D and source.resource_name.begins_with("FlySwarmPBR_"):
+				if destroyed:
+					var burnt := source.duplicate() as StandardMaterial3D
+					burnt.albedo_color = Color(.19, .17, .15)
+					burnt.roughness = 1.0
+					mesh_instance.set_surface_override_material(surface, burnt)
+				else:
+					mesh_instance.set_surface_override_material(surface, source)
+				count += 1
+				continue
 			if source is StandardMaterial3D and source.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 				continue
 			# Do not paint road wheels as dark track steel: this was a major

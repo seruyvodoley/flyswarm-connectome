@@ -4,162 +4,40 @@
     {
       "completion": "complete",
       "ipc_stats": {
-        "count": 4473,
-        "max": 85.76,
-        "mean": 18.4102503912363,
-        "p95": 19.677,
-        "p99": 20.369
+        "count": 2241,
+        "max": 28.848,
+        "mean": 18.2238652387327,
+        "p95": 19.496,
+        "p99": 19.689
       },
       "male_cns_connected": true,
-      "male_cns_tick_ms": 4.7709999998915,
+      "male_cns_tick_ms": 4.56291600130498,
       "male_cns_tick_stats": {
-        "count": 4473,
-        "max": 74.2947079997975,
-        "mean": 4.62001133468736,
-        "p95": 5.17987499915762,
-        "p99": 7.33120899894857
+        "count": 2241,
+        "max": 16.2625830016623,
+        "mean": 4.39828034093796,
+        "p95": 4.88237500030664,
+        "p99": 5.09691700062831
       },
       "match": 1,
-      "navigation_intervention_mean": 0.0757497839547048,
-      "neural_responses": 4473,
-      "opponent_distance_m": 158.981269509922,
-      "opponent_moving_fraction": 0.760053321484117,
-      "opponent_penetrations": 2,
-      "opponent_shots": 2,
-      "opponent_stuck_recoveries": 4,
+      "navigation_intervention_mean": 0.172162556356748,
+      "neural_responses": 2241,
+      "opponent_distance_m": 95.2986627992423,
+      "opponent_final_position": [
+        -33.0143699645996,
+        -0.104579605162144,
+        12.2751331329346
+      ],
+      "opponent_moving_fraction": 0.709333333333347,
+      "opponent_penetrations": 0,
+      "opponent_shots": 1,
+      "opponent_stuck_recoveries": 3,
+      "opponent_target_visible_s": 21.0999999999996,
       "player_shots": 0,
       "real_neural_response_seen": true,
-      "realtime_factor": 1.00163904064521,
-      "seconds": 90.0199999999992,
-      "wall_seconds": 89.872695
-    },
-    {
-      "completion": "complete",
-      "ipc_stats": {
-        "count": 4482,
-        "max": 59.052,
-        "mean": 18.4008634538153,
-        "p95": 19.698,
-        "p99": 20.373
-      },
-      "male_cns_connected": true,
-      "male_cns_tick_ms": 4.66783299998497,
-      "male_cns_tick_stats": {
-        "count": 4482,
-        "max": 40.2427919998445,
-        "mean": 4.49298742370201,
-        "p95": 5.08958299906226,
-        "p99": 6.22358399959921
-      },
-      "match": 2,
-      "navigation_intervention_mean": 0.0757764657269618,
-      "neural_responses": 4482,
-      "opponent_distance_m": 159.054453379935,
-      "opponent_moving_fraction": 0.759608975783161,
-      "opponent_penetrations": 2,
-      "opponent_shots": 2,
-      "opponent_stuck_recoveries": 4,
-      "player_shots": 0,
-      "real_neural_response_seen": true,
-      "realtime_factor": 1.00177539705949,
-      "seconds": 90.0199999999992,
-      "wall_seconds": 89.860462
-    },
-    {
-      "completion": "complete",
-      "ipc_stats": {
-        "count": 4490,
-        "max": 33.334,
-        "mean": 18.4106443207127,
-        "p95": 19.745,
-        "p99": 20.319
-      },
-      "male_cns_connected": true,
-      "male_cns_tick_ms": 4.11125000027823,
-      "male_cns_tick_stats": {
-        "count": 4490,
-        "max": 16.7737920000945,
-        "mean": 4.38529718485734,
-        "p95": 4.93737499891722,
-        "p99": 5.24149999910151
-      },
-      "match": 3,
-      "navigation_intervention_mean": 0.0757764657269618,
-      "neural_responses": 4490,
-      "opponent_distance_m": 159.054453379935,
-      "opponent_moving_fraction": 0.759608975783161,
-      "opponent_penetrations": 2,
-      "opponent_shots": 2,
-      "opponent_stuck_recoveries": 4,
-      "player_shots": 0,
-      "real_neural_response_seen": true,
-      "realtime_factor": 1.00184818843711,
-      "seconds": 90.0199999999992,
-      "wall_seconds": 89.853933
-    },
-    {
-      "completion": "complete",
-      "ipc_stats": {
-        "count": 4492,
-        "max": 26.67,
-        "mean": 18.4465429652716,
-        "p95": 19.815,
-        "p99": 20.451
-      },
-      "male_cns_connected": true,
-      "male_cns_tick_ms": 4.53887500043493,
-      "male_cns_tick_stats": {
-        "count": 4492,
-        "max": 10.3517909992661,
-        "mean": 4.28661879717982,
-        "p95": 4.96745899909001,
-        "p99": 5.71029200000339
-      },
-      "match": 4,
-      "navigation_intervention_mean": 0.0757764657269618,
-      "neural_responses": 4492,
-      "opponent_distance_m": 159.054453379935,
-      "opponent_moving_fraction": 0.759608975783161,
-      "opponent_penetrations": 2,
-      "opponent_shots": 2,
-      "opponent_stuck_recoveries": 4,
-      "player_shots": 0,
-      "real_neural_response_seen": true,
-      "realtime_factor": 1.00190950462196,
-      "seconds": 90.0199999999992,
-      "wall_seconds": 89.848434
-    },
-    {
-      "completion": "complete",
-      "ipc_stats": {
-        "count": 4471,
-        "max": 74.561,
-        "mean": 18.5019320062626,
-        "p95": 19.819,
-        "p99": 20.548
-      },
-      "male_cns_connected": true,
-      "male_cns_tick_ms": 4.670125001212,
-      "male_cns_tick_stats": {
-        "count": 4471,
-        "max": 67.4928749995161,
-        "mean": 4.52934022499673,
-        "p95": 5.35129099989717,
-        "p99": 7.71508400066523
-      },
-      "match": 5,
-      "navigation_intervention_mean": 0.0757764657269618,
-      "neural_responses": 4471,
-      "opponent_distance_m": 159.054453379935,
-      "opponent_moving_fraction": 0.759608975783161,
-      "opponent_penetrations": 2,
-      "opponent_shots": 2,
-      "opponent_stuck_recoveries": 4,
-      "player_shots": 0,
-      "real_neural_response_seen": true,
-      "realtime_factor": 1.00184768669896,
-      "seconds": 90.0199999999992,
-      "wall_seconds": 89.853978
+      "realtime_factor": 1.0035690035983,
+      "seconds": 45.0000000000014,
+      "wall_seconds": 44.839966
     }
   ]
 }

@@ -12,6 +12,7 @@ __pycache__/
 *.log
 # Local / large simulation output
 results/raw/
+results/research/
 results/tmp/
 # Default output of the unchanged new experiment (per-battle rows)
 results/flyswarm_05_two_brains_8v8_raw.csv

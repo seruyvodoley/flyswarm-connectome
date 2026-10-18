@@ -1,0 +1,13 @@
+{
+  "id": "is2_1944",
+  "seed": 20,
+  "resolution": 2048,
+  "seconds": 21.334534883499146,
+  "ao": "four-ray short-range per-mesh structural occlusion; no directional light baked",
+  "geometry": "unchanged",
+  "textures": [
+    "albedo.png",
+    "orm.png",
+    "normal.png"
+  ]
+}

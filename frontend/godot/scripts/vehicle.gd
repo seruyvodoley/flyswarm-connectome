@@ -416,6 +416,7 @@ func weapon_block_reason() -> String:
 func hit(shell: Dictionary, point: Vector3, normal: Vector3, zone: String):
 	if not alive:return
 	last_impact=Combat.impact(shell.ammo,shell.distance,shell.velocity,normal,cfg.armour_data[zone])
+	last_impact.shot_id=str(shell.get("shot_id",""))
 	last_impact.shell=shell.ammo.get("id","unknown")
 	last_impact.impact_speed_m_s=shell.velocity.length()
 	last_impact.nominal_thickness_mm=cfg.armour_data[zone].thickness_mm
@@ -537,6 +538,8 @@ func module_radius(key: String) -> float:
 
 func destroy_vehicle(killer_id: int):
 	if not alive:return
+	if world.has_method("record_research_event"):
+		world.record_research_event("vehicle_destroyed",{"target_id":agent_id,"team":"blue" if team==0 else "red","killer_id":killer_id,"shot_id":str(last_impact.get("shot_id","")),"cause":str(last_impact.get("kill_reason","ram_or_other"))})
 	alive=false
 	speed=0.0
 	velocity=Vector3.ZERO

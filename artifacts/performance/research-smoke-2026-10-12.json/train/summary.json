@@ -1,0 +1,1970 @@
+{
+  "backend_disconnects": 0,
+  "backend_metadata": {
+    "brain_seeds": [
+      100.0,
+      1100.0
+    ],
+    "controllers": {
+      "blue": "brain",
+      "red": "brain"
+    },
+    "feature_mode": "connectome_only",
+    "mode": "imitation",
+    "neuron_count": 2667200.0,
+    "policy_ids": {},
+    "policy_sha256": {},
+    "runtime": "dual_8v8",
+    "team_policy_ids": {},
+    "team_policy_sha256": {}
+  },
+  "brain": "IMITATION_TEACHER",
+  "brain_tick_ms": 68.4781669988297,
+  "capture_changes": 0,
+  "communication": {
+    "delay_steps": 1.0,
+    "events": [],
+    "heard_total": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "sample": 1.0,
+    "song_out": [
+      0.0,
+      2.0,
+      2.0,
+      0.0,
+      0.0,
+      6.0,
+      0.0,
+      10.0,
+      2.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0,
+      3.0
+    ]
+  },
+  "completion": "complete",
+  "ipc_latency_ms": {
+    "count": 12,
+    "max": 229.987,
+    "mean": 98.6281666666667,
+    "p95": 229.987,
+    "p99": 229.987
+  },
+  "ipc_roundtrip_ms": 75.176,
+  "last_valid_command_age_ms": 7.159,
+  "male_cns_tick_ms": {
+    "count": 12,
+    "max": 218.944457999896,
+    "mean": 86.6672152575726,
+    "p95": 218.944457999896,
+    "p99": 218.944457999896
+  },
+  "max_rut_depth_m": 0.0,
+  "mean_physics_ms": 2.60836,
+  "mode": "HISTORICAL",
+  "neural_requests": 12,
+  "neural_response_rate_hz": 4.13180172034451,
+  "neural_response_timeouts": 0,
+  "neural_steps": 12,
+  "objective_captures": [
+    0,
+    0
+  ],
+  "objective_neutralizations": [
+    0,
+    0
+  ],
+  "physics_steps": 50,
+  "projectiles": [],
+  "realtime_factor": 0.344316810028709,
+  "render_fps": null,
+  "repeated_motor_command_steps": 0,
+  "shot_distances": [
+    254.476028442383,
+    254.476028442383,
+    254.476028442383,
+    254.476028442383,
+    254.630737304688,
+    254.630737304688,
+    253.725311279297,
+    255.670654296875,
+    255.670654296875,
+    255.670654296875,
+    255.670654296875,
+    254.416122436523,
+    254.416122436523,
+    254.050354003906
+  ],
+  "tickets": [
+    250.0,
+    250.0
+  ],
+  "time": 1.0,
+  "track_segments": 0,
+  "vehicles": [
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.9564151949875,
+          0.0,
+          -0.618123292583333,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.00403959642228506,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          9.6958422005,
+          5.987102445,
+          0.0,
+          0.0,
+          3.486784401,
+          92.5330169619
+        ]
+      },
+      "gun": -0.0007581699916809,
+      "heard_input": 0.0,
+      "id": 0,
+      "impact": {
+        "angle": 0.187671848273494,
+        "capability": 128.706008148193,
+        "damaged": [
+          "commander",
+          "loader",
+          "engine",
+          "breech",
+          "turret_drive",
+          "fuel"
+        ],
+        "distance": 267.839782714844,
+        "effective": 16.0,
+        "impact_speed_m_s": 783.560485839844,
+        "nominal": 16.0,
+        "nominal_thickness_mm": 16.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "zis53_ap",
+        "zone": "roof"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": false,
+        "fuel": false,
+        "gunner": true,
+        "loader": false,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        9.6958422005,
+        5.987102445,
+        0.0,
+        0.0,
+        3.486784401,
+        92.5330169619
+      ],
+      "position": [
+        -98.0,
+        0.0800004974007607,
+        -130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 8,
+      "team": "blue",
+      "turret": 0.0,
+      "vehicle": "panther_g",
+      "yaw": 0.0
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.953948111471463,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.000000114901055363474,
+          -0.00641658324996012,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          5.987102445,
+          5.987102445,
+          3.645,
+          3.645,
+          3.486784401,
+          105.7320832519
+        ]
+      },
+      "gun": -0.000327452032722643,
+      "heard_input": 0.0,
+      "id": 1,
+      "impact": {
+        "angle": 0.134170394689856,
+        "capability": 128.706027781963,
+        "damaged": [
+          "gunner",
+          "commander",
+          "breech",
+          "turret_drive"
+        ],
+        "distance": 267.839259147644,
+        "effective": 100.0,
+        "impact_speed_m_s": 783.557556152344,
+        "nominal": 100.0,
+        "nominal_thickness_mm": 100.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "zis53_ap",
+        "zone": "mantlet"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": false,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        5.987102445,
+        5.987102445,
+        3.645,
+        3.645,
+        3.486784401,
+        105.7320832519
+      ],
+      "position": [
+        -70.0,
+        0.0800216794013977,
+        -130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 9,
+      "team": "blue",
+      "turret": 0.00000000125564791223657,
+      "vehicle": "panther_g",
+      "yaw": 0.0
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.9564151949875,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          -0.104028037557032,
+          -0.00397292764138284,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          6.437102445,
+          6.437102445,
+          0.0,
+          0.0,
+          3.486784401,
+          64.0412735965
+        ]
+      },
+      "gun": -0.000752275229428587,
+      "heard_input": 0.0,
+      "id": 2,
+      "impact": {
+        "angle": 54.6714200384464,
+        "capability": 128.705951571465,
+        "damaged": [],
+        "distance": 267.841291427612,
+        "effective": 128.996802159351,
+        "impact_speed_m_s": 783.569458007812,
+        "nominal": 80.0,
+        "nominal_thickness_mm": 80.0,
+        "penetrated": false,
+        "ricochet": false,
+        "shell": "zis53_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 1,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 1,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        6.437102445,
+        6.437102445,
+        0.0,
+        0.0,
+        3.486784401,
+        64.0412735965
+      ],
+      "position": [
+        -42.0,
+        0.0805637463927269,
+        -130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 9,
+      "team": "blue",
+      "turret": -0.0871330569886301,
+      "vehicle": "panther_g",
+      "yaw": 0.0
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.830450019619155,
+          0.0,
+          0.21521004075,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0000062739135704563,
+          -0.00442479038556115,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          4.6958422005,
+          5.987102445,
+          0.0,
+          0.0,
+          3.486784401,
+          44.85474860895
+        ]
+      },
+      "gun": -0.00080006714798443,
+      "heard_input": 0.0,
+      "id": 3,
+      "impact": {
+        "angle": 54.7196527791884,
+        "capability": 128.705970203876,
+        "damaged": [],
+        "distance": 267.840794563293,
+        "effective": 129.134354899372,
+        "impact_speed_m_s": 783.566589355469,
+        "nominal": 80.0,
+        "nominal_thickness_mm": 80.0,
+        "penetrated": false,
+        "ricochet": false,
+        "shell": "zis53_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        4.6958422005,
+        5.987102445,
+        0.0,
+        0.0,
+        3.486784401,
+        44.85474860895
+      ],
+      "position": [
+        -14.0,
+        0.0887293145060539,
+        -130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 11,
+      "team": "blue",
+      "turret": 0.00000619944288814341,
+      "vehicle": "panther_g",
+      "yaw": 0.0
+    },
+    {
+      "alive": false,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.0,
+          0.0,
+          0.3228504075,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          0.0,
+          1.937102445,
+          0.0,
+          0.0,
+          3.486784401,
+          92.2327750855
+        ]
+      },
+      "gun": -0.000125654347137357,
+      "heard_input": 0.0,
+      "id": 4,
+      "impact": {
+        "angle": 0.249446024833782,
+        "capability": 193.038346297741,
+        "damaged": [
+          "gunner",
+          "commander",
+          "loader",
+          "engine",
+          "breech",
+          "turret_drive"
+        ],
+        "distance": 263.803616523743,
+        "effective": 100.0,
+        "impact_speed_m_s": 771.817199707031,
+        "nominal": 100.0,
+        "nominal_thickness_mm": 100.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "d25t_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.34,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 0.34
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": false,
+        "fuel": true,
+        "gunner": false,
+        "loader": false,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        0.0,
+        1.937102445,
+        0.0,
+        0.0,
+        3.486784401,
+        92.2327750855
+      ],
+      "position": [
+        14.0,
+        0.160493314266205,
+        -130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": -1,
+      "team": "blue",
+      "turret": 0.00000403190687730646,
+      "vehicle": "tiger_i",
+      "yaw": 0.0
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.939725237722452,
+          0.0,
+          -0.11021495925,
+          -0.4100625,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.00075009374503779,
+          -0.0307752102472563,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          6.2433922005,
+          5.582102445,
+          3.2805,
+          0.0,
+          3.486784401,
+          107.26370028225
+        ]
+      },
+      "gun": -0.000370985823165269,
+      "heard_input": 0.0,
+      "id": 5,
+      "impact": {
+        "angle": 0.134170394689856,
+        "capability": 193.038404500484,
+        "damaged": [
+          "gunner",
+          "commander",
+          "breech"
+        ],
+        "distance": 263.802247047424,
+        "effective": 120.0,
+        "impact_speed_m_s": 771.809204101562,
+        "nominal": 120.0,
+        "nominal_thickness_mm": 120.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "d25t_ap",
+        "zone": "mantlet"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": false,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        6.2433922005,
+        5.582102445,
+        3.2805,
+        0.0,
+        3.486784401,
+        107.26370028225
+      ],
+      "position": [
+        42.0,
+        0.522002100944519,
+        -130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 13,
+      "team": "blue",
+      "turret": 0.0000159289445965588,
+      "vehicle": "tiger_i",
+      "yaw": 0.0
+    },
+    {
+      "alive": false,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.0,
+          0.0,
+          0.3228504075,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          0.0,
+          1.937102445,
+          0.0,
+          0.0,
+          3.486784401,
+          68.85051938435
+        ]
+      },
+      "gun": -0.000737425688225057,
+      "heard_input": 0.0,
+      "id": 6,
+      "impact": {
+        "angle": 54.8200225608107,
+        "capability": 196.2289133358,
+        "damaged": [
+          "driver",
+          "gunner",
+          "commander",
+          "engine",
+          "turret_drive"
+        ],
+        "distance": 267.06831741333,
+        "effective": 129.421831898359,
+        "impact_speed_m_s": 885.490905761719,
+        "nominal": 80.0,
+        "nominal_thickness_mm": 80.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "d10s_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.00133949657902122,
+        "kills": 1,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.3,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 0.3
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": false,
+        "driver": false,
+        "engine": false,
+        "fuel": true,
+        "gunner": false,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        0.0,
+        1.937102445,
+        0.0,
+        0.0,
+        3.486784401,
+        68.85051938435
+      ],
+      "position": [
+        69.9987411499023,
+        1.57399272918701,
+        -130.000457763672
+      ],
+      "speed_m_s": 0.0,
+      "target": -1,
+      "team": "blue",
+      "turret": -0.0000910382078944053,
+      "vehicle": "jagdpanther",
+      "yaw": 0.0
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.548073215375071,
+          0.0,
+          -0.64271495925,
+          -0.1142265999375,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          -0.535994058050734,
+          -0.151509636017207,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          5.7933922005,
+          1.937102445,
+          2.657205,
+          1.7433922005,
+          3.486784401,
+          94.82338895225
+        ]
+      },
+      "gun": -0.0186508488081667,
+      "heard_input": 0.0,
+      "id": 7,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.00279573327861726,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        5.7933922005,
+        1.937102445,
+        2.657205,
+        1.7433922005,
+        3.486784401,
+        94.82338895225
+      ],
+      "position": [
+        97.9978485107422,
+        2.97328782081604,
+        -130.00178527832
+      ],
+      "speed_m_s": 0.0,
+      "target": 13,
+      "team": "blue",
+      "turret": -0.0875576920065622,
+      "vehicle": "jagdpanther",
+      "yaw": 0.0
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.34523288906626,
+          0.0,
+          -0.0492075,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          -0.000000325656614563741,
+          -0.00078045632868752,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          2.95245,
+          2.657205,
+          0.0,
+          0.0,
+          3.486784401,
+          66.722897696
+        ]
+      },
+      "gun": -0.000145634425894493,
+      "heard_input": 0.0,
+      "id": 8,
+      "impact": {
+        "angle": 0.191797000879986,
+        "capability": 176.978064155579,
+        "damaged": [
+          "loader",
+          "engine",
+          "breech",
+          "turret_drive"
+        ],
+        "distance": 260.438716888428,
+        "effective": 90.0,
+        "impact_speed_m_s": 925.311462402344,
+        "nominal": 90.0,
+        "nominal_thickness_mm": 90.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "kwk42_ap",
+        "zone": "turret_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": true,
+        "driver": true,
+        "engine": false,
+        "fuel": true,
+        "gunner": true,
+        "loader": false,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        2.95245,
+        2.657205,
+        0.0,
+        0.0,
+        3.486784401,
+        66.722897696
+      ],
+      "position": [
+        -98.0,
+        0.0800004974007607,
+        130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 0,
+      "team": "red",
+      "turret": -0.0000000707306052103889,
+      "vehicle": "t34_85",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.34523288906626,
+          0.0,
+          0.0492075,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          -0.000000486103228780621,
+          -0.00130007336540512,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          2.657205,
+          2.95245,
+          0.0,
+          0.0,
+          3.486784401,
+          82.55923348285
+        ]
+      },
+      "gun": -0.0000523143591721484,
+      "heard_input": 0.0,
+      "id": 9,
+      "impact": {
+        "angle": 0.1655109964311,
+        "capability": 176.978073406219,
+        "damaged": [
+          "gunner",
+          "commander",
+          "engine",
+          "breech",
+          "turret_drive"
+        ],
+        "distance": 260.43853187561,
+        "effective": 20.0,
+        "impact_speed_m_s": 925.310119628906,
+        "nominal": 20.0,
+        "nominal_thickness_mm": 20.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "kwk42_ap",
+        "zone": "roof"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": false,
+        "fuel": true,
+        "gunner": false,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        2.657205,
+        2.95245,
+        0.0,
+        0.0,
+        3.486784401,
+        82.55923348285
+      ],
+      "position": [
+        -70.0,
+        0.0800216794013977,
+        130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 1,
+      "team": "red",
+      "turret": -0.0000000593107706618742,
+      "vehicle": "t34_85",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": false,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.0,
+          0.0,
+          0.29056536675,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          0.0,
+          1.7433922005,
+          0.0,
+          0.0,
+          3.486784401,
+          87.03965822095
+        ]
+      },
+      "gun": -0.0000525327490444392,
+      "heard_input": 0.0,
+      "id": 10,
+      "impact": {
+        "angle": 59.7251134147616,
+        "capability": 176.978035640717,
+        "damaged": [
+          "loader",
+          "engine",
+          "transmission",
+          "breech",
+          "turret_drive",
+          "fuel",
+          "ammo_rack"
+        ],
+        "distance": 260.439287185669,
+        "effective": 82.0185425201357,
+        "impact_speed_m_s": 925.315612792969,
+        "nominal": 45.0,
+        "nominal_thickness_mm": 45.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "kwk42_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.28,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 0.28
+      },
+      "modules": {
+        "ammo_rack": false,
+        "breech": false,
+        "commander": true,
+        "driver": true,
+        "engine": false,
+        "fuel": false,
+        "gunner": true,
+        "loader": false,
+        "track_left": true,
+        "track_right": true,
+        "transmission": false,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        0.0,
+        1.7433922005,
+        0.0,
+        0.0,
+        3.486784401,
+        87.03965822095
+      ],
+      "position": [
+        -42.0,
+        0.0805637463927269,
+        130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": -1,
+      "team": "red",
+      "turret": -0.000000100665544345462,
+      "vehicle": "t34_85",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.9564151949875,
+          0.0,
+          0.119205600833333,
+          -0.242137805625,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          -0.0000224871458058828,
+          -0.00189131134526953,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          6.437102445,
+          7.15233605,
+          1.937102445,
+          0.0,
+          3.486784401,
+          45.3983287614
+        ]
+      },
+      "gun": -0.0000558219104007904,
+      "heard_input": 0.0,
+      "id": 11,
+      "impact": {
+        "angle": 59.7568938227852,
+        "capability": 176.97804479599,
+        "damaged": [
+          "gunner",
+          "commander",
+          "engine",
+          "transmission",
+          "breech",
+          "turret_drive"
+        ],
+        "distance": 260.4391040802,
+        "effective": 82.0879371555114,
+        "impact_speed_m_s": 925.314147949219,
+        "nominal": 45.0,
+        "nominal_thickness_mm": 45.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "kwk42_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": false,
+        "fuel": true,
+        "gunner": false,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": false,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        6.437102445,
+        7.15233605,
+        1.937102445,
+        0.0,
+        3.486784401,
+        45.3983287614
+      ],
+      "position": [
+        -14.0,
+        0.0887293145060539,
+        130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 3,
+      "team": "red",
+      "turret": -0.000000560771313454214,
+      "vehicle": "t34_85",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.9564151949875,
+          0.0,
+          -0.568915792583334,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.258169967421728,
+          -0.00722209367124611,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          9.4005972005,
+          5.987102445,
+          0.0,
+          0.0,
+          3.486784401,
+          121.79861541045
+        ]
+      },
+      "gun": -0.000984402326148112,
+      "heard_input": 0.0,
+      "id": 12,
+      "impact": {
+        "angle": 59.668560906073,
+        "capability": 138.945650935173,
+        "damaged": [],
+        "distance": 261.449308395386,
+        "effective": 181.989796228374,
+        "impact_speed_m_s": 764.967529296875,
+        "nominal": 100.0,
+        "nominal_thickness_mm": 100.0,
+        "penetrated": false,
+        "ricochet": false,
+        "shell": "kwk36_ap",
+        "zone": "upper_front"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 1,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 1,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        9.4005972005,
+        5.987102445,
+        0.0,
+        0.0,
+        3.486784401,
+        121.79861541045
+      ],
+      "position": [
+        14.0,
+        0.160493314266205,
+        130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 3,
+      "team": "red",
+      "turret": 0.0491080768843928,
+      "vehicle": "is2_1944",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.953948111471463,
+          0.0,
+          0.0,
+          -0.4100625,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          -0.00043734978231313,
+          -0.0221906101262975,
+          1.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          5.987102445,
+          5.987102445,
+          3.2805,
+          0.0,
+          3.486784401,
+          70.567324435
+        ]
+      },
+      "gun": -0.00262704103575401,
+      "heard_input": 0.0,
+      "id": 13,
+      "impact": {
+        "angle": 0.0815646880685774,
+        "capability": 138.945747208595,
+        "damaged": [
+          "loader",
+          "breech"
+        ],
+        "distance": 261.446741104126,
+        "effective": 100.0,
+        "impact_speed_m_s": 764.952392578125,
+        "nominal": 100.0,
+        "nominal_thickness_mm": 100.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "kwk36_ap",
+        "zone": "mantlet"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.0,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": false,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        5.987102445,
+        5.987102445,
+        3.2805,
+        0.0,
+        3.486784401,
+        70.567324435
+      ],
+      "position": [
+        42.0,
+        0.522002100944519,
+        130.0
+      ],
+      "speed_m_s": 0.0,
+      "target": 5,
+      "team": "red",
+      "turret": -0.0000982182365183276,
+      "vehicle": "is2_1944",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": false,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.0,
+          0.0,
+          0.3228504075,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          0.0,
+          1.937102445,
+          0.0,
+          0.0,
+          3.486784401,
+          55.7245082296
+        ]
+      },
+      "gun": -0.000308876840177268,
+      "heard_input": 0.0,
+      "id": 14,
+      "impact": {
+        "angle": 0.0559529119041136,
+        "capability": 222.067176151276,
+        "damaged": [
+          "gunner",
+          "commander",
+          "loader",
+          "breech",
+          "turret_drive"
+        ],
+        "distance": 258.656476974487,
+        "effective": 110.0,
+        "impact_speed_m_s": 989.701477050781,
+        "nominal": 110.0,
+        "nominal_thickness_mm": 110.0,
+        "penetrated": true,
+        "ricochet": false,
+        "shell": "pak43_ap",
+        "zone": "mantlet"
+      },
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.000773546868003905,
+        "kills": 1,
+        "objective_presence_s": 0.0,
+        "penetrations": 1,
+        "reverse_s": 0.0,
+        "shots": 1,
+        "stationary_s": 0.26,
+        "stuck_recoveries": 0,
+        "target_switches": 0,
+        "target_visible_s": 0.26
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": false,
+        "commander": false,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": false,
+        "loader": false,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": false
+      },
+      "neural_trace": [
+        0.0,
+        1.937102445,
+        0.0,
+        0.0,
+        3.486784401,
+        55.7245082296
+      ],
+      "position": [
+        69.9992828369141,
+        1.56267511844635,
+        130.000289916992
+      ],
+      "speed_m_s": 0.0,
+      "target": -1,
+      "team": "red",
+      "turret": -0.000169721603331937,
+      "vehicle": "su100",
+      "yaw": -3.14159250259399
+    },
+    {
+      "alive": true,
+      "control": {
+        "adapter_action": null,
+        "decoder_action": [
+          0.381332536236981,
+          0.0,
+          0.9978504075,
+          0.14102049375,
+          0.0,
+          0.0
+        ],
+        "final_action": [
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          -0.150279463376001,
+          0.0
+        ],
+        "gunnery_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "objective_aux_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "raw_neural_action": [
+          0.0,
+          5.987102445,
+          2.15233605,
+          3.2805,
+          3.486784401,
+          134.96927611735
+        ]
+      },
+      "gun": -0.0185187172371801,
+      "heard_input": 0.0,
+      "id": 15,
+      "impact": {},
+      "metrics": {
+        "capture_s": 0.0,
+        "chassis_aim_s": 0.0,
+        "contest_s": 0.0,
+        "distance_travelled": 0.00200815452262759,
+        "kills": 0,
+        "objective_presence_s": 0.0,
+        "penetrations": 0,
+        "reverse_s": 0.0,
+        "shots": 0,
+        "stationary_s": 1.0,
+        "stuck_recoveries": 0,
+        "target_switches": 1,
+        "target_visible_s": 1.0
+      },
+      "modules": {
+        "ammo_rack": true,
+        "breech": true,
+        "commander": true,
+        "driver": true,
+        "engine": true,
+        "fuel": true,
+        "gunner": true,
+        "loader": true,
+        "track_left": true,
+        "track_right": true,
+        "transmission": true,
+        "turret_drive": true
+      },
+      "neural_trace": [
+        0.0,
+        5.987102445,
+        2.15233605,
+        3.2805,
+        3.486784401,
+        134.96927611735
+      ],
+      "position": [
+        97.998405456543,
+        2.95801782608032,
+        130.001220703125
+      ],
+      "speed_m_s": 0.0,
+      "target": 3,
+      "team": "red",
+      "turret": 0.10471975511966,
+      "vehicle": "su100",
+      "yaw": -3.14159250259399
+    }
+  ],
+  "wall_seconds": 2.904302,
+  "zones": [
+    {
+      "contested": false,
+      "inside": [
+        0,
+        0
+      ],
+      "owner": -1,
+      "progress": 0.0
+    },
+    {
+      "contested": false,
+      "inside": [
+        0,
+        0
+      ],
+      "owner": -1,
+      "progress": 0.0
+    },
+    {
+      "contested": false,
+      "inside": [
+        0,
+        0
+      ],
+      "owner": -1,
+      "progress": 0.0
+    }
+  ]
+}

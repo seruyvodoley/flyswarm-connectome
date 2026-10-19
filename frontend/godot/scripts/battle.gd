@@ -750,9 +750,9 @@ func initialize_demo_controller() -> void:
 func update_demo_control_hint() -> void:
 	if not is_instance_valid(demo_controls):return
 	if str(AppState.settings.language)=="ru":
-		demo_controls.text="ЛЕВЫЙ СТИК: ДВИЖЕНИЕ · ПРАВЫЙ СТИК: ВЗГЛЯД И ПРИЦЕЛ · L2: ПРИБЛИЖЕНИЕ · R2: ВЫСТРЕЛ · OPTIONS: ПАУЗА · ○: НАЗАД" if demo_gamepad_active else "МЫШЬ: ПРИЦЕЛИВАНИЕ · ЛКМ: ВЫСТРЕЛ · УДЕРЖИВАЙТЕ ПКМ: ПРИБЛИЖЕНИЕ · ПРОБЕЛ: ПАУЗА · ESC: МЕНЮ\nПОДКЛЮЧИТЕ DUALSENSE ДЛЯ РУЧНОГО УПРАВЛЕНИЯ"
+		demo_controls.text="ЛЕВЫЙ СТИК: ДВИЖЕНИЕ · ПРАВЫЙ СТИК: ВЗГЛЯД И ПРИЦЕЛ · L2: ПРИБЛИЖЕНИЕ · R2: ВЫСТРЕЛ · OPTIONS / ○: МЕНЮ ПАУЗЫ" if demo_gamepad_active else "МЫШЬ: ПРИЦЕЛИВАНИЕ · ЛКМ: ВЫСТРЕЛ · УДЕРЖИВАЙТЕ ПКМ: ПРИБЛИЖЕНИЕ · ПРОБЕЛ: ПАУЗА · ESC: МЕНЮ\nПОДКЛЮЧИТЕ DUALSENSE ДЛЯ РУЧНОГО УПРАВЛЕНИЯ"
 	else:
-		demo_controls.text="LEFT STICK: DRIVE · RIGHT STICK: LOOK AND AIM · L2: ZOOM · R2: FIRE · OPTIONS: PAUSE · ○: BACK" if demo_gamepad_active else "MOUSE: AIM · LMB: FIRE · HOLD RMB: ZOOM · SPACE: PAUSE · ESC: MENU\nCONNECT DUALSENSE FOR MANUAL DRIVE"
+		demo_controls.text="LEFT STICK: DRIVE · RIGHT STICK: LOOK AND AIM · L2: ZOOM · R2: FIRE · OPTIONS / ○: PAUSE MENU" if demo_gamepad_active else "MOUSE: AIM · LMB: FIRE · HOLD RMB: ZOOM · SPACE: PAUSE · ESC: MENU\nCONNECT DUALSENSE FOR MANUAL DRIVE"
 
 func _on_demo_joy_connection_changed(device: int, connected: bool) -> void:
 	if not is_demo:return
@@ -2676,6 +2676,14 @@ func _unhandled_input(event):
 		if Input.is_physical_key_pressed(KEY_DOWN):camera.rotate_object_local(Vector3.RIGHT,-.035)
 
 func _input(event):
+	# Circle/B is the controller equivalent of Escape in visitor-versus-fly PvP.
+	# It opens the existing pause menu, where Return to Main Menu is selectable
+	# using the D-pad or one-step stick navigation and Cross/A.
+	if is_demo and event is InputEventJoypadButton and event.pressed and event.button_index==JoyButton.JOY_BUTTON_B:
+		if session_config!=null and not paused:
+			pause_requested.emit()
+			get_viewport().set_input_as_handled()
+		return
 	if is_demo and not demo_gamepad_active and event is InputEventMouseMotion:
 		demo_apply_mouse_motion(event.position,false)
 		return

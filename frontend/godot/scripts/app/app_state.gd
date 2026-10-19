@@ -19,6 +19,13 @@ var last_output=""
 var last_report={}
 var generation=0
 var current_page="MainMenu"
+# A controller gesture is consumed once, on crossing the engage threshold.
+# It is re-armed only after BOTH left-stick axes return close to centre.
+const MENU_STICK_ENGAGE := 0.65
+const MENU_STICK_RELEASE := 0.28
+var menu_axes: Dictionary={}
+var menu_stick_latches: Dictionary={}
+
 var loading_message="Preparing simulation…"
 var backend_dialog_open=false
 var open_day_mode=false
@@ -49,13 +56,6 @@ func _ready():
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	get_tree().auto_accept_quit=false
 	apply_settings()
-
-# A controller gesture is consumed once, on crossing the engage threshold.
-# It is re-armed only after BOTH left-stick axes return close to centre.
-const MENU_STICK_ENGAGE := 0.65
-const MENU_STICK_RELEASE := 0.28
-var menu_axes: Dictionary={}
-var menu_stick_latches: Dictionary={}
 
 func _input(event: InputEvent) -> void:
 	# Only the application menus are handled here. The active tank battle
@@ -111,7 +111,9 @@ func _menu_targets() -> Array[Control]:
 		if not node is Control:continue
 		var control: Control=node
 		if not control.is_visible_in_tree() or control.focus_mode==Control.FOCUS_NONE:continue
-		if control is BaseButton and control.disabled:continue
+		if control is BaseButton:
+			var button: BaseButton=control
+			if button.disabled:continue
 		if control is LineEdit and control.get_parent() is SpinBox:continue
 		if control is BaseButton or control is SpinBox or control is LineEdit or control is ItemList or control is Slider:
 			controls.append(control)
@@ -132,14 +134,16 @@ func _menu_move(direction: Vector2) -> void:
 		controls[0].grab_focus()
 		return
 	# A replay list has its own selectable cells. Advance one row per gesture.
-	if focused is ItemList and direction.y!=0.0 and focused.item_count>0:
-		var selected=focused.get_selected_items()
-		var index=selected[0] if not selected.is_empty() else 0
-		var next_index=index+int(direction.y)
-		if next_index>=0 and next_index<focused.item_count:
-			focused.select(next_index)
-			focused.ensure_current_is_visible()
-			return
+	if focused is ItemList and direction.y!=0.0:
+		var list: ItemList=focused
+		if list.item_count>0:
+			var selected=list.get_selected_items()
+			var index=selected[0] if not selected.is_empty() else 0
+			var next_index=index+int(direction.y)
+			if next_index>=0 and next_index<list.item_count:
+				list.select(next_index)
+				list.ensure_current_is_visible()
+				return
 	var origin=focused.get_global_rect().get_center()
 	var nearest: Control=null
 	var best_score=INF
@@ -159,15 +163,19 @@ func _menu_activate() -> void:
 	var focused: Control=get_viewport().gui_get_focus_owner()
 	if not focused in _menu_targets():return
 	if focused is OptionButton:
-		focused.show_popup()
+		var option: OptionButton=focused
+		option.show_popup()
 	elif focused is BaseButton:
-		if focused.toggle_mode:focused.button_pressed=not focused.button_pressed
-		focused.emit_signal("pressed")
+		var button: BaseButton=focused
+		if button.toggle_mode:button.button_pressed=not button.button_pressed
+		button.pressed.emit()
 	elif focused is ItemList:
-		var selection=focused.get_selected_items()
-		if not selection.is_empty():focused.item_activated.emit(selection[0])
+		var list: ItemList=focused
+		var selection=list.get_selected_items()
+		if not selection.is_empty():list.item_activated.emit(selection[0])
 	elif focused is SpinBox:
-		focused.get_line_edit().grab_focus()
+		var spin: SpinBox=focused
+		spin.get_line_edit().grab_focus()
 func windows_host() -> bool:
 	return OS.get_name()=="Windows"
 func user_home_path() -> String:

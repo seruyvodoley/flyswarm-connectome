@@ -2681,8 +2681,8 @@ func _input(event):
 	# using the D-pad or one-step stick navigation and Cross/A.
 	if is_demo and event is InputEventJoypadButton and event.pressed and event.button_index==JoyButton.JOY_BUTTON_B:
 		if session_config!=null and not paused:
-			pause_requested.emit()
 			get_viewport().set_input_as_handled()
+			pause_requested.emit()
 		return
 	if is_demo and not demo_gamepad_active and event is InputEventMouseMotion:
 		demo_apply_mouse_motion(event.position,false)

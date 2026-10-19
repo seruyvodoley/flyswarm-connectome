@@ -63,7 +63,7 @@ func _input(event: InputEvent) -> void:
 	if not is_instance_valid(view):return
 	if current_page not in ["MainMenu","OpenDayMain","HowItWorks","DemoResult","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
 	for popup in view.find_children("*","Window",true,false):
-		if popup.visible:return
+		if popup is Window and popup.visible:return
 	if event is InputEventJoypadMotion:
 		if event.axis not in [JoyAxis.JOY_AXIS_LEFT_X,JoyAxis.JOY_AXIS_LEFT_Y]:return
 		var axes: Vector2=menu_axes.get(event.device,Vector2.ZERO)
@@ -108,11 +108,13 @@ func _menu_targets() -> Array[Control]:
 	var controls: Array[Control]=[]
 	if not is_instance_valid(view):return controls
 	for node in view.find_children("*","Control",true,false):
-		if not node.is_visible_in_tree() or node.focus_mode==Control.FOCUS_NONE:continue
-		if node is BaseButton and node.disabled:continue
-		if node is LineEdit and node.get_parent() is SpinBox:continue
-		if node is BaseButton or node is SpinBox or node is LineEdit or node is ItemList or node is Slider:
-			controls.append(node)
+		if not node is Control:continue
+		var control: Control=node
+		if not control.is_visible_in_tree() or control.focus_mode==Control.FOCUS_NONE:continue
+		if control is BaseButton and control.disabled:continue
+		if control is LineEdit and control.get_parent() is SpinBox:continue
+		if control is BaseButton or control is SpinBox or control is LineEdit or control is ItemList or control is Slider:
+			controls.append(control)
 	return controls
 
 func _focus_initial_menu_control() -> void:

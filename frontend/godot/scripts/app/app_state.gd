@@ -26,7 +26,6 @@ var marl_pid=-1
 var marl_output=""
 var marl_replay_path=""
 var marl_progress={}
-var menu_stick_latched=false
 func _ready():
 	OpenDayController.configure()
 	packaged_app=not OS.has_feature("editor")
@@ -51,58 +50,115 @@ func _ready():
 	get_tree().auto_accept_quit=false
 	apply_settings()
 
-func _input(_event):
-	# Cross/A, D-pad and left-stick navigation work in every application
-	# window. Open Day's own menu keeps its compact vehicle-card focus order.
-	if current_page in ["OpenDayMain","HowItWorks","DemoResult"]:return
-	if current_page not in ["MainMenu","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
-	var back=Input.is_action_just_pressed("od_back")
-	var confirm=Input.is_action_just_pressed("od_confirm")
-	var direction=menu_navigation_direction()
-	if current_page=="PauseMenu" and Input.is_action_just_pressed("od_pause"):back=true
-	if not back and not confirm and direction==0:return
-	var focus=get_viewport().gui_get_focus_owner()
-	if focus is LineEdit or focus is TextEdit:return
-	get_viewport().set_input_as_handled()
-	if back:
-		if current_page=="PauseMenu" and is_instance_valid(battle):resume()
-		else:menu()
-		return
-	var buttons:Array[BaseButton]=[]
-	if is_instance_valid(view):
-		for node in view.find_children("*","BaseButton",true,false):
-			if node is BaseButton and node.visible and not node.disabled and node.focus_mode!=Control.FOCUS_NONE:buttons.append(node)
-	if buttons.is_empty():return
-	var index=buttons.find(focus)
-	if index<0:index=0
-	if direction!=0:
-		index=(index+direction+buttons.size())%buttons.size()
-		buttons[index].grab_focus()
-	elif confirm:
-		buttons[index].emit_signal("pressed")
+# A controller gesture is consumed once, on crossing the engage threshold.
+# It is re-armed only after BOTH left-stick axes return close to centre.
+const MENU_STICK_ENGAGE := 0.65
+const MENU_STICK_RELEASE := 0.28
+var menu_axes: Dictionary={}
+var menu_stick_latches: Dictionary={}
 
-func menu_navigation_direction() -> int:
-	if Input.is_action_just_pressed("od_ui_up") or Input.is_action_just_pressed("od_ui_left"):return -1
-	if Input.is_action_just_pressed("od_ui_down") or Input.is_action_just_pressed("od_ui_right"):return 1
-	var strongest=0.0
-	var direction=0
-	var has_controller=false
-	for device in Input.get_connected_joypads():
-		has_controller=true
-		var horizontal=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_X)
-		var vertical=Input.get_joy_axis(device,JoyAxis.JOY_AXIS_LEFT_Y)
-		if absf(horizontal)>absf(strongest):
-			strongest=horizontal
-			direction=1 if horizontal>0.0 else -1
-		if absf(vertical)>absf(strongest):
-			strongest=vertical
-			direction=1 if vertical>0.0 else -1
-	if not has_controller or absf(strongest)<.24:
-		menu_stick_latched=false
-		return 0
-	if menu_stick_latched or absf(strongest)<.58:return 0
-	menu_stick_latched=true
-	return direction
+func _input(event: InputEvent) -> void:
+	# Only the application menus are handled here. The active tank battle
+	# keeps its own analog controls; modal FileDialogs handle their own input.
+	if not is_instance_valid(view):return
+	if current_page not in ["MainMenu","OpenDayMain","HowItWorks","DemoResult","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:return
+	for popup in view.find_children("*","Window",true,false):
+		if popup.visible:return
+	if event is InputEventJoypadMotion:
+		if event.axis not in [JoyAxis.JOY_AXIS_LEFT_X,JoyAxis.JOY_AXIS_LEFT_Y]:return
+		var axes: Vector2=menu_axes.get(event.device,Vector2.ZERO)
+		if event.axis==JoyAxis.JOY_AXIS_LEFT_X:axes.x=event.axis_value
+		else:axes.y=event.axis_value
+		menu_axes[event.device]=axes
+		get_viewport().set_input_as_handled()
+		if maxf(absf(axes.x),absf(axes.y))<=MENU_STICK_RELEASE:
+			menu_stick_latches[event.device]=false
+			return
+		if menu_stick_latches.get(event.device,false):return
+		if maxf(absf(axes.x),absf(axes.y))<MENU_STICK_ENGAGE:return
+		menu_stick_latches[event.device]=true
+		if absf(axes.x)>absf(axes.y):_menu_move(Vector2.RIGHT if axes.x>0.0 else Vector2.LEFT)
+		else:_menu_move(Vector2.DOWN if axes.y>0.0 else Vector2.UP)
+		return
+	if not event is InputEventJoypadButton or not event.pressed:return
+	var direction=Vector2.ZERO
+	match event.button_index:
+		JoyButton.JOY_BUTTON_DPAD_UP:direction=Vector2.UP
+		JoyButton.JOY_BUTTON_DPAD_DOWN:direction=Vector2.DOWN
+		JoyButton.JOY_BUTTON_DPAD_LEFT:direction=Vector2.LEFT
+		JoyButton.JOY_BUTTON_DPAD_RIGHT:direction=Vector2.RIGHT
+		JoyButton.JOY_BUTTON_A:
+			get_viewport().set_input_as_handled()
+			_menu_activate()
+			return
+		JoyButton.JOY_BUTTON_B,JoyButton.JOY_BUTTON_START:
+			get_viewport().set_input_as_handled()
+			if current_page=="PauseMenu":resume()
+			elif event.button_index==JoyButton.JOY_BUTTON_B:
+				if current_page=="OpenDayMain":research_menu()
+				elif current_page in ["HowItWorks","DemoResult"]:open_day_menu()
+				elif current_page=="MarlViewer":show_page("MarlLaboratory")
+				else:menu()
+			return
+		_:return
+	get_viewport().set_input_as_handled()
+	_menu_move(direction)
+
+func _menu_targets() -> Array[Control]:
+	var controls: Array[Control]=[]
+	if not is_instance_valid(view):return controls
+	for node in view.find_children("*","Control",true,false):
+		if not node.is_visible_in_tree() or node.focus_mode==Control.FOCUS_NONE:continue
+		if node is BaseButton and node.disabled:continue
+		if node is LineEdit and node.get_parent() is SpinBox:continue
+		if node is BaseButton or node is SpinBox or node is LineEdit or node is ItemList or node is Slider:
+			controls.append(node)
+	return controls
+
+func _menu_move(direction: Vector2) -> void:
+	var controls=_menu_targets()
+	if controls.is_empty():return
+	var focused: Control=get_viewport().gui_get_focus_owner()
+	if not focused in controls:
+		controls[0].grab_focus()
+		return
+	# A replay list has its own selectable cells. Advance one row per gesture.
+	if focused is ItemList and direction.y!=0.0 and focused.item_count>0:
+		var selected=focused.get_selected_items()
+		var index=selected[0] if not selected.is_empty() else 0
+		var next_index=index+int(direction.y)
+		if next_index>=0 and next_index<focused.item_count:
+			focused.select(next_index)
+			focused.ensure_current_is_visible()
+			return
+	var origin=focused.get_global_rect().get_center()
+	var nearest: Control=null
+	var best_score=INF
+	for candidate in controls:
+		if candidate==focused:continue
+		var offset=candidate.get_global_rect().get_center()-origin
+		var forward=offset.dot(direction)
+		if forward<5.0:continue
+		var lateral=absf(offset.cross(direction))
+		var score=forward+lateral*2.5
+		if score<best_score:
+			best_score=score
+			nearest=candidate
+	if nearest!=null:nearest.grab_focus()
+
+func _menu_activate() -> void:
+	var focused: Control=get_viewport().gui_get_focus_owner()
+	if not focused in _menu_targets():return
+	if focused is OptionButton:
+		focused.show_popup()
+	elif focused is BaseButton:
+		if focused.toggle_mode:focused.button_pressed=not focused.button_pressed
+		focused.emit_signal("pressed")
+	elif focused is ItemList:
+		var selection=focused.get_selected_items()
+		if not selection.is_empty():focused.item_activated.emit(selection[0])
+	elif focused is SpinBox:
+		focused.get_line_edit().grab_focus()
 func windows_host() -> bool:
 	return OS.get_name()=="Windows"
 func user_home_path() -> String:
@@ -198,6 +254,8 @@ func set_battle_overlay_visible(value: bool):
 	for layer in battle.find_children("*","CanvasLayer",true,false):
 		layer.visible=value
 func show_page(page: String):
+	menu_axes.clear()
+	menu_stick_latches.clear()
 	current_page=page
 	set_battle_overlay_visible(false)
 	clear_view()
@@ -342,6 +400,7 @@ func launch():
 	battle.backend_failed.connect(on_backend_failed)
 	get_tree().root.add_child(battle)
 	clear_view()
+	current_page="Battle"
 	set_battle_overlay_visible(true)
 	backend_state="READY" if session.needs_brain() else "NOT REQUIRED"
 func start_backend(token: int) -> bool:
@@ -398,6 +457,7 @@ func reconnect():
 		battle.paused=false
 		backend_dialog_open=false
 		clear_view()
+		current_page="Battle"
 		set_battle_overlay_visible(true)
 	else:view.disconnect_dialog(loading_message)
 func pause_menu():
@@ -408,6 +468,7 @@ func pause_menu():
 func resume():
 	if is_instance_valid(battle):battle.resume_active_clock();battle.paused=false
 	clear_view()
+	current_page="Battle"
 	set_battle_overlay_visible(true)
 func on_completed(report: Dictionary):
 	last_report=report

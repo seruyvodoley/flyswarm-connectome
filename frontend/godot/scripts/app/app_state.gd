@@ -115,6 +115,13 @@ func _menu_targets() -> Array[Control]:
 			controls.append(node)
 	return controls
 
+func _focus_initial_menu_control() -> void:
+	if not is_instance_valid(view):return
+	var current=get_viewport().gui_get_focus_owner()
+	if current!=null and view.is_ancestor_of(current):return
+	var targets=_menu_targets()
+	if not targets.is_empty():targets[0].grab_focus()
+
 func _menu_move(direction: Vector2) -> void:
 	var controls=_menu_targets()
 	if controls.is_empty():return
@@ -261,6 +268,7 @@ func show_page(page: String):
 	clear_view()
 	view=load("res://scenes/app/"+page+".tscn").instantiate()
 	get_tree().root.add_child(view)
+	call_deferred("_focus_initial_menu_control")
 func run_marl_job(command: String,args: Array=[]):
 	if marl_pid>0 and OS.is_process_running(marl_pid):return
 	var root=results_root().path_join("marl")

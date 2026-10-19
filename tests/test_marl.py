@@ -10,6 +10,10 @@ from flyswarm.marl.policy import SharedPPOPolicy
 from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features,vehicle_profile
 from flyswarm.bridge.server import load_policy,ppo_features
 from flyswarm.marl.experiments import TeamGymnasiumEnv, run_random_baseline
+from flyswarm.marl.experiments import run_student_agent
+from flyswarm.marl.student_code import AGENT_TEMPLATE, REWARD_TEMPLATE, ManagedStudentAgent, load_agent, load_reward
+from flyswarm.marl.exporter import export_practical
+import zipfile
 import json
 
 class MarlTests(unittest.TestCase):
@@ -58,6 +62,92 @@ class MarlTests(unittest.TestCase):
         self.assertEqual(info["backend"],"analytical_training")
         self.assertEqual(len(info["snapshot"]["agents"]),16)
         self.assertFalse(terminated);self.assertFalse(truncated)
+        env.close()
+    def test_student_python_api_runs_strategy_and_snapshots_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);agent_file=root/"agent.py";reward_file=root/"reward.py"
+            agent_file.write_text(AGENT_TEMPLATE,encoding="utf-8")
+            reward_file.write_text(REWARD_TEMPLATE,encoding="utf-8")
+            action=load_agent(agent_file)(np.zeros(30,np.float32),{"agent_id":"blue_0"})
+            self.assertEqual(action.shape,(6,));self.assertEqual(action[0],.5)
+            self.assertTrue(np.isfinite(load_reward(reward_file)({"objective_capture":1.0,"damage_dealt":0.0,"own_death":0.0})))
+            output=root/"student-run"
+            result=run_student_agent(output,agent_file,episodes=1,seed=71,max_steps=2,reward_file=reward_file)
+            self.assertEqual(result["runs"][0]["episode_steps"],2)
+            self.assertTrue((output/"student_code/agent.py").is_file())
+            self.assertTrue((output/"student_code/reward.py").is_file())
+            self.assertTrue((output/"replays/student-seed-71.jsonl").is_file())
+            self.assertTrue((output/"manifest.json").is_file())
+    def test_student_code_rejects_bad_contract_and_nonfinite_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            bad=root/"bad.py";bad.write_text("def act(obs): return [0, 0]\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"exactly 6"):
+                load_agent(bad)(np.zeros(30,np.float32),{})
+            bad.write_text("def act(obs): return [float('nan')] * 6\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"NaN"):
+                load_agent(bad)(np.zeros(30,np.float32),{})
+            bad.write_text("def act(obs): return [2, 0, 0, 0, 0, 0]\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"range"):
+                load_agent(bad)(np.zeros(30,np.float32),{})
+            bad.write_text("def act(obs):\n !!!",encoding="utf-8")
+            with self.assertRaises(SyntaxError):load_agent(bad)
+    def test_managed_student_worker_runs_and_reports_exceptions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"agent.py"
+            source.write_text("def act(obs, context=None):\n    return [context['team_index']/8, 0, 0, 0, 0, 0]\n",encoding="utf-8")
+            with ManagedStudentAgent(source,timeout_seconds=4) as worker:
+                actions=worker.act_team([np.zeros(30,np.float32),np.ones(30,np.float32)],
+                    [{"team_index":0},{"team_index":4}])
+                self.assertEqual([float(x[0]) for x in actions],[0.,.5])
+                self.assertTrue(worker.process.is_alive())
+            self.assertFalse(worker.process.is_alive())
+            source.write_text("def act(obs):\n    raise RuntimeError('student failure')\n",encoding="utf-8")
+            with ManagedStudentAgent(source,timeout_seconds=4) as worker:
+                with self.assertRaisesRegex(RuntimeError,"student failure"):
+                    worker.act_team([np.zeros(30,np.float32)],[{}])
+    def test_managed_student_worker_times_out_and_terminates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"agent.py"
+            source.write_text("def act(obs):\n    while True: pass\n",encoding="utf-8")
+            with ManagedStudentAgent(source,timeout_seconds=.2,startup_timeout_seconds=4) as worker:
+                with self.assertRaisesRegex(TimeoutError,"timed out"):
+                    worker.act_team([np.zeros(30,np.float32)],[{}])
+                self.assertFalse(worker.process.is_alive())
+    def test_custom_reward_rejects_missing_function_and_nonfinite_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"reward.py";source.write_text("VALUE = 2\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"calculate_reward"):
+                load_reward(source)
+            source.write_text("def calculate_reward(c): return float('inf')\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"NaN or infinity"):
+                load_reward(source)({})
+    def test_practical_export_only_contains_real_session_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);workspace=root/"workspace";sessions=root/"sessions";session=sessions/"run-1"
+            workspace.mkdir();session.mkdir(parents=True)
+            (workspace/"agent.py").write_text("def act(o): return [0]*6\n",encoding="utf-8")
+            (session/"manifest.json").write_text(json.dumps({"experiment":"student"}),encoding="utf-8")
+            (session/"evaluation.csv").write_text("seed,score\n1,2\n",encoding="utf-8")
+            (session/"progress.json").write_text("{}",encoding="utf-8")
+            outside=root/"private.txt";outside.write_text("must not export",encoding="utf-8")
+            (session/"linked-private.txt").symlink_to(outside)
+            destination=root/"submission.zip"
+            result=export_practical(workspace,sessions,destination)
+            self.assertEqual(result["sessions"],1)
+            with zipfile.ZipFile(destination) as archive:
+                names=set(archive.namelist())
+                self.assertIn("FlySwarm_Practical/agent.py",names)
+                self.assertIn("FlySwarm_Practical/results/run-1/evaluation.csv",names)
+                self.assertNotIn("FlySwarm_Practical/results/run-1/progress.json",names)
+                self.assertFalse(any("linked-private" in name for name in names))
+    def test_custom_reward_is_used_inside_ppo_environment(self):
+        env=TeamGymnasiumEnv(seed=9,max_steps=1,reward_function=lambda components: 2.0)
+        env.reset(seed=9)
+        _,reward,_,_,info=env.step(np.zeros((8,6),np.float32))
+        self.assertEqual(reward,16.0)
+        self.assertNotEqual(reward,info["standard_evaluation_reward"])
+        self.assertEqual(info["backend"],"analytical_training")
         env.close()
     def test_analytical_fire_requires_line_of_sight_aim_and_records_turret(self):
         env=FlySwarmParallelEnv(max_steps=5,role_conditioning=False);env.reset(seed=13)

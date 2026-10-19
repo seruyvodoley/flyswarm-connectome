@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import platform
+import shutil
 import subprocess
 import time
 import uuid
@@ -18,6 +19,7 @@ from gymnasium import spaces
 
 from .env import ACTION_NAMES, AGENTS, DEFAULT_REWARDS, FlySwarmParallelEnv
 from .roles import DEFAULT_COMPOSITION
+from .student_code import ManagedStudentAgent, load_reward
 
 BLUE = tuple(f"blue_{i}" for i in range(8))
 RED = tuple(f"red_{i}" for i in range(8))
@@ -82,7 +84,7 @@ class TeamGymnasiumEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, seed: int = 0, max_steps: int = 600, team: int = 0,
-                 reward_coefficients: dict[str, float] | None = None):
+                 reward_coefficients: dict[str, float] | None = None, reward_function=None):
         super().__init__()
         if team not in (0, 1):
             raise ValueError("team must be 0 (blue) or 1 (red)")
@@ -94,6 +96,7 @@ class TeamGymnasiumEnv(gym.Env):
             max_steps=self.max_steps,
             reward_coefficients=reward_coefficients,
             role_conditioning=True,
+            reward_function=reward_function,
         )
         self.observation_space = spaces.Box(
             low=-10, high=10, shape=(8 * self.env.obs_dim,), dtype=np.float32
@@ -133,6 +136,8 @@ class TeamGymnasiumEnv(gym.Env):
         info = {
             "backend": "analytical_training",
             "team_reward": reward,
+            "training_reward": reward,
+            "standard_evaluation_reward": float(sum(infos[a]["standard_evaluation_reward"] for a in members)),
             "episode_reward": self.episode_reward,
             "episode_step": self.episode_step,
             "snapshot": snapshot,
@@ -160,6 +165,16 @@ def new_experiment_dir(root: Path, label: str) -> Path:
     return path
 
 
+def _prepare_output(output: Path) -> None:
+    output = Path(output)
+    if output.exists():
+        unexpected = [path.name for path in output.iterdir()
+                      if path.name != "execution.log" and not path.name.startswith("._")]
+        if unexpected:
+            raise FileExistsError(f"Experiment output directory is not empty: {output}")
+    output.mkdir(parents=True, exist_ok=True)
+
+
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -180,6 +195,7 @@ def _source_metadata() -> dict[str, str | None]:
     fingerprint=hashlib.sha256()
     for relative in ("src/flyswarm/marl/env.py","src/flyswarm/marl/roles.py",
                      "src/flyswarm/marl/experiments.py","src/flyswarm/marl/cli.py",
+                     "src/flyswarm/marl/student_code.py","src/flyswarm/marl/exporter.py",
                      "src/flyswarm/bridge/server.py"):
         source=root/relative
         if source.is_file():
@@ -216,11 +232,12 @@ def start_replay(path: Path, env: FlySwarmParallelEnv, seed: int, policy_id: str
 def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
                   seed: int, policy_id: str, run_id: str, replay_path: Path | None = None,
                   ppo_model=None, rng: np.random.Generator | None = None,
-                  deterministic: bool = False) -> dict[str, Any]:
+                  deterministic: bool = False, student_agent=None) -> dict[str, Any]:
     members = BLUE
     rule_red = FixedRulePolicy(env, 1).actions
     total_reward = 0.0
     captures = kills = deaths = 0
+    standard_evaluation_reward = 0.0
     episode_steps = 0
     while env.agents:
         actions = rule_red()
@@ -228,14 +245,27 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
             team_obs = np.concatenate([observations[a] for a in members]).astype(np.float32)
             action, _ = ppo_model.predict(team_obs, deterministic=deterministic)
             actions.update({a: np.asarray(action).reshape(8, 6)[i] for i, a in enumerate(BLUE)})
+        elif student_agent is not None:
+            if episode_steps == 0 and getattr(student_agent, "reset", None):
+                student_agent.reset(seed=int(seed))
+            contexts = [{"agent_id": a, "team": "blue", "episode_seed": int(seed),
+                         "episode_step": int(episode_steps), "team_index": int(local_index)}
+                        for local_index, a in enumerate(members)]
+            if hasattr(student_agent, "act_team"):
+                team_actions = student_agent.act_team([observations[a] for a in members], contexts)
+                actions.update({a: action for a, action in zip(members, team_actions)})
+            else:
+                actions.update({a: student_agent(observations[a], context)
+                                for a, context in zip(members, contexts)})
         else:
             for a in members:
                 actions[a] = rng.uniform(-1, 1, size=6).astype(np.float32)
         old_health = env.health.copy()
         old_owners = env.zones_owner.copy()
-        observations, rewards, terms, truncs, _ = env.step(actions)
+        observations, rewards, terms, truncs, infos = env.step(actions)
         team_step_reward = float(sum(rewards[a] for a in members))
         total_reward += team_step_reward
+        standard_evaluation_reward += float(sum(infos[a]["standard_evaluation_reward"] for a in members))
         episode_steps += 1
         captures += int(np.count_nonzero((old_owners != 0) & (env.zones_owner == 0)))
         kills += int(np.count_nonzero((old_health[8:] > 0) & (env.health[8:] <= 0)))
@@ -251,7 +281,9 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
     winner = "blue" if tickets[0] > tickets[1] else ("red" if tickets[1] > tickets[0] else "draw")
     return {
         "seed": seed, "policy_id": policy_id, "run_id": run_id,
-        "team_reward": total_reward, "episode_steps": episode_steps,
+        "team_reward": total_reward, "training_reward": total_reward,
+        "standard_evaluation_reward": standard_evaluation_reward,
+        "episode_steps": episode_steps,
         "episode_seconds": episode_steps * env.dt, "captures": captures,
         "kills": kills, "deaths": deaths, "winner": winner,
         "blue_tickets": tickets[0], "red_tickets": tickets[1],
@@ -260,10 +292,57 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
     }
 
 
+def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
+                      seed: int = 101, max_steps: int = 300,
+                      reward_file: Path | None = None) -> dict[str, Any]:
+    """Run a student's real Python strategy in the analytical PettingZoo env."""
+    agent_file = Path(agent_file).expanduser().resolve()
+    reward_file = Path(reward_file).expanduser().resolve() if reward_file else None
+    reward_function = load_reward(reward_file) if reward_file else None
+    _prepare_output(output)
+    (output / "student_code").mkdir()
+    shutil.copy2(agent_file, output / "student_code/agent.py")
+    if reward_file:
+        shutil.copy2(reward_file, output / "student_code/reward.py")
+    rows=[]
+    agent = ManagedStudentAgent(agent_file)
+    try:
+        for episode in range(int(episodes)):
+            episode_seed=int(seed+episode)
+            env=FlySwarmParallelEnv(max_steps=max_steps,reward_function=reward_function)
+            try:
+                observations,_=env.reset(seed=episode_seed)
+                replay=output/"replays"/f"student-seed-{episode_seed}.jsonl"
+                start_replay(replay,env,episode_seed,"student_python_agent")
+                rows.append(_step_episode(env,observations,episode_seed,"student_python_agent",
+                                          f"student-{episode_seed}",replay,student_agent=agent))
+            finally:
+                env.close()
+    finally:
+        agent.close()
+    _write_run_outputs(output,rows,"student_python_agent",seed,max_steps)
+    manifest=json.loads((output/"manifest.json").read_text(encoding="utf-8"))
+    manifest.update({"agent_file_sha256":hashlib.sha256(agent_file.read_bytes()).hexdigest(),
+                     "reward_file_sha256":hashlib.sha256(reward_file.read_bytes()).hexdigest() if reward_file else None,
+                     "student_code_directory":"student_code",
+                     "security_note":"Student Python ran in the separate backend process with current-user permissions; this is not a sandbox."})
+    write_json(output/"manifest.json",manifest)
+    write_json(output/"summary.json",{
+        "backend":"analytical_training","experiment":"student_python_agent",
+        "episodes":len(rows),"mean_training_reward":_mean(rows,"training_reward"),
+        "mean_standard_evaluation_reward":_mean(rows,"standard_evaluation_reward"),
+        "mean_captures":_mean(rows,"captures"),"mean_kills":_mean(rows,"kills"),
+        "blue_win_rate":_win_rate(rows),"runs":rows,
+    })
+    return {"experiment_dir":str(output),"runs":rows,
+            "mean_training_reward":_mean(rows,"training_reward"),
+            "mean_standard_evaluation_reward":_mean(rows,"standard_evaluation_reward")}
+
+
 def run_random_baseline(output: Path, episodes: int = 3, seed: int = 101,
                         max_steps: int = 300, reward_coefficients=None) -> dict[str, Any]:
     """Run uniform random blue actions against the fixed rule opponent."""
-    output.mkdir(parents=True, exist_ok=False)
+    _prepare_output(output)
     rows = []
     for episode in range(int(episodes)):
         episode_seed = int(seed + episode)
@@ -326,7 +405,8 @@ def _write_run_outputs(output: Path, rows: list[dict[str, Any]], backend: str,
 
 def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
                   max_steps: int = 300, learning_rate: float = 3e-4,
-                  progress_path: Path | None = None, reward_coefficients=None) -> dict[str, Any]:
+                  progress_path: Path | None = None, reward_coefficients=None,
+                  reward_function=None, reward_file: Path | None = None) -> dict[str, Any]:
     """Train the real Stable-Baselines3 PPO implementation on the team wrapper."""
     try:
         from stable_baselines3 import PPO
@@ -334,7 +414,7 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
     except ImportError as exc:
         raise RuntimeError("PPO training requires stable-baselines3; install requirements-marl.txt") from exc
 
-    output.mkdir(parents=True, exist_ok=False)
+    _prepare_output(output)
     progress_path = progress_path or output / "progress.json"
     curve_path = output / "training.csv"
 
@@ -369,7 +449,8 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
                 })
             return not (output / "cancel").exists()
 
-    env = TeamGymnasiumEnv(seed=seed, max_steps=max_steps, reward_coefficients=reward_coefficients)
+    env = TeamGymnasiumEnv(seed=seed, max_steps=max_steps, reward_coefficients=reward_coefficients,
+                           reward_function=reward_function)
     n_steps = min(256, max(16, int(timesteps)))
     model = PPO(
         "MlpPolicy", env, learning_rate=float(learning_rate), n_steps=n_steps,
@@ -397,6 +478,8 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
         "learning_rate": float(learning_rate), "checkpoint": str(zipped),
         "checkpoint_sha256": digest, "elapsed_seconds": round(time.monotonic() - started, 3),
         "reward_coefficients": _effective_rewards(reward_coefficients),
+        "custom_reward": bool(reward_function),
+        "reward_file_sha256": hashlib.sha256(Path(reward_file).read_bytes()).hexdigest() if reward_file else None,
         "created_utc": datetime.now(timezone.utc).isoformat(),
     })
     training_rows=_read_csv(curve_path)
@@ -413,7 +496,11 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
         "max_steps":int(max_steps),"learning_rate":float(learning_rate),
         "reward_coefficients":_effective_rewards(reward_coefficients),
         "vehicle_ids":list(DEFAULT_COMPOSITION),"opponent":"fixed objective-seeking and aim-aware rule policy",
+        "custom_reward":bool(reward_function),
     })
+    if reward_file:
+        (output/"student_code").mkdir(exist_ok=True)
+        shutil.copy2(reward_file,output/"student_code/reward.py")
     current = json.loads(progress_path.read_text()) if progress_path.exists() else {}
     current.update({"state": "complete", "timesteps": int(model.num_timesteps), "checkpoint": str(zipped), "checkpoint_sha256": digest})
     write_json(progress_path, current)
@@ -543,6 +630,69 @@ def compare_paired(checkpoint: Path, output: Path, episodes: int = 5,
     })
     _plot_comparison(grouped, output / "plots" / "random_vs_ppo.png")
     return {"experiment_dir": str(output), **{k: v for k, v in summary.items() if k != "runs"}, "runs": rows}
+
+
+def compare_all_policies(output: Path, agent_file: Path, standard_checkpoint: Path,
+                         custom_reward_checkpoint: Path, episodes: int = 5,
+                         seed: int = 1001, max_steps: int = 300) -> dict[str, Any]:
+    """Compare four policies under one unchanged, standard evaluation protocol."""
+    try:
+        from stable_baselines3 import PPO
+    except ImportError as exc:
+        raise RuntimeError("Four-way comparison requires stable-baselines3") from exc
+    standard_model=PPO.load(str(standard_checkpoint),device="cpu")
+    custom_model=PPO.load(str(custom_reward_checkpoint),device="cpu")
+    policies=("uniform_random","student_python_agent","ppo_standard_reward","ppo_custom_reward")
+    _prepare_output(output)
+    rows=[]
+    agent=ManagedStudentAgent(agent_file)
+    try:
+        for episode in range(int(episodes)):
+            episode_seed=int(seed+episode)
+            for policy_id in policies:
+                env=FlySwarmParallelEnv(max_steps=max_steps)
+                try:
+                    observations,_=env.reset(seed=episode_seed)
+                    replay=output/"replays"/f"{policy_id}-seed-{episode_seed}.jsonl"
+                    start_replay(replay,env,episode_seed,policy_id)
+                    kwargs={}
+                    rng=None
+                    if policy_id=="student_python_agent":
+                        kwargs["student_agent"]=agent
+                    elif policy_id=="ppo_standard_reward":
+                        kwargs["ppo_model"]=standard_model;kwargs["deterministic"]=True
+                    elif policy_id=="ppo_custom_reward":
+                        kwargs["ppo_model"]=custom_model;kwargs["deterministic"]=True
+                    else:
+                        rng=np.random.default_rng(episode_seed)
+                    row=_step_episode(env,observations,episode_seed,policy_id,
+                                      f"{policy_id}-{episode_seed}",replay,rng=rng,**kwargs)
+                    row["evaluation_protocol"]="standard_default_reward_same_seed_fixed_opponent"
+                    rows.append(row)
+                finally:
+                    env.close()
+    finally:
+        agent.close()
+    groups={policy:[r for r in rows if r["policy_id"]==policy] for policy in policies}
+    _write_csv(output/"comparison.csv",rows)
+    _write_csv(output/"evaluation.csv",rows)
+    summary={"backend":"analytical_training","protocol":"same independent seeds, fixed opponent, default standard reward",
+             "training_reward_is_not_used_for_ranking":True,"seeds":list(range(seed,seed+episodes)),
+             "episodes_per_policy":int(episodes),"policies":{
+                 name:{"mean_standard_evaluation_reward":_mean(group,"standard_evaluation_reward"),
+                       "win_rate":_win_rate(group),"mean_captures":_mean(group,"captures"),
+                       "mean_kills":_mean(group,"kills"),"mean_losses":_mean(group,"deaths")}
+                 for name,group in groups.items()},"runs":rows}
+    write_json(output/"summary.json",summary)
+    write_json(output/"config.json",{"protocol":summary["protocol"],"seeds":summary["seeds"],
+                 "episodes_per_policy":int(episodes),"max_steps":int(max_steps),
+                 "reward":"unchanged DEFAULT_REWARDS evaluation metric"})
+    write_json(output/"manifest.json",{**_source_metadata(),"agent_file_sha256":hashlib.sha256(Path(agent_file).read_bytes()).hexdigest(),
+                 "standard_checkpoint_sha256":hashlib.sha256(Path(standard_checkpoint).read_bytes()).hexdigest(),
+                 "custom_reward_checkpoint_sha256":hashlib.sha256(Path(custom_reward_checkpoint).read_bytes()).hexdigest(),
+                 "security_note":"Student code runs with current-user permissions; not a sandbox."})
+    _plot_comparison({name:group for name,group in groups.items()},output/"plots/comparison.png")
+    return {"experiment_dir":str(output),"policies":summary["policies"],"seeds":summary["seeds"]}
 
 
 def _win_rate(rows):

@@ -219,6 +219,24 @@ func run_marl_job(command: String,args: Array=[]):
 	marl_progress={"state":"starting" if marl_pid>0 else "error","command":command}
 	if marl_pid<=0:marl_progress["message"]="Could not start the Python experiment process."
 	show_page("MarlLaboratory")
+func stop_marl_job():
+	if marl_pid>0 and OS.is_process_running(marl_pid):
+		FileAccess.open(marl_output.path_join("cancel"),FileAccess.WRITE).store_string("cancel")
+		OS.kill(marl_pid)
+	marl_pid=-1
+func marl_history()->Array:
+	var entries=[]
+	var root=results_root().path_join("marl")
+	var dir=DirAccess.open(root)
+	if dir==null:return entries
+	dir.list_dir_begin();var name=dir.get_next()
+	while name!="":
+		if dir.current_is_dir() and name not in [".",".."]:
+			var manifest=read_json(root.path_join(name).path_join("manifest.json"))
+			if not manifest.is_empty():entries.append({"name":name,"path":root.path_join(name),"manifest":manifest})
+		name=dir.get_next()
+	entries.sort_custom(func(a,b):return str(a.name)>str(b.name))
+	return entries
 func open_marl_replay(path: String):
 	marl_replay_path=path
 	show_page("MarlViewer")
@@ -444,7 +462,7 @@ func _process(_dt):
 		if not OS.is_process_running(marl_pid):
 			marl_pid=-1
 			var has_result=FileAccess.file_exists(marl_output.path_join("summary.json")) or FileAccess.file_exists(marl_output.path_join("manifest.json"))
-			if str(marl_progress.get("state",""))!="error":marl_progress["state"]="complete" if has_result else "error"
+			if str(marl_progress.get("state","")) not in ["error","cancelled"]:marl_progress["state"]="complete" if has_result else "error"
 			if not has_result and not marl_progress.has("message"):marl_progress["message"]="Experiment process exited without writing a result manifest."
 		if current_page=="MarlLaboratory" and is_instance_valid(view) and view.has_method("update_marl_status"):
 			view.update_marl_status(marl_progress,marl_output)

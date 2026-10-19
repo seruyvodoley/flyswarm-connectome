@@ -28,9 +28,11 @@ DEFAULT_REWARDS={
 class FlySwarmParallelEnv(ParallelEnv):
     metadata={"name":"flyswarm_analytical_v1","render_modes":[]}
     possible_agents=list(AGENTS)
-    def __init__(self,max_steps=1500,reward_coefficients=None,dt=.1,vehicle_ids=None,role_conditioning=True):
+    def __init__(self,max_steps=1500,reward_coefficients=None,dt=.1,vehicle_ids=None,role_conditioning=True,reward_function=None):
         self.max_steps=int(max_steps);self.dt=float(dt)
         self.coefficients=DEFAULT_REWARDS|dict(reward_coefficients or {})
+        if reward_function is not None and not callable(reward_function):raise TypeError("reward_function must be callable")
+        self.reward_function=reward_function
         self.vehicle_ids=tuple(vehicle_ids or DEFAULT_COMPOSITION)
         if len(self.vehicle_ids)!=16:raise ValueError("vehicle_ids must contain 16 vehicle ids")
         self.role_conditioning=bool(role_conditioning)
@@ -144,7 +146,14 @@ class FlySwarmParallelEnv(ParallelEnv):
                 "battle_loss":float(done and self.tickets[team]<self.tickets[enemy]),
                 "role_shaping":self._role_shaping(i,previous_pos,applied[i]),
             }
-            self.last_components[i]=c;rewards[a]=sum(self.coefficients[k]*v for k,v in c.items());infos[a]=self._info(i)
+            self.last_components[i]=c
+            standard_reward=float(sum(DEFAULT_REWARDS[k]*v for k,v in c.items()))
+            training_reward=float(self.reward_function(dict(c)) if self.reward_function else sum(self.coefficients[k]*v for k,v in c.items()))
+            if not np.isfinite(training_reward):raise ValueError("reward function returned NaN or infinity")
+            rewards[a]=training_reward
+            infos[a]=self._info(i)
+            infos[a]["training_reward"]=training_reward
+            infos[a]["standard_evaluation_reward"]=standard_reward
         terminations={a:done and self.steps<self.max_steps for a in self.possible_agents}
         truncations={a:done and self.steps>=self.max_steps for a in self.possible_agents}
         observations=self._observations()

@@ -2,12 +2,14 @@
 
 import runpy
 import sys
+import multiprocessing
 from pathlib import Path
 
 from flyswarm.bridge.server import main
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     if len(sys.argv) >= 2 and sys.argv[1] == "--marl":
         from flyswarm.marl.cli import main as marl_main
         raise SystemExit(marl_main(sys.argv[2:]))

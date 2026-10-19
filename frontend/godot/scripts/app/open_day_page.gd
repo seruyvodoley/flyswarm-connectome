@@ -165,7 +165,7 @@ func _process(delta):
 		attract_clock+=delta
 		if attract_clock>=4.0:attract_clock=0;attract_phase=(attract_phase+1)%3
 		attract_label.get_parent().visible=true
-		attract_label.text=copy_text(["A FLY CONTROLS A TANK","REAL MALECNS ACTIVITY","CAN YOU DEFEAT THE FLY?\\nCLICK TO FIGHT"][attract_phase])
+		attract_label.text=copy_text(["A FLY CONTROLS A TANK","REAL MALECNS ACTIVITY","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT"][attract_phase])
 
 func _input(event):
 	# Controller navigation belongs exclusively to AppState.

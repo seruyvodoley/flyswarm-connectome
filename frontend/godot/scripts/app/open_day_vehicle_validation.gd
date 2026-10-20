@@ -38,6 +38,17 @@ func run() -> void:
 		quit(1)
 		return
 	var fly_preview := fly as FlyPreview
+	var open_day_page: Node
+	for child in app.view.find_children("*", "Control", true, false):
+		if child.has_method("copy_text"):
+			open_day_page = child
+			break
+	if open_day_page != null:
+		var original_language: String = str(app.settings.language)
+		app.settings.language = "ru"
+		if open_day_page.copy_text("IS-2 (44)") != "ИС-2 (обр. 1944)" or open_day_page.copy_text("SU-100") != "СУ-100":
+			_fail("Russian Open Day vehicle names must use Cyrillic IS-2 and SU-100 labels")
+		app.settings.language = original_language
 	if not is_instance_valid(fly_preview.fly_skeleton):
 		_fail("Ebony Drosophila preview must load its articulated skeleton")
 	else:
@@ -245,7 +256,10 @@ func _capture_vehicle_switches(preview: VehiclePreview) -> void:
 	for index in 30:
 		var id: String = PREVIEW_IDS[index % PREVIEW_IDS.size()]
 		preview.set_vehicle(id)
-		await _frames(3)
+		for _frame in 90:
+			await _frames(1)
+			if is_instance_valid(preview.preview_model) and preview.preview_model.name == "Preview_%s" % id:
+				break
 		if not is_instance_valid(preview.preview_model) or preview.preview_model.name != "Preview_%s" % id:
 			_fail("VehiclePreview did not load requested model %s on switch %d" % [id, index + 1])
 		if preview.pitch_pivot.get_child_count() != 1:

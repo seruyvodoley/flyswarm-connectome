@@ -22,6 +22,7 @@ const RU_COPY={
 	"This is Drosophila.":"Это дрозофила.","We use a reconstructed model of its nervous system to control an agent in a virtual environment.":"Реконструированная модель её нервной системы управляет агентом в виртуальном мире.",
 	"We use a reconstructed nervous system model to control an agent in a virtual world.":"Реконструированная модель нервной системы управляет агентом в виртуальном мире.",
 	"CHOOSE YOUR VEHICLE":"ВЫБЕРИ ТАНК","WHY A FLY?":"ПОЧЕМУ МУХА?","EYES":"ЗРИТЕЛЬНЫЕ СИГНАЛЫ",
+	"IS-2 (44)":"ИС-2 (обр. 1944)","SU-100":"СУ-100",
 	"DROSOPHILA · 3D VIEW":"ДРОЗОФИЛА · 3D-ПРОСМОТР","VEHICLE · 3D VIEW":"ТЕХНИКА · 3D-ПРОСМОТР",
 	"DRAG TO INSPECT · DOUBLE-CLICK TO RESET":"ПЕРЕТАСКИВАЙ ДЛЯ ОСМОТРА · ДВОЙНОЙ ЩЕЛЧОК — СБРОС",
 	"Visual signals enter the reconstructed sensory pathways.":"Зрительные сигналы поступают в реконструированные сенсорные пути.","NERVOUS SYSTEM":"НЕРВНАЯ СИСТЕМА",
@@ -148,6 +149,8 @@ func select_vehicle(vehicle_id: String) -> void:
 func _update_vehicle_selection() -> void:
 	if is_instance_valid(selected_vehicle_label):
 		var vehicle_name: String = {"t34_85":"T-34-85","is2_1944":"IS-2 (1944)","panther_g":"PANTHER G","tiger_i":"TIGER I","jagdpanther":"JAGDPANTHER","su100":"SU-100"}.get(selected_vehicle,selected_vehicle)
+		if str(AppState.settings.language) == "ru":
+			vehicle_name = {"is2_1944":"ИС-2 обр. 1944","su100":"СУ-100"}.get(selected_vehicle, vehicle_name)
 		selected_vehicle_label.text = ("ВЫБРАНО · " if str(AppState.settings.language) == "ru" else "SELECTED · ") + vehicle_name
 		selected_vehicle_label.add_theme_color_override("font_color", DesignSystem.text_for(str(AppState.settings.get("appearance", "dark"))))
 	for id in vehicle_buttons:

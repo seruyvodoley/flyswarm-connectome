@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import sys
 import numpy as np
@@ -9,7 +10,7 @@ from flyswarm.marl import FlySwarmParallelEnv
 from flyswarm.marl.policy import SharedPPOPolicy
 from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features,vehicle_profile
 from flyswarm.bridge.server import load_policy,ppo_features
-from flyswarm.marl.experiments import TeamGymnasiumEnv, run_random_baseline
+from flyswarm.marl.experiments import TeamGymnasiumEnv, run_random_baseline, train_sb3_ppo
 from flyswarm.marl.experiments import run_student_agent
 from flyswarm.marl.student_code import AGENT_TEMPLATE, REWARD_TEMPLATE, ManagedStudentAgent, load_agent, load_reward
 from flyswarm.marl.exporter import export_practical
@@ -191,4 +192,22 @@ class MarlTests(unittest.TestCase):
             self.assertEqual(final_state["tickets"],frames[-1]["tickets"])
             self.assertTrue((root/"baseline.csv").is_file())
             self.assertTrue((root/"summary.json").is_file())
+    def test_ppo_progress_reports_finalization_until_chart_is_ready(self):
+        from flyswarm.marl import experiments
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/"ppo"
+            progress=output/"progress.json"
+            observed=[]
+            def render_chart(csv_path,png_path):
+                state=json.loads(progress.read_text())
+                observed.append(state["state"])
+                self.assertEqual(state["phase"],"artifacts")
+                self.assertTrue(csv_path.is_file())
+            with patch.object(experiments,"_plot_learning_curve",side_effect=render_chart):
+                result=train_sb3_ppo(output,timesteps=16,seed=41,max_steps=2,progress_path=progress)
+            state=json.loads(progress.read_text())
+            self.assertEqual(observed,["finalizing"])
+            self.assertEqual(state["state"],"complete")
+            self.assertEqual(state["timesteps"],16)
+            self.assertTrue(Path(result["checkpoint"]).is_file())
 if __name__=="__main__":unittest.main()

@@ -314,6 +314,11 @@ func run_marl_job(command: String,args: Array=[]):
 	if marl_pid>0 and OS.is_process_running(marl_pid):return
 	var root=results_root().path_join("marl")
 	DirAccess.make_dir_recursive_absolute(root)
+	# Keep Matplotlib's font cache in persistent user data so first chart render
+	# does not look like a stalled training process.
+	var matplotlib_cache=OS.get_user_data_dir().path_join("cache/matplotlib")
+	DirAccess.make_dir_recursive_absolute(matplotlib_cache)
+	OS.set_environment("MPLCONFIGDIR",matplotlib_cache)
 	var stamp=Time.get_datetime_string_from_system().replace(":","-")+"-"+str(Time.get_ticks_msec())
 	marl_output=root.path_join(stamp+"-"+command)
 	DirAccess.make_dir_recursive_absolute(marl_output.get_base_dir())
@@ -322,9 +327,9 @@ func run_marl_job(command: String,args: Array=[]):
 	else:cli_args.append_array(["-m","flyswarm.marl.cli"])
 	cli_args.append_array(["--output-root",root,"--experiment-dir",marl_output,command])
 	for item in args:cli_args.append(str(item))
+	marl_progress={"state":"starting","phase":"process","command":command,"message":"Starting the Python experiment worker…"}
 	marl_pid=OS.create_process(python,cli_args)
-	marl_progress={"state":"starting" if marl_pid>0 else "error","command":command}
-	if marl_pid<=0:marl_progress["message"]="Could not start the Python experiment process."
+	if marl_pid<=0:marl_progress={"state":"error","phase":"process","command":command,"message":"Could not start the Python experiment process."}
 	show_page("MarlLaboratory")
 func stop_marl_job():
 	if marl_pid>0 and OS.is_process_running(marl_pid):

@@ -408,15 +408,29 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
                   progress_path: Path | None = None, reward_coefficients=None,
                   reward_function=None, reward_file: Path | None = None) -> dict[str, Any]:
     """Train the real Stable-Baselines3 PPO implementation on the team wrapper."""
+    started = time.monotonic()
+    _prepare_output(output)
+    progress_path = progress_path or output / "progress.json"
+    curve_path = output / "training.csv"
+    write_json(progress_path, {
+        "state": "initializing", "phase": "dependencies",
+        "timesteps": 0, "target_timesteps": int(timesteps), "episodes": 0,
+        "elapsed_seconds": 0.0, "latest_episode_reward": None,
+        "message": "Loading Stable-Baselines3 and preparing the PPO model.",
+    })
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.callbacks import BaseCallback
     except ImportError as exc:
         raise RuntimeError("PPO training requires stable-baselines3; install requirements-marl.txt") from exc
 
-    _prepare_output(output)
-    progress_path = progress_path or output / "progress.json"
-    curve_path = output / "training.csv"
+    write_json(progress_path, {
+        "state": "initializing", "phase": "environment",
+        "timesteps": 0, "target_timesteps": int(timesteps), "episodes": 0,
+        "elapsed_seconds": round(time.monotonic() - started, 2),
+        "latest_episode_reward": None,
+        "message": "Preparing the training environment.",
+    })
 
     class Progress(BaseCallback):
         def __init__(self):
@@ -425,6 +439,15 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
             self.rows = []
             self.episode_count = 0
             self.last_logged_steps = 0
+
+        def _on_training_start(self):
+            write_json(progress_path, {
+                "state": "training", "phase": "rollouts",
+                "timesteps": int(self.num_timesteps), "target_timesteps": int(timesteps),
+                "episodes": self.episode_count, "elapsed_seconds": round(time.monotonic() - started, 2),
+                "latest_episode_reward": None,
+                "message": "PPO rollouts are running.",
+            })
 
         def _on_step(self):
             for info in self.locals.get("infos", []):
@@ -452,15 +475,30 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
     env = TeamGymnasiumEnv(seed=seed, max_steps=max_steps, reward_coefficients=reward_coefficients,
                            reward_function=reward_function)
     n_steps = min(256, max(16, int(timesteps)))
+    write_json(progress_path, {
+        "state": "initializing", "phase": "model",
+        "timesteps": 0, "target_timesteps": int(timesteps), "episodes": 0,
+        "elapsed_seconds": round(time.monotonic() - started, 2),
+        "latest_episode_reward": None,
+        "message": "Constructing the PPO policy network.",
+    })
     model = PPO(
         "MlpPolicy", env, learning_rate=float(learning_rate), n_steps=n_steps,
         batch_size=min(64, max(8, n_steps)), n_epochs=5, gamma=.99, gae_lambda=.95,
         clip_range=.2, seed=int(seed), device="cpu", verbose=0,
         policy_kwargs={"net_arch": {"pi": [128, 128], "vf": [128, 128]}},
     )
-    started = time.monotonic()
     try:
         model.learn(total_timesteps=int(timesteps), callback=Progress(), progress_bar=False)
+        training_rows = _read_csv(curve_path)
+        write_json(progress_path, {
+            "state": "finalizing", "phase": "artifacts",
+            "timesteps": int(model.num_timesteps), "target_timesteps": int(timesteps),
+            "episodes": len(training_rows),
+            "elapsed_seconds": round(time.monotonic() - started, 2),
+            "latest_episode_reward": float(training_rows[-1]["mean_team_reward"]) if training_rows else None,
+            "message": "Training finished; saving checkpoint and learning curve.",
+        })
         checkpoint = output / "checkpoint" / "ppo_team"
         checkpoint.parent.mkdir(parents=True, exist_ok=True)
         model.save(str(checkpoint))
@@ -501,10 +539,20 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
     if reward_file:
         (output/"student_code").mkdir(exist_ok=True)
         shutil.copy2(reward_file,output/"student_code/reward.py")
+    plot_error = None
+    try:
+        _plot_learning_curve(curve_path, output / "plots" / "learning_curve.png")
+    except Exception as exc:  # A chart is supplemental; preserve a valid checkpoint and results.
+        plot_error = str(exc)
     current = json.loads(progress_path.read_text()) if progress_path.exists() else {}
-    current.update({"state": "complete", "timesteps": int(model.num_timesteps), "checkpoint": str(zipped), "checkpoint_sha256": digest})
+    current.update({
+        "state": "complete", "phase": "complete", "timesteps": int(model.num_timesteps),
+        "checkpoint": str(zipped), "checkpoint_sha256": digest,
+        "elapsed_seconds": round(time.monotonic() - started, 2),
+        "message": "Training and checkpoint are ready." if plot_error is None else
+                   f"Training and checkpoint are ready; learning curve could not be rendered: {plot_error}",
+    })
     write_json(progress_path, current)
-    _plot_learning_curve(curve_path, output / "plots" / "learning_curve.png")
     return {"checkpoint": str(zipped), "checkpoint_sha256": digest,
             "timesteps": int(model.num_timesteps), "episodes": len(_read_csv(curve_path)),
             "experiment_dir": str(output)}

@@ -6,6 +6,8 @@ var orientation_correction: Node3D
 var preview_camera: Camera3D
 var fit_bounds=AABB()
 var viewport: SubViewport
+var wing_pivots: Array[Node3D] = []
+var preview_elapsed := 0.0
 @export_range(0.0, 60.0, 1.0) var preview_render_hz := 30.0
 var render_elapsed := 0.0
 
@@ -42,6 +44,9 @@ func _ready():
 		return
 	var fly_model=fly_scene.instantiate() as Node3D
 	orientation_correction.add_child(fly_model)
+	for pivot_name in ["WingPivot_L", "WingPivot_R"]:
+		var pivot=fly_model.find_child(pivot_name,true,false) as Node3D
+		if is_instance_valid(pivot):wing_pivots.append(pivot)
 	fit_model_to_preview(fly_model,3.2,orientation_correction.transform)
 	_request_viewport_frame()
 	_sync_viewport_size()
@@ -92,12 +97,17 @@ func _request_viewport_frame() -> void:
 	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
 
 func _process(delta):
-	if is_instance_valid(fly_root):fly_root.rotate_y(delta*rotation_speed)
 	if not is_instance_valid(viewport):return
 	if not is_visible_in_tree():
 		render_elapsed=0.0
 		viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
 		return
+	if is_instance_valid(fly_root):fly_root.rotate_y(delta*rotation_speed)
+	preview_elapsed+=delta
+	var flap=sin(preview_elapsed*47.0)*0.22
+	for index in wing_pivots.size():
+		var pivot=wing_pivots[index]
+		if is_instance_valid(pivot):pivot.rotation.x=flap*(1.0 if index==0 else -1.0)
 	if preview_render_hz<=0.0:
 		viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 		return

@@ -18,8 +18,9 @@ const IDS=["panther_g","tiger_i","jagdpanther","t34_85","is2_1944","su100"]
 const VEHICLES=["Panther Ausf. G","Tiger I · late 1944","Jagdpanther","T-34-85 · 1944","IS-2 · 1944","SU-100"]
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	theme=DesignSystem.make_theme(18)
-	var bg=ColorRect.new();bg.color=DesignSystem.INK;bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
+	var appearance=str(AppState.settings.get("appearance","dark"))
+	theme=DesignSystem.make_theme(18,appearance)
+	var bg=ColorRect.new();bg.color=DesignSystem.ink_for(appearance);bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var layout=MarginContainer.new();layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","right","top","bottom"]:layout.add_theme_constant_override("margin_"+side,32)
 	add_child(layout)
@@ -80,7 +81,7 @@ func back():button(body,"Back",AppState.menu)
 func menu_entry(parent: VBoxContainer,title_text: String,description_text: String,callback: Callable):
 	var frame=PanelContainer.new()
 	frame.custom_minimum_size=Vector2(440,94)
-	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style())
+	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style(str(AppState.settings.get("appearance","dark"))))
 	parent.add_child(frame)
 	var card=VBoxContainer.new()
 	card.add_theme_constant_override("separation",5)
@@ -98,7 +99,7 @@ func main_menu():
 	var split=HBoxContainer.new();split.add_theme_constant_override("separation",40);body.add_child(split)
 	var left=VBoxContainer.new();left.custom_minimum_size.x=520;left.add_theme_constant_override("separation",8);split.add_child(left)
 	label(left,"CONNECTOME / EMBODIMENT",14).modulate=DesignSystem.ACCENT
-	label(left,"FLYSWARM",58).add_theme_color_override("font_color",DesignSystem.TEXT)
+	label(left,"FLYSWARM",58).add_theme_color_override("font_color",DesignSystem.text_for(str(AppState.settings.get("appearance","dark"))))
 	label(left,"A world to observe. A network to study.",16)
 	var spacer=Control.new();spacer.custom_minimum_size.y=20;left.add_child(spacer)
 	menu_entry(left,"OPEN DAY DEMO","A fast 1v1: a visitor against a tank controlled by the reconstructed MaleCNS model.",AppState.open_day_menu)
@@ -261,6 +262,7 @@ func settings_menu():
 	title("LOCAL PREFERENCES","Settings")
 	var s=AppState.settings
 	dropdown("Language",["English","Русский"],["en","ru"],str(s.get("language","en")),func(v):AppState.set_language(str(v)))
+	dropdown("Appearance",["Dark · charcoal and olive","Light · paper and spruce"],["dark","light"],str(s.get("appearance","dark")),func(v):s.appearance=v;AppState.show_page("Settings"))
 	dropdown("Graphics preset",["Low","Medium","High"],[0,1,2],s.preset,func(v):s.preset=v;s.shadows=v>0;s.vegetation=[.25,.6,1.0][v];s.effects=[.3,.6,1.0][v];AppState.show_page("Settings"))
 	dropdown("Window resolution",["1280 × 800","1440 × 900","1920 × 1080"],[0,1,2],s.resolution,func(v):s.resolution=v)
 	toggle("Fullscreen",s.fullscreen,func(v):s.fullscreen=v)
@@ -276,7 +278,7 @@ func settings_menu():
 	dropdown("Default communication",["No Audio","Team Audio","All Audio"],["no_audio","team_audio","all_audio"],s.audio,func(v):s.audio=v)
 	text_block("Enhanced visuals preserve the old heightfield collision and forest visibility. Enhanced physical changes terrain and obstacle collision and is a separate experiment condition. Legacy restores the previous scenery. Replays keep the profile they recorded. LOD bias uses imported mesh LODs where present.")
 	button(body,"SAVE SETTINGS",func():AppState.save_settings();AppState.menu())
-	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"dataset_path":str(AppState.settings.get("dataset_path","")),"environment_profile":"enhanced_visual"};AppState.save_settings();AppState.show_page("Settings"))
+	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"appearance":"dark","dataset_path":str(AppState.settings.get("dataset_path","")),"environment_profile":"enhanced_visual"};AppState.save_settings();AppState.show_page("Settings"))
 	back()
 
 func malecns_dataset_settings() -> void:

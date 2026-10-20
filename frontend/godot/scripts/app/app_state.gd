@@ -3,7 +3,7 @@ const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var session=Config.new()
-var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","dataset_path":"","environment_profile":"enhanced_visual"}
+var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","appearance":"dark","dataset_path":"","environment_profile":"enhanced_visual"}
 var root_path=""
 var python=""
 var packaged_app=false
@@ -54,6 +54,7 @@ func _ready():
 		settings.dataset_path=OS.get_environment("FLY_DATA")
 		if str(settings.dataset_path)=="":settings.dataset_path=user_home_path().path_join("fly-data")
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
+	if str(settings.appearance) not in ["dark", "light"]:settings.appearance="dark"
 	get_tree().auto_accept_quit=false
 	apply_settings()
 

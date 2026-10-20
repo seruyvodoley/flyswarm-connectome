@@ -19,6 +19,8 @@ results/flyswarm_05_two_brains_8v8_raw.csv
 # Local connectome data; canonical dataset is outside this repository
 fly-data/
 data/local/
+# Research-run notebooks and generated experiments are managed in GitLab.
+experiments/
 # Temporary files
 *.tmp
 *.bak

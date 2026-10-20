@@ -39,8 +39,9 @@ const RU_COPY={
 func _ready():
 	OpenDayController.configure()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	theme=DesignSystem.make_theme(18)
-	var bg=ColorRect.new();bg.color=DesignSystem.INK;bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
+	var appearance=str(AppState.settings.get("appearance","dark"))
+	theme=DesignSystem.make_theme(18,appearance)
+	var bg=ColorRect.new();bg.color=DesignSystem.ink_for(appearance);bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,28)
 	add_child(margin)
@@ -64,7 +65,7 @@ func copy_text(text: String) -> String:
 	return AppState.tr_text(text)
 func panel(parent: Node) -> VBoxContainer:
 	var frame=PanelContainer.new();frame.size_flags_vertical=Control.SIZE_EXPAND_FILL;frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style());parent.add_child(frame)
+	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style(str(AppState.settings.get("appearance","dark"))));parent.add_child(frame)
 	var box=VBoxContainer.new();box.add_theme_constant_override("separation",12);frame.add_child(box);return box
 func preview(parent: Node,min_size=Vector2(480,340)):
 	var fly=FlyPreview.new();fly.custom_minimum_size=min_size;fly.size_flags_vertical=Control.SIZE_EXPAND_FILL;fly.size_flags_horizontal=Control.SIZE_EXPAND_FILL;parent.add_child(fly);return fly

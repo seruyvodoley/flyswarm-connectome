@@ -18,8 +18,9 @@ var student_reward_path=""
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	theme=DesignSystem.make_theme(18)
-	var bg=ColorRect.new();bg.color=DesignSystem.INK;bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
+	var appearance=str(AppState.settings.get("appearance","dark"))
+	theme=DesignSystem.make_theme(18,appearance)
+	var bg=ColorRect.new();bg.color=DesignSystem.ink_for(appearance);bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,42)
 	add_child(margin)
@@ -28,16 +29,28 @@ func _ready():
 	var title=Label.new();title.text=_t("ЛАБОРАТОРИЯ MARL","MARL LABORATORY");title.add_theme_font_size_override("font_size",34);title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;top.add_child(title)
 	var back=Button.new();back.text=_t("В меню","Back");back.pressed.connect(AppState.menu);top.add_child(back)
 	var intro=Label.new();intro.text=_t("PettingZoo Parallel · Stable-Baselines3 PPO · 16 машин · Python задаёт исход боя","PettingZoo Parallel · Stable-Baselines3 PPO · 16 vehicles · Python owns battle outcomes");intro.modulate=Color("bdc7bd");column.add_child(intro)
-	var tabs=TabContainer.new();tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(tabs)
+	var tab_row=HBoxContainer.new();tab_row.add_theme_constant_override("separation",6);column.add_child(tab_row)
+	var tabs=TabContainer.new();tabs.tabs_visible=false;tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(tabs)
+	var experiments_tab=Button.new();experiments_tab.text=_t("Эксперименты","Experiments");experiments_tab.toggle_mode=true;experiments_tab.button_pressed=true;tab_row.add_child(experiments_tab)
+	var python_tab=Button.new();python_tab.text="Python";python_tab.toggle_mode=true;tab_row.add_child(python_tab)
+	experiments_tab.pressed.connect(func():tabs.current_tab=0;experiments_tab.button_pressed=true;python_tab.button_pressed=false)
+	python_tab.pressed.connect(func():tabs.current_tab=1;experiments_tab.button_pressed=false;python_tab.button_pressed=true)
+	tabs.tab_changed.connect(func(index):experiments_tab.button_pressed=index==0;python_tab.button_pressed=index==1)
+	for tab_button in [experiments_tab,python_tab]:
+		tab_button.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,false))
+		tab_button.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,false))
+		tab_button.add_theme_stylebox_override("pressed",DesignSystem.tab_style(appearance,true))
+		tab_button.add_theme_color_override("font_color",DesignSystem.text_for(appearance))
 	var split=HBoxContainer.new();split.add_theme_constant_override("separation",36);tabs.add_child(split);split.name=_t("Эксперименты","Experiments");split.size_flags_vertical=Control.SIZE_EXPAND_FILL
-	var left=VBoxContainer.new();left.custom_minimum_size.x=540;left.add_theme_constant_override("separation",10);split.add_child(left)
-	_section(left,"A · RANDOM BASELINE","A · СЛУЧАЙНАЯ БАЗА")
+	var left_scroll=ScrollContainer.new();left_scroll.custom_minimum_size.x=520;left_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;left_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;split.add_child(left_scroll)
+	var left=VBoxContainer.new();left.size_flags_horizontal=Control.SIZE_EXPAND_FILL;left.add_theme_constant_override("separation",10);left_scroll.add_child(left)
+	_section(left,"A · СЛУЧАЙНАЯ БАЗА","A · RANDOM BASELINE")
 	_number(left,"Seed",seed_value,1,2147480000,func(v):seed_value=int(v))
 	_number(left,"Episode steps / Шаги эпизода",episode_steps,16,1500,func(v):episode_steps=int(v))
 	_action(left,_t("Запустить случайную политику","Run random baseline"),func():
 		AppState.run_marl_job("baseline",["--episodes","3","--seed",str(seed_value),"--max-steps",str(episode_steps)]))
 	var b=Button.new();b.text=_t("Смотреть последний случайный бой","Watch last Random battle");b.pressed.connect(func():_open_replay("random-seed-"+str(seed_value)+".jsonl"));left.add_child(b)
-	_section(left,"B · PPO TRAINING","B · ОБУЧЕНИЕ PPO")
+	_section(left,"B · ОБУЧЕНИЕ PPO","B · PPO TRAINING")
 	_number(left,"Training steps / Шаги обучения",training_steps,64,500000,func(v):training_steps=int(v))
 	_action(left,_t("Обучить PPO и сохранить checkpoint","Train PPO and save checkpoint"),func():
 		AppState.run_marl_job("train",["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps)]))
@@ -46,7 +59,7 @@ func _ready():
 		_confirm_python_job("train",["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps),"--reward-file",student_reward_path]))
 	checkpoint_path=_find_checkpoint()
 	var select=Button.new();select.text=_t("Выбрать checkpoint…","Choose checkpoint…");select.pressed.connect(_choose_checkpoint);left.add_child(select)
-	_section(left,"C · EVALUATION","C · ОЦЕНКА")
+	_section(left,"C · ОЦЕНКА","C · EVALUATION")
 	_action(left,_t("Оценить модель на тестовых seed","Evaluate checkpoint on test seeds"),func():_run_checkpoint("evaluate"))
 	_action(left,_t("Сравнить Random и PPO на одинаковых seed","Compare Random and PPO on paired seeds"),func():_run_checkpoint("compare"))
 	_action(left,_t("Сравнить четыре стратегии на одинаковых условиях","Compare all four policies"),func():
@@ -61,17 +74,31 @@ func _ready():
 	var results=Button.new();results.text=_t("Открыть папку результатов","Open results folder");results.pressed.connect(func():OS.shell_open(AppState.results_root().path_join("marl")));left.add_child(results)
 	var history=Button.new();history.text=_t("История экспериментов…","Experiment history…");history.pressed.connect(_show_history);left.add_child(history)
 	var right=VBoxContainer.new();right.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_theme_constant_override("separation",14);split.add_child(right)
-	_section(right,"EXPERIMENT STATUS","СТАТУС ЭКСПЕРИМЕНТА")
-	status_label=Label.new();status_label.text=_t("Готово к запуску","Ready");status_label.add_theme_font_size_override("font_size",24);right.add_child(status_label)
-	status_progress=ProgressBar.new();status_progress.min_value=0;status_progress.max_value=1;status_progress.indeterminate=true;status_progress.custom_minimum_size.y=12;right.add_child(status_progress)
-	detail_label=Label.new();detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;detail_label.modulate=Color("b4c0b6");right.add_child(detail_label)
-	var caveat=Label.new();caveat.text=_t("Визуальный replay показывает записанную аналитическую траекторию. Godot не пересчитывает урон и победу. PPO обучает внешнее управление, не MaleCNS. Сравнивайте числа по нескольким независимым seed.","Replay renders the recorded analytical trajectory. Godot does not recalculate damage or winner. PPO trains an external controller, not MaleCNS. Compare metrics across independent seeds.");caveat.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;caveat.modulate=Color("c9b48a");right.add_child(caveat)
+	var status_card=PanelContainer.new();status_card.add_theme_stylebox_override("panel",DesignSystem.panel_style(appearance));right.add_child(status_card)
+	var status_content=VBoxContainer.new();status_content.add_theme_constant_override("separation",10);status_card.add_child(status_content)
+	_section(status_content,"СТАТУС ЭКСПЕРИМЕНТА","EXPERIMENT STATUS")
+	status_label=Label.new();status_label.text=_t("Готово к запуску","Ready");status_label.add_theme_font_size_override("font_size",24);status_content.add_child(status_label)
+	status_progress=ProgressBar.new();status_progress.min_value=0;status_progress.max_value=1;status_progress.indeterminate=true;status_progress.custom_minimum_size.y=12;status_content.add_child(status_progress)
+	detail_label=Label.new();detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;detail_label.modulate=DesignSystem.muted_for(appearance);status_content.add_child(detail_label)
+	var workflow_card=PanelContainer.new();workflow_card.add_theme_stylebox_override("panel",DesignSystem.panel_style(appearance));right.add_child(workflow_card)
+	var workflow=VBoxContainer.new();workflow.add_theme_constant_override("separation",8);workflow_card.add_child(workflow)
+	_section(workflow,"ПОРЯДОК РАБОТЫ","A CLEAR WORKFLOW")
+	for item in [
+		_t("01  Настройте seed и длину эпизода","01  Set the seed and episode length"),
+		_t("02  Измените agent.py или reward.py","02  Edit agent.py or reward.py"),
+		_t("03  Проверьте код и запустите стратегию","03  Check the code and run a strategy"),
+		_t("04  Оцените и сравните на одинаковых seed","04  Evaluate and compare on paired seeds"),
+		_t("05  Откройте повтор и экспортируйте работу","05  Review a replay and export the practical"),
+	]:
+		var step=Label.new();step.text=item;step.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;step.add_theme_color_override("font_color",DesignSystem.text_for(appearance));workflow.add_child(step)
+	var caveat=Label.new();caveat.text=_t("Разделяйте награду при обучении и независимую оценку. PPO обучает внешнюю стратегию и не меняет MaleCNS.","Keep training reward separate from independent evaluation. PPO trains an external strategy and does not change MaleCNS.");caveat.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;caveat.modulate=DesignSystem.muted_for(appearance);right.add_child(caveat)
 	_build_programming_tab(tabs)
 	update_marl_status(AppState.marl_progress,AppState.marl_output)
 
 func _workspace_dir()->String:
 	return ProjectSettings.globalize_path("user://marl_workspace")
 func _build_programming_tab(tabs:TabContainer):
+	var appearance=str(AppState.settings.get("appearance","dark"))
 	var panel=VBoxContainer.new();panel.name=_t("Python","Python");panel.add_theme_constant_override("separation",8);tabs.add_child(panel)
 	student_agent_path=_workspace_dir().path_join("agent.py");student_reward_path=_workspace_dir().path_join("reward.py")
 	DirAccess.make_dir_recursive_absolute(_workspace_dir())
@@ -84,7 +111,7 @@ func _build_programming_tab(tabs:TabContainer):
 	var import_button=Button.new();import_button.text=_t("Импортировать .py…","Import .py…");import_button.pressed.connect(_import_python);row.add_child(import_button)
 	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.pressed.connect(_save_current_code);row.add_child(save_button)
 	var restore_button=Button.new();restore_button.text=_t("Шаблон","Template");restore_button.pressed.connect(_restore_template);row.add_child(restore_button)
-	code_editor=CodeEdit.new();code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.auto_indent=true;code_editor.indent_size=4;panel.add_child(code_editor)
+	code_editor=CodeEdit.new();code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("e9eee2") if DesignSystem.is_light(appearance) else Color("283328"));code_editor.add_theme_color_override("line_number_color",DesignSystem.muted_for(appearance));panel.add_child(code_editor)
 	var highlighter=CodeHighlighter.new();highlighter.number_color=Color("82928a");highlighter.symbol_color=Color("d1b579");highlighter.function_color=Color("8cc8b2");highlighter.add_color_region("\"","\"",Color("a7c88b"));highlighter.add_color_region("'","'",Color("a7c88b"));highlighter.add_keyword_color("def",Color("ce9aef"));highlighter.add_keyword_color("return",Color("ce9aef"));highlighter.add_keyword_color("import",Color("ce9aef"));highlighter.add_keyword_color("from",Color("ce9aef"));highlighter.add_keyword_color("if",Color("ce9aef"));highlighter.add_keyword_color("for",Color("ce9aef"));highlighter.add_keyword_color("in",Color("ce9aef"));code_editor.syntax_highlighter=highlighter
 	var actions=HBoxContainer.new();panel.add_child(actions)
 	var check=Button.new();check.text=_t("Проверить код","Check code");check.pressed.connect(func():_confirm_student_run("check"));actions.add_child(check)

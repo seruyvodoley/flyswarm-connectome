@@ -6,7 +6,7 @@ The files in this directory are visual assets only. Geometry and textures are bu
 
 | Local file | Source and credit | License | Changes |
 | --- | --- | --- | --- |
-| `fly/fly.glb` | [HEREISCB/flybrain viewer asset](https://github.com/HEREISCB/flybrain/tree/main/viewer/assets/fly); FlyBrain credits the model as derived from [TuragaLab/flybody](https://github.com/TuragaLab/flybody). | FlyBrain: MIT; FlyBody source model: Apache-2.0. See `licenses/FlyBrain-MIT.txt` and `licenses/FlyBody-Apache-2.0.txt`. | Visual-only GLB used in the fly preview. It does not load FlyBody's simulation runtime. |
+| `fly/fly.glb` | Original FlySwarm visual model, generated from project-side procedural Blender geometry in `tools/blender/build_drosophila_male.py`. | Created in this project; no third-party model or research data is included. | Adult-male educational visualization with compound eyes, six legs, halteres, and a veined wing pair. Visual only; it does not participate in MaleCNS calculations. |
 
 ## Vegetation and rocks
 

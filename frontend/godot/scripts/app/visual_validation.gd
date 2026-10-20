@@ -1,20 +1,36 @@
 extends SceneTree
 var app
 var failures=0
+var screenshot_dir := ""
 func check(condition: bool,message: String):
 	if not condition:failures+=1;push_error(message)
 func _initialize():call_deferred("run")
 func capture(name):
 	await process_frame
 	await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_png("/tmp/flyswarm-"+name+".png")
+	root.get_texture().get_image().save_png(screenshot_dir.path_join(name+".png"))
 func run():
 	app=root.get_node("AppState")
+	screenshot_dir=OS.get_environment("FLYSWARM_QA_OUT")
+	if screenshot_dir=="":screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/visual_validation")
+	DirAccess.make_dir_recursive_absolute(screenshot_dir)
 	for language in ["en","ru"]:
 		app.settings.language=language
 		for page in ["MainMenu","HistoricalBattleSetup","Settings","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser"]:
 			app.show_page(page)
 			await capture(language+"-"+page)
+	for appearance in ["dark","light"]:
+		app.settings.appearance=appearance
+		for page in ["MainMenu","Settings","OpenDayMain","MarlLaboratory"]:
+			app.show_page(page)
+			await capture(appearance+"-"+page)
+			if page=="MarlLaboratory":
+				var tab_list=app.view.find_children("*","TabContainer",true,false)
+				if not tab_list.is_empty():
+					var tabs=tab_list[0] as TabContainer
+					tabs.current_tab=1
+					await capture(appearance+"-MarlPython")
+	app.settings.appearance="dark"
 	app.configure("battle");app.session.seconds=60;app.launch()
 	for frame in range(20):await process_frame
 	app.battle.set_physics_process(false)

@@ -30,6 +30,8 @@ experiments/
 results/replays/
 *.blend1
 assets/models/imported/t34_85/candidates/
+# Original third-party Blender/GLB downloads used only to regenerate optimized assets.
+tools/blender/upstream/
 
 # Local application builds
 build/

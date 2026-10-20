@@ -9,6 +9,12 @@ The running renderer does not expose a trustworthy GPU-time or CPU/GPU-load
 counter through this script; those require a separate Instruments or Activity
 Monitor capture.
 
+The optional `--exercise-fire` switch injects a synthetic Open Day click after
+the intro, then records frame times that contain a shot or a hit separately.
+It measures the firing and impact code paths; it is not a hardware controller
+test. `--camera=0` provides a diagnostic comparison with the impact report
+hidden in overview mode.
+
 From the repository root, run:
 
 ```sh
@@ -18,6 +24,7 @@ From the repository root, run:
 ./tools/run run-profile --mode=menu --seconds=30 --disable-preview=fly,vehicle
 ./tools/run run-profile --mode=menu --seconds=30 --preview-rate=0
 ./tools/run run-profile --mode=battle-rule --seconds=30
+./tools/run run-profile --mode=battle-rule --seconds=30 --exercise-fire
 ./tools/run run-profile --mode=battle-rule --seconds=30 --shadows=off
 ./tools/run run-profile --mode=battle-rule --seconds=30 --vegetation=0.25
 ./tools/run run-profile --mode=battle-brain --seconds=30

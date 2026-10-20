@@ -17,6 +17,8 @@ func run():
 		app.show_page(page)
 		await process_frame
 		check(is_instance_valid(app.view),"Scene instantiation "+page)
+		if page in ["LoadingScreen","JobProgress"]:
+			check(not app.view.find_children("*","ProgressBar",true,false).is_empty(),page+" shows operation progress")
 
 	var original_language=str(app.settings.get("language","en"))
 	app.settings.language="ru"
@@ -40,6 +42,17 @@ func run():
 	check(persisted.get_value("settings","language")=="en","Language persisted")
 	FileAccess.open("user://settings.cfg",FileAccess.WRITE).store_string(saved_settings)
 	app.settings.language=original_language
+	app.show_page("MainMenu")
+	await process_frame
+	app.show_page("Settings")
+	await process_frame
+	check(app.view.find_child("DatasetCheckProgress",true,false) is ProgressBar,"MaleCNS data check exposes an indeterminate status bar")
+	var unavailable_dataset := ProjectSettings.globalize_path("res://dataset-check-unavailable")
+	check(app.request_malecns_dataset_validation(unavailable_dataset),"MaleCNS data check starts asynchronously")
+	for _attempt in 300:
+		if app.dataset_validation_state != "checking":break
+		await create_timer(.1).timeout
+	check(app.dataset_validation_state=="error" and not app.dataset_validation_result.get("ready",false),"MaleCNS data check reports invalid data after the worker completes (state=%s result=%s)" % [app.dataset_validation_state,str(app.dataset_validation_result)])
 	app.show_page("MainMenu")
 	await process_frame
 	app.configure("range")

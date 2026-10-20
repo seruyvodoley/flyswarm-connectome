@@ -14,6 +14,11 @@ var replay_list: ItemList
 var form_controls={}
 var reward_curve: Control
 var reward_curve_refresh=0.0
+var dataset_check_button: Button
+var dataset_status_label: Label
+var dataset_check_progress: ProgressBar
+var dataset_validation_last_state := "idle"
+var dataset_validation_russian := false
 const IDS=["panther_g","tiger_i","jagdpanther","t34_85","is2_1944","su100"]
 const VEHICLES=["Panther Ausf. G","Tiger I · late 1944","Jagdpanther","T-34-85 · 1944","IS-2 · 1944","SU-100"]
 func _ready():
@@ -288,25 +293,28 @@ func malecns_dataset_settings() -> void:
 	var path_row=HBoxContainer.new();path_row.add_theme_constant_override("separation",12);body.add_child(path_row)
 	var path_edit=LineEdit.new();path_edit.name="MaleCNSDatasetPath";path_edit.text=str(AppState.settings.dataset_path);path_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;path_row.add_child(path_edit)
 	var browse=Button.new();browse.text="Выбрать папку…" if russian else "Choose folder…";browse.custom_minimum_size.y=48;path_row.add_child(browse)
-	var check=Button.new();check.text="Проверить MaleCNS" if russian else "Check MaleCNS data";body.add_child(check)
-	var status=Label.new();status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status.custom_minimum_size.y=32;body.add_child(status)
-	status.text="Два файла данных не включены в приложение." if russian else "The connectome files are not included in the app."
-	status.modulate=Color("b3c0b8")
+	dataset_validation_russian=russian
+	dataset_check_button=Button.new();dataset_check_button.text="Проверить MaleCNS" if russian else "Check MaleCNS data";body.add_child(dataset_check_button)
+	dataset_status_label=Label.new();dataset_status_label.name="DatasetCheckStatus";dataset_status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;dataset_status_label.custom_minimum_size.y=32;body.add_child(dataset_status_label)
+	dataset_status_label.text="Два файла данных не включены в приложение." if russian else "The connectome files are not included in the app."
+	dataset_status_label.modulate=Color("b3c0b8")
+	dataset_check_progress=ProgressBar.new();dataset_check_progress.name="DatasetCheckProgress";dataset_check_progress.indeterminate=true;dataset_check_progress.custom_minimum_size.y=10;dataset_check_progress.visible=false;body.add_child(dataset_check_progress)
 	browse.pressed.connect(func():
 		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_DIR;dialog.use_native_dialog=true;add_child(dialog)
 		dialog.dir_selected.connect(func(path):path_edit.text=path;AppState.set_dataset_path(path);dialog.queue_free())
 		dialog.canceled.connect(func():dialog.queue_free())
 		dialog.popup_centered_ratio(.75))
-	check.pressed.connect(func():
+	dataset_check_button.pressed.connect(func():
 		AppState.set_dataset_path(path_edit.text)
-		status.text="Проверяю контрольные суммы…" if russian else "Checking dataset files and checksums…"
-		var result=AppState.validate_malecns_dataset(path_edit.text)
-		if result.get("ready",false):
-			status.text=("MALECNS ГОТОВ · " if russian else "MALECNS READY · ")+str(result.get("path",path_edit.text))
-			status.modulate=Color("8ccf9b")
-		else:
-			status.text=("ДАННЫЕ MALECNS НЕ НАЙДЕНЫ · " if russian else "MALECNS DATA NOT READY · ")+str(result.get("error",""))
-			status.modulate=Color("ef9a7a"))
+		dataset_status_label.text="Проверяю контрольные суммы…" if russian else "Checking dataset files and checksums…"
+		dataset_status_label.modulate=Color("b3c0b8")
+		dataset_check_progress.visible=true
+		dataset_check_button.disabled=true
+		dataset_validation_last_state="checking"
+		if not AppState.request_malecns_dataset_validation(path_edit.text):
+			dataset_status_label.text="Проверка уже выполняется." if russian else "A dataset check is already running."
+			dataset_check_progress.visible=false
+			dataset_check_button.disabled=false)
 
 func pause_screen():
 	title("SESSION PAUSED","Pause")
@@ -405,6 +413,21 @@ func _refresh_training_curve():
 	reward_curve.call("set_samples",samples)
 func _process(dt):
 	status.text=AppState.tr_text("BACKEND")+"  ·  "+AppState.tr_text(AppState.backend_state)
+	if page=="Settings" and is_instance_valid(dataset_status_label):
+		var state=str(AppState.dataset_validation_state)
+		if state=="checking":
+			dataset_check_progress.visible=true
+			dataset_check_button.disabled=true
+		elif state != dataset_validation_last_state and state in ["ready","error"]:
+			dataset_check_progress.visible=false
+			dataset_check_button.disabled=false
+			if state=="ready":
+				dataset_status_label.text=("MALECNS ГОТОВ · " if dataset_validation_russian else "MALECNS READY · ")+str(AppState.dataset_validation_result.get("path",AppState.dataset_validation_path))
+				dataset_status_label.modulate=Color("8ccf9b")
+			else:
+				dataset_status_label.text=("ДАННЫЕ MALECNS НЕ НАЙДЕНЫ · " if dataset_validation_russian else "MALECNS DATA NOT READY · ")+str(AppState.dataset_validation_result.get("error",""))
+				dataset_status_label.modulate=Color("ef9a7a")
+			dataset_validation_last_state=state
 	if page=="LoadingScreen" and not AppState.backend_state in ["ERROR","DISCONNECTED"]:
 		headline.text=AppState.tr_text(AppState.loading_message)
 		if is_instance_valid(loading_progress):loading_progress.indeterminate=AppState.backend_state in ["STARTING","CONNECTING","BUSY"]

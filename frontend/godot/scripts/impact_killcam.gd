@@ -8,6 +8,8 @@ class ImpactModelView extends SubViewportContainer:
 	var camera: Camera3D
 	var projectile: MeshInstance3D
 	var overlay: Control
+	var prepared_models: Dictionary = {}
+	var active_model_id := ""
 	var path_start=Vector3.ZERO
 	var path_end=Vector3.ZERO
 	var shot_elapsed=0.0
@@ -48,17 +50,15 @@ class ImpactModelView extends SubViewportContainer:
 			overlay.queue_redraw()
 
 	func show_event(event: Dictionary):
-		for child in stage.get_children():
-			if child is Node3D and child is not Camera3D and child is not DirectionalLight3D and child is not OmniLight3D:
-				stage.remove_child(child)
-				child.queue_free()
 		var vehicle_id=str(event.get("vehicle_id","t34_85"))
-		var packed=load("res://assets/vehicles/"+vehicle_id+".glb") as PackedScene
-		if packed==null:return
-		model=packed.instantiate()
+		if not prepared_models.has(vehicle_id) and not _prepare_model(vehicle_id):return
+		if active_model_id != "" and prepared_models.has(active_model_id):
+			(prepared_models[active_model_id] as Node3D).visible = false
+		model = prepared_models[vehicle_id] as Node3D
+		active_model_id = vehicle_id
+		model.visible = true
+		_clear_event_geometry(model)
 		model.rotation.y=deg_to_rad(-26)
-		_apply_xray(model)
-		stage.add_child(model)
 		projectile=null
 		overlay.active=false
 		var turret=model.find_child("TurretPivot",true,false)
@@ -108,6 +108,43 @@ class ImpactModelView extends SubViewportContainer:
 				if xyz is Array and xyz.size()>=3:hit_modules[key]=Vector3(float(xyz[0]),float(xyz[1]),float(xyz[2]))
 			overlay.set_impact(model,camera,Vector2(viewport.size),path_start,origin,path_end,hit_modules)
 		model.rotation.y=deg_to_rad(-26)
+
+	func prewarm_models(vehicle_ids: Array) -> void:
+		for raw_id in vehicle_ids:
+			var vehicle_id := str(raw_id)
+			if not _prepare_model(vehicle_id):continue
+			# Warm both model and hit-marker render paths while the battle starts.
+			show_event({
+				"vehicle_id": vehicle_id,
+				"turret_angle": 0.0,
+				"module_positions": {"gunner": [0.0, 0.9, 0.0]},
+				"destroyed_modules": [],
+				"impact": {"point_local": [0.0, 0.8, 0.9], "incoming_local": [0.0, 0.0, 1.0], "penetrated": true, "damaged": ["gunner"], "disabled": []},
+			})
+			await RenderingServer.frame_post_draw
+			var prepared := prepared_models[vehicle_id] as Node3D
+			_clear_event_geometry(prepared)
+			prepared.visible = false
+			projectile = null
+			if is_instance_valid(overlay):overlay.active = false
+
+	func _clear_event_geometry(target: Node3D) -> void:
+		for child in target.get_children():
+			if child.name in ["DamageMarker", "ImpactPath"]:
+				child.queue_free()
+
+	func _prepare_model(vehicle_id: String) -> bool:
+		if prepared_models.has(vehicle_id):return true
+		var packed := load("res://assets/vehicles/" + vehicle_id + ".glb") as PackedScene
+		if packed == null:return false
+		var prepared := packed.instantiate() as Node3D
+		if prepared == null:return false
+		prepared.name = "PreparedImpactModel_" + vehicle_id
+		prepared.visible = false
+		_apply_xray(prepared)
+		stage.add_child(prepared)
+		prepared_models[vehicle_id] = prepared
+		return true
 
 	func _apply_xray(root: Node3D):
 		var ghost=StandardMaterial3D.new()
@@ -209,6 +246,14 @@ func _ready():
 	model_view.custom_minimum_size=Vector2(350,145) if demo_layout else Vector2(560,235)
 	model_view.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	column.add_child(model_view)
+	if battle != null and battle.vehicles.size() > 0:
+		var shooter_team := int(battle.vehicles[int(battle.selected)].team) if battle.selected >= 0 and battle.selected < battle.vehicles.size() else int(battle.vehicles[0].team)
+		var target_models: Array[String] = []
+		for vehicle in battle.vehicles:
+			if not vehicle.alive or int(vehicle.team) == shooter_team:continue
+			var vehicle_id := str(vehicle.cfg.id)
+			if not target_models.has(vehicle_id):target_models.append(vehicle_id)
+		if not target_models.is_empty():model_view.call_deferred("prewarm_models", target_models)
 	body=Label.new()
 	body.add_theme_font_size_override("font_size",11)
 	body.add_theme_color_override("font_color",Color("edf0e8"))

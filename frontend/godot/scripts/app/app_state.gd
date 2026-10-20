@@ -3,7 +3,7 @@ const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var session=Config.new()
-var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":1.0,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","appearance":"dark","dataset_path":"","environment_profile":"enhanced_visual"}
+var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","appearance":"dark","dataset_path":"","environment_profile":"enhanced_visual"}
 var root_path=""
 var python=""
 var packaged_app=false
@@ -33,6 +33,12 @@ var marl_pid=-1
 var marl_output=""
 var marl_replay_path=""
 var marl_progress={}
+var dataset_validation_thread: Thread
+var dataset_validation_state := "idle"
+var dataset_validation_result: Dictionary = {}
+var dataset_validation_path := ""
+var marl_poll_elapsed := 0.0
+var job_poll_elapsed := 0.0
 func _ready():
 	OpenDayController.configure()
 	packaged_app=not OS.has_feature("editor")
@@ -211,6 +217,11 @@ func tr_format(key: String,args: Array) -> String:
 	return I18n.format(key,str(settings.get("language","en")),args)
 
 func validate_malecns_dataset(path: String) -> Dictionary:
+	var result := _run_malecns_dataset_check(path)
+	_apply_malecns_dataset_result(path, result)
+	return result
+
+func _run_malecns_dataset_check(path: String) -> Dictionary:
 	if path.strip_edges()=="":return {"ready":false,"error":"Select a folder first"}
 	var args=PackedStringArray()
 	if packaged_app:args.append_array(["--check-data","--data-dir",path])
@@ -219,13 +230,28 @@ func validate_malecns_dataset(path: String) -> Dictionary:
 	var exit_code=OS.execute(python,args,output,true)
 	for line in output:
 		var parsed=JSON.parse_string(line)
-		if parsed is Dictionary:
-			if exit_code==0 and parsed.get("ready",false):
-				settings.dataset_path=path
-				OS.set_environment("FLY_DATA",path)
-				persist_settings()
-			return parsed
+		if parsed is Dictionary:return parsed if exit_code==0 else {"ready":false,"error":str(parsed.get("error","Dataset check failed (exit %d)" % exit_code))}
 	return {"ready":false,"error":"Dataset check failed (exit %d): %s" % [exit_code,"\n".join(output)]}
+
+func _apply_malecns_dataset_result(path: String, result: Dictionary) -> void:
+	if result.get("ready",false):
+		settings.dataset_path=path
+		OS.set_environment("FLY_DATA",path)
+		persist_settings()
+
+func request_malecns_dataset_validation(path: String) -> bool:
+	if dataset_validation_thread != null and dataset_validation_thread.is_started():return false
+	dataset_validation_path=path
+	dataset_validation_result={}
+	dataset_validation_state="checking"
+	dataset_validation_thread=Thread.new()
+	var error := dataset_validation_thread.start(Callable(self,"_run_malecns_dataset_check").bind(path))
+	if error != OK:
+		dataset_validation_thread=null
+		dataset_validation_state="error"
+		dataset_validation_result={"ready":false,"error":"Could not start the dataset check worker (%s)." % error}
+		return false
+	return true
 
 func set_dataset_path(path: String) -> void:
 	settings.dataset_path=path
@@ -535,18 +561,28 @@ func start_job(evaluate=false):
 	else:job_pid=OS.create_process(python,[root_path.path_join("tools/app_job.py"),job_path.path_join("job.json")])
 	backend_state="BUSY"
 	show_page("JobProgress")
-func _process(_dt):
+func _process(dt):
+	if dataset_validation_thread != null and dataset_validation_thread.is_started() and not dataset_validation_thread.is_alive():
+		dataset_validation_result=dataset_validation_thread.wait_to_finish()
+		_apply_malecns_dataset_result(dataset_validation_path,dataset_validation_result)
+		dataset_validation_state="ready" if dataset_validation_result.get("ready",false) else "error"
+		dataset_validation_thread=null
+	marl_poll_elapsed += dt
+	job_poll_elapsed += dt
 	if marl_pid>0:
-		var progress=read_json(marl_output.path_join("progress.json"))
-		if not progress.is_empty():marl_progress=progress
-		if not OS.is_process_running(marl_pid):
-			marl_pid=-1
-			var has_result=FileAccess.file_exists(marl_output.path_join("summary.json")) or FileAccess.file_exists(marl_output.path_join("manifest.json"))
-			if str(marl_progress.get("state","")) not in ["error","cancelled"]:marl_progress["state"]="complete" if has_result else "error"
-			if not has_result and not marl_progress.has("message"):marl_progress["message"]="Experiment process exited without writing a result manifest."
+		if marl_poll_elapsed >= .2:
+			marl_poll_elapsed = fmod(marl_poll_elapsed,.2)
+			var progress=read_json(marl_output.path_join("progress.json"))
+			if not progress.is_empty():marl_progress=progress
+			if not OS.is_process_running(marl_pid):
+				marl_pid=-1
+				var has_result=FileAccess.file_exists(marl_output.path_join("summary.json")) or FileAccess.file_exists(marl_output.path_join("manifest.json"))
+				if str(marl_progress.get("state","")) not in ["error","cancelled"]:marl_progress["state"]="complete" if has_result else "error"
+				if not has_result and not marl_progress.has("message"):marl_progress["message"]="Experiment process exited without writing a result manifest."
 		if current_page=="MarlLaboratory" and is_instance_valid(view) and view.has_method("update_marl_status"):
 			view.update_marl_status(marl_progress,marl_output)
-	if current_page=="JobProgress" and job_path!="":
+	if current_page=="JobProgress" and job_path!="" and job_poll_elapsed >= .2:
+		job_poll_elapsed = fmod(job_poll_elapsed,.2)
 		var state=read_json(job_path.path_join("progress.json"))
 		if state.get("state","") in ["complete","cancelled","error"]:
 			backend_state="NOT REQUIRED"

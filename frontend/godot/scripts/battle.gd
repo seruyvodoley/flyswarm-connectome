@@ -35,6 +35,15 @@ var effects=[]
 var effect_quad_cache: Dictionary = {}
 var effect_material_cache: Dictionary = {}
 var impact_particle_pool: Array = []
+var impact_particle_pool_limit := 16
+var effect_mesh_pool: Array[MeshInstance3D] = []
+var effect_mesh_pool_limit := 64
+var shell_visual_pool: Array[MeshInstance3D] = []
+var shell_visual_pool_limit := 24
+var vehicle_status_refresh_elapsed := 0.0
+var vehicle_status_camera_mode := -1
+var vehicle_status_selected := -1
+var vehicle_status_impact_visible := false
 var impact_particle_process: ParticleProcessMaterial
 var impact_particle_quad: QuadMesh
 var impact_particle_material: ShaderMaterial
@@ -681,6 +690,9 @@ func _ready():
 	update_selection_buttons()
 	refresh_comm_panel()
 	if is_demo:setup_demo_ui(canvas)
+	# Allocate reusable combat visuals before the first player shot/impact. This
+	# keeps scene-tree and particle-node construction out of the combat hot path.
+	call_deferred("_prewarm_combat_vfx")
 
 	if requires_brain: bridge.connect_backend(int(option("--port","8765")))
 	record_path=option("--record","")
@@ -887,6 +899,9 @@ func demo_male_cns_trace_summary() -> Dictionary:
 func update_vehicle_status():
 	if not is_instance_valid(vehicle_status_panel):return
 	var replaced_by_demo_impact=is_demo and is_instance_valid(impact_killcam) and impact_killcam.visible
+	vehicle_status_camera_mode = camera_mode
+	vehicle_status_selected = selected
+	vehicle_status_impact_visible = replaced_by_demo_impact
 	vehicle_status_panel.visible=camera_mode in [1,2] and not range_killcam_active and not replaced_by_demo_impact and selected>=0 and selected<vehicles.size()
 	if not vehicle_status_panel.visible:return
 	var v=vehicles[selected]
@@ -1484,10 +1499,11 @@ func fire(v):
 	research_shot_seq+=1
 	var shot_id="%s:%08d" % [option("--run-id","interactive"),research_shot_seq]
 	_ensure_combat_vfx_resources()
-	var vis=MeshInstance3D.new()
+	var vis: MeshInstance3D = shell_visual_pool.pop_back() if not shell_visual_pool.is_empty() else MeshInstance3D.new()
+	if vis.get_parent() == null:add_child(vis)
 	vis.mesh=shell_visual_mesh
 	vis.material_override=shell_visual_material
-	add_child(vis)
+	vis.visible=true
 	vis.position=p
 	vis.look_at(p+dir,Vector3.UP)
 	vis.rotate_object_local(Vector3.RIGHT,-PI/2.0)
@@ -1574,7 +1590,7 @@ func step_shells(dt: float):
 		if not hit.is_empty() or s.age>8 or s.distance>2500:
 			if hit.is_empty():
 				record_research_event("projectile_expired",{"shot_id":str(s.get("shot_id","")),"shooter_id":int(s.owner),"flight_distance_m":float(s.distance),"flight_time_s":float(s.age),"reason":"age_limit" if s.age>8 else "range_limit"})
-			s.visual.queue_free()
+			_release_shell_visual(s.visual)
 			shells.remove_at(i)
 		else:
 			s.position=to
@@ -2166,7 +2182,9 @@ func effect(
 			return
 
 	_ensure_combat_vfx_resources()
-	var mesh=MeshInstance3D.new()
+	var mesh: MeshInstance3D = effect_mesh_pool.pop_back() if not effect_mesh_pool.is_empty() else MeshInstance3D.new()
+	if mesh.get_parent() == null:add_child(mesh)
+	mesh.visible=true
 	var mesh_key=snappedf(size,0.01)
 	if not effect_quad_cache.has(mesh_key):
 		var quad=QuadMesh.new();quad.size=Vector2(size*2.0,size*2.0);effect_quad_cache[mesh_key]=quad
@@ -2183,7 +2201,6 @@ func effect(
 	var material: ShaderMaterial=effect_material_cache[material_key]
 	mesh.material_override=material
 
-	add_child(mesh)
 	mesh.global_position=p
 
 	effects.append({
@@ -2219,6 +2236,61 @@ func _ensure_combat_vfx_resources() -> void:
 		impact_particle_process=ParticleProcessMaterial.new();impact_particle_process.direction=Vector3(0,1,0);impact_particle_process.spread=180;impact_particle_process.initial_velocity_min=1.6;impact_particle_process.initial_velocity_max=4.8;impact_particle_process.gravity=Vector3(0,-2.6,0);impact_particle_process.scale_min=.22;impact_particle_process.scale_max=.58
 		impact_particle_quad=QuadMesh.new();impact_particle_quad.size=Vector2(.7,.7)
 		impact_particle_material=ShaderMaterial.new();impact_particle_material.shader=EffectSpriteShader;impact_particle_material.set_shader_parameter("tint",Color(.29,.25,.19,.76));impact_particle_material.set_shader_parameter("irregularity",.36)
+
+func _prewarm_combat_vfx() -> void:
+	_ensure_combat_vfx_resources()
+	var created_nodes := 0
+	for _index in effect_mesh_pool_limit:
+		var mesh := MeshInstance3D.new()
+		mesh.name = "PooledCombatEffect"
+		mesh.visible = false
+		add_child(mesh)
+		effect_mesh_pool.append(mesh)
+		created_nodes += 1
+		if created_nodes % 8 == 0:await get_tree().process_frame
+	for _index in shell_visual_pool_limit:
+		var mesh := MeshInstance3D.new()
+		mesh.name = "PooledShellVisual"
+		mesh.mesh = shell_visual_mesh
+		mesh.material_override = shell_visual_material
+		mesh.visible = false
+		add_child(mesh)
+		shell_visual_pool.append(mesh)
+		created_nodes += 1
+		if created_nodes % 8 == 0:await get_tree().process_frame
+	for _index in impact_particle_pool_limit:
+		var particles := GPUParticles3D.new()
+		particles.name = "PooledImpactBurst"
+		particles.process_material = impact_particle_process
+		particles.draw_pass_1 = impact_particle_quad
+		particles.material_override = impact_particle_material
+		particles.one_shot = true
+		particles.explosiveness = .92
+		particles.emitting = false
+		particles.visible = false
+		add_child(particles)
+		impact_particle_pool.append(particles)
+		created_nodes += 1
+		if created_nodes % 8 == 0:await get_tree().process_frame
+
+func _release_shell_visual(mesh: MeshInstance3D) -> void:
+	if not is_instance_valid(mesh):return
+	mesh.visible=false
+	mesh.position=Vector3.ZERO
+	if shell_visual_pool.size() < shell_visual_pool_limit:
+		shell_visual_pool.append(mesh)
+	else:
+		mesh.queue_free()
+
+func _release_effect_mesh(mesh: MeshInstance3D) -> void:
+	if not is_instance_valid(mesh):return
+	mesh.visible=false
+	mesh.scale=Vector3.ONE
+	mesh.position=Vector3.ZERO
+	if effect_mesh_pool.size() < effect_mesh_pool_limit:
+		effect_mesh_pool.append(mesh)
+	else:
+		mesh.queue_free()
 
 
 func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
@@ -2409,7 +2481,10 @@ func _process(dt):
 		if fx.get("particles",false):
 			if float(fx["life"])<=0.0:
 				var particles: GPUParticles3D=fx["node"]
-				particles.emitting=false;particles.visible=false;impact_particle_pool.append(particles);effects.remove_at(i)
+				particles.emitting=false;particles.visible=false
+				if impact_particle_pool.size() < impact_particle_pool_limit:impact_particle_pool.append(particles)
+				else:particles.queue_free()
+				effects.remove_at(i)
 			continue
 
 		var initial=maxf(
@@ -2456,7 +2531,7 @@ func _process(dt):
 			material.albedo_color=colour
 
 		if float(fx["life"])<=0.0:
-			fx["node"].queue_free()
+			_release_effect_mesh(fx["node"])
 			effects.remove_at(i)
 	if range_feedback_timer>0.0:
 		range_feedback_timer=maxf(0.0,range_feedback_timer-dt)
@@ -2478,7 +2553,13 @@ func _process(dt):
 	# Combat and collision queries continue using fixed-tick transforms.
 	var render_transform: Transform3D=v.get_global_transform_interpolated()
 	var render_position: Vector3=render_transform.origin
-	update_vehicle_status()
+	vehicle_status_refresh_elapsed += dt
+	var status_context_changed = camera_mode != vehicle_status_camera_mode or selected != vehicle_status_selected
+	var impact_report_visible = is_demo and is_instance_valid(impact_killcam) and impact_killcam.visible
+	status_context_changed = status_context_changed or impact_report_visible != vehicle_status_impact_visible
+	if status_context_changed or vehicle_status_refresh_elapsed >= .1:
+		vehicle_status_refresh_elapsed = fmod(vehicle_status_refresh_elapsed, .1)
+		update_vehicle_status()
 	if is_instance_valid(impact_killcam) and impact_killcam.visible and (finished_report or ended or camera_mode not in [1,2] or impact_killcam.source_id!=selected):
 		impact_killcam.dismiss()
 	if camera_mode in [0,3] and is_instance_valid(range_killcam_panel):range_killcam_panel.visible=false

@@ -7,6 +7,8 @@ const OUTPUT_DIR := "res://../../artifacts/performance"
 const WARMUP_SECONDS := 5.0
 
 var frame_ms: Array[float] = []
+var shot_frame_ms: Array[float] = []
+var impact_frame_ms: Array[float] = []
 var process_ms: Array[float] = []
 var physics_ms: Array[float] = []
 var draw_calls: Array[float] = []
@@ -20,6 +22,8 @@ var disabled_previews: Array[String] = []
 var graphics_overrides := {}
 var last_brain_response := -1
 var preview_rate_override := -1.0
+var exercise_fire := false
+var camera_override := -1
 
 func _initialize() -> void:
 	call_deferred("run")
@@ -41,6 +45,10 @@ func run() -> void:
 			graphics_overrides["shadows"] = arg.trim_prefix("--shadows=") != "off"
 		elif arg.begins_with("--preview-rate="):
 			preview_rate_override = maxf(0.0, float(arg.trim_prefix("--preview-rate=")))
+		elif arg == "--exercise-fire":
+			exercise_fire = true
+		elif arg.begins_with("--camera="):
+			camera_override = clampi(int(arg.trim_prefix("--camera=")), 0, 3)
 	if mode not in ["menu", "battle-rule", "battle-brain"]:
 		push_error("Unsupported profile mode: %s" % mode)
 		quit(2)
@@ -79,7 +87,12 @@ func run() -> void:
 			quit(1)
 			return
 	await _wait_seconds(WARMUP_SECONDS)
+	if camera_override >= 0 and is_instance_valid(app.battle):
+		app.battle.camera_mode = camera_override
+		app.battle.last_camera_mode = -1
 	frame_ms.clear()
+	shot_frame_ms.clear()
+	impact_frame_ms.clear()
 	process_ms.clear()
 	physics_ms.clear()
 	draw_calls.clear()
@@ -104,11 +117,21 @@ func run() -> void:
 	_sample_started_usec = Time.get_ticks_usec()
 	var started := _sample_started_usec
 	while float(Time.get_ticks_usec() - started) / 1000000.0 < seconds:
+		if exercise_fire and mode == "battle-rule" and is_instance_valid(app.battle) and app.battle.sim_time > 4.0:
+			# Synthetic fire input exercises the same fire -> projectile -> hit path;
+			# it is a repeatable profiling stimulus, not a controller test.
+			app.battle.mouse_fire_pending = true
+		var shots_before := _combat_event_count(app.battle, "shots") if is_instance_valid(app.battle) else 0
+		var impacts_before := _combat_event_count(app.battle, "impacts") if is_instance_valid(app.battle) else 0
 		var frame_started := Time.get_ticks_usec()
 		await process_frame
 		if mode.begins_with("battle") and is_instance_valid(app.battle) and app.battle.finished_report:
 			break
-		frame_ms.append(float(Time.get_ticks_usec() - frame_started) / 1000.0)
+		var elapsed_frame_ms := float(Time.get_ticks_usec() - frame_started) / 1000.0
+		frame_ms.append(elapsed_frame_ms)
+		if is_instance_valid(app.battle):
+			if _combat_event_count(app.battle, "shots") > shots_before:shot_frame_ms.append(elapsed_frame_ms)
+			if _combat_event_count(app.battle, "impacts") > impacts_before:impact_frame_ms.append(elapsed_frame_ms)
 		if is_instance_valid(app.battle) and app.battle.bridge.responses_received != last_brain_response:
 			last_brain_response = app.battle.bridge.responses_received
 			var tick_ms = app.battle.bridge.last_reply.get("tick_ms", null)
@@ -144,6 +167,12 @@ func _wait_seconds(seconds: float) -> void:
 func _sample(monitor: int, target: Array[float]) -> void:
 	target.append(float(Performance.get_monitor(monitor)))
 
+func _combat_event_count(battle: Node, event_kind: String) -> int:
+	var count := 0
+	for vehicle in battle.vehicles:
+		count += int(vehicle.metrics.get("shots", 0)) if event_kind == "shots" else vehicle.impact_history.size()
+	return count
+
 func _summary(values: Array[float]) -> Dictionary:
 	if values.is_empty():
 		return {"available": false}
@@ -152,7 +181,8 @@ func _summary(values: Array[float]) -> Dictionary:
 	var total := 0.0
 	for value in values:
 		total += value
-	return {"mean": total / values.size(), "p99": ordered[mini(ordered.size() - 1, int(ceil(ordered.size() * 0.99))) - 1], "max": ordered[-1]}
+	var p99_index := clampi(int(ceil(float(ordered.size()) * 0.99)) - 1, 0, ordered.size() - 1)
+	return {"mean": total / values.size(), "p99": ordered[p99_index], "max": ordered[-1]}
 
 func _report(mode: String, seconds: float, app: Node) -> Dictionary:
 	var size := DisplayServer.window_get_size()
@@ -170,6 +200,12 @@ func _report(mode: String, seconds: float, app: Node) -> Dictionary:
 		"sampled_frames": frame_ms.size(),
 		"presentation_fps": presentation_hz,
 		"frame_ms": _summary(frame_ms),
+		"shot_frame_count": shot_frame_ms.size(),
+		"shot_frame_ms": _summary(shot_frame_ms),
+		"impact_frame_count": impact_frame_ms.size(),
+		"impact_frame_ms": _summary(impact_frame_ms),
+		"synthetic_fire_input": exercise_fire,
+		"camera_override": camera_override,
 		"process_ms": _summary(_to_milliseconds(process_ms)),
 		"physics_ms": _summary(_to_milliseconds(physics_ms)),
 		"draw_calls": _summary(draw_calls),

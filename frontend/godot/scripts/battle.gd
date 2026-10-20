@@ -753,7 +753,7 @@ func setup_demo_ui(canvas: CanvasLayer):
 	demo_brain_preview=FlyBrainPreview.new();demo_brain_preview.custom_minimum_size=Vector2(270,148);demo_brain_preview.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;brain_box.add_child(demo_brain_preview)
 	var brain_caption=Label.new();brain_caption.text="СХЕМАТИЧЕСКАЯ ВИЗУАЛИЗАЦИЯ MALECNS" if str(AppState.settings.language)=="ru" else "SCHEMATIC MALECNS VISUALIZATION";brain_caption.add_theme_font_size_override("font_size",10);brain_caption.add_theme_color_override("font_color",Color("c9cfbf"));brain_box.add_child(brain_caption)
 	demo_brain_text=Label.new();demo_brain_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_brain_text.add_theme_font_size_override("font_size",13);demo_brain_text.add_theme_color_override("font_color",Color("e4e8dc"));brain_box.add_child(demo_brain_text);canvas.add_child(demo_brain_panel)
-	demo_intro=Label.new();demo_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);demo_intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_intro.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_intro.add_theme_font_size_override("font_size",42);demo_intro.add_theme_color_override("font_color",Color("ead58f"));demo_intro.add_theme_color_override("font_shadow_color",Color.BLACK);demo_intro.add_theme_constant_override("shadow_offset_x",3);demo_intro.add_theme_constant_override("shadow_offset_y",3);demo_intro.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_intro)
+	demo_intro=Label.new();demo_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);demo_intro.offset_left=375;demo_intro.offset_right=-280;demo_intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_intro.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_intro.add_theme_font_size_override("font_size",32);demo_intro.add_theme_color_override("font_color",Color("ead58f"));demo_intro.add_theme_color_override("font_shadow_color",Color.BLACK);demo_intro.add_theme_constant_override("shadow_offset_x",3);demo_intro.add_theme_constant_override("shadow_offset_y",3);demo_intro.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_intro)
 	vehicles[8].get_node("Identification").text="🪰 FLY-01"
 
 func initialize_demo_controller() -> void:
@@ -2609,7 +2609,8 @@ func _process(dt):
 		var target_fov=42.0 if is_demo and demo_sniper_mode else 62.0
 		camera.fov=move_toward(camera.fov,target_fov,45.0*dt) if is_demo else 62.0
 		var rendered_turret: Transform3D=v.turret.get_global_transform_interpolated()
-		var demo_forward=demo_camera_forward(v) if is_demo else Vector3(rendered_turret.basis.z.x,0,rendered_turret.basis.z.z).normalized()
+		# Keep camera orientation on the same interpolated hull transform as the tank mesh.
+		var demo_forward=Vector3(render_transform.basis.z.x,0,render_transform.basis.z.z).normalized() if is_demo else Vector3(rendered_turret.basis.z.x,0,rendered_turret.basis.z.z).normalized()
 		# Keep the selected aim point attached to the vehicle's local frame. A
 		# fixed world point drifts behind a moving tank and makes the camera
 		# swing around to chase it, which reads as jitter and loses the vehicle.

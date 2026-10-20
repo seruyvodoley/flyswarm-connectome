@@ -172,6 +172,13 @@ func run():
 	battle.paused=true
 	var connected_controllers=Input.get_connected_joypads()
 	check(battle.demo_gamepad_active==not connected_controllers.is_empty(),"Open Day automatically selects a connected joypad when present")
+	check(battle.demo_intro.autowrap_mode==TextServer.AUTOWRAP_WORD_SMART and battle.demo_intro.offset_left==375 and battle.demo_intro.offset_right==-280,"Open Day intro instructions wrap inside a centered safe area")
+	if capture_enabled:
+		battle.demo_intro_left=0.0
+		battle.demo_intro.text="ТВОЙ ТАНК: ИС-2 (обр. 1944)\nЛЕВЫЙ СТИК — ДВИЖЕНИЕ · ПРАВЫЙ — ВЗГЛЯД И ПРИЦЕЛ · L2 — ПРИБЛИЖЕНИЕ · R2 — ВЫСТРЕЛ"
+		battle.demo_intro.visible=true
+		await capture("battle-intro-centered-1280x720")
+		battle.demo_intro.visible=false
 	print("OPENDAY CONTROLLER connected=",connected_controllers," active=",battle.demo_gamepad_active," name=",Input.get_joy_name(battle.demo_controller_device) if battle.demo_controller_device>=0 else "mouse fallback")
 	if battle.demo_gamepad_active:
 		var player_vehicle=battle.vehicles[0]

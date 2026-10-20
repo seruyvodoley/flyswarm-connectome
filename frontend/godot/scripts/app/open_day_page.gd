@@ -1,4 +1,5 @@
 extends Control
+const DesignSystem = preload("res://scripts/app/design_system.gd")
 @export var page="OpenDayMain"
 const FlyPreview=preload("res://scripts/app/fly_preview.gd")
 const VehiclePreview=preload("res://scripts/app/vehicle_preview.gd")
@@ -38,13 +39,10 @@ const RU_COPY={
 func _ready():
 	OpenDayController.configure()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var theme_resource=Theme.new();theme_resource.default_font_size=18
-	for kind in ["normal","hover","pressed","focus","disabled"]:
-		var style=StyleBoxFlat.new();style.bg_color=Color("253532") if kind=="hover" else Color("172622");style.border_color=Color("bba16c") if kind in ["hover","focus"] else Color("35433e");style.set_border_width_all(1);style.set_corner_radius_all(4);style.content_margin_left=18;style.content_margin_right=18;style.content_margin_top=11;style.content_margin_bottom=11;theme_resource.set_stylebox(kind,"Button",style)
-	theme=theme_resource
-	var bg=ColorRect.new();bg.color=Color("0b1414");bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
+	theme=DesignSystem.make_theme(18)
+	var bg=ColorRect.new();bg.color=DesignSystem.INK;bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,30)
+	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,28)
 	add_child(margin)
 	var root=VBoxContainer.new();root.add_theme_constant_override("separation",14);margin.add_child(root)
 	var top=HBoxContainer.new();root.add_child(top)
@@ -66,7 +64,7 @@ func copy_text(text: String) -> String:
 	return AppState.tr_text(text)
 func panel(parent: Node) -> VBoxContainer:
 	var frame=PanelContainer.new();frame.size_flags_vertical=Control.SIZE_EXPAND_FILL;frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	var style=StyleBoxFlat.new();style.bg_color=Color("101d1a");style.border_color=Color("3b5149");style.set_border_width_all(1);style.set_corner_radius_all(5);style.content_margin_left=20;style.content_margin_right=20;style.content_margin_top=18;style.content_margin_bottom=18;frame.add_theme_stylebox_override("panel",style);parent.add_child(frame)
+	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style());parent.add_child(frame)
 	var box=VBoxContainer.new();box.add_theme_constant_override("separation",12);frame.add_child(box);return box
 func preview(parent: Node,min_size=Vector2(480,340)):
 	var fly=FlyPreview.new();fly.custom_minimum_size=min_size;fly.size_flags_vertical=Control.SIZE_EXPAND_FILL;fly.size_flags_horizontal=Control.SIZE_EXPAND_FILL;parent.add_child(fly);return fly
@@ -89,7 +87,7 @@ func build_main(root: VBoxContainer):
 	label(center,"CHOOSE YOUR VEHICLE",13).modulate=Color("c1a573")
 	var choices=GridContainer.new();choices.columns=3;choices.add_theme_constant_override("h_separation",6);choices.add_theme_constant_override("v_separation",4);center.add_child(choices)
 	for choice in [["T-34-85","t34_85"],["IS-2 (44)","is2_1944"],["PANTHER G","panther_g"],["TIGER I","tiger_i"],["JAGDPANTHER","jagdpanther"],["SU-100","su100"]]:
-		var choice_button=button(choices,choice[0],func(id=choice[1]):select_vehicle(id));choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;choice_button.custom_minimum_size.y=36;choice_button.add_theme_font_size_override("font_size",15)
+		var choice_button=button(choices,choice[0],func(id=choice[1]):select_vehicle(id));choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;choice_button.custom_minimum_size.y=44;choice_button.add_theme_font_size_override("font_size",15)
 		vehicle_buttons[choice[1]]=choice_button
 	selected_vehicle_label=label(center,"T-34-85",12);selected_vehicle_label.modulate=Color("c1a573")
 	vehicle_preview=VehiclePreview.new();vehicle_preview.custom_minimum_size=Vector2(400,155);vehicle_preview.size_flags_horizontal=Control.SIZE_EXPAND_FILL;vehicle_preview.vehicle_id=selected_vehicle;center.add_child(vehicle_preview)
@@ -116,7 +114,19 @@ func _update_vehicle_selection() -> void:
 		selected_vehicle_label.text={"t34_85":"T-34-85","is2_1944":"IS-2 (1944)","panther_g":"PANTHER G","tiger_i":"TIGER I","jagdpanther":"JAGDPANTHER","su100":"SU-100"}.get(selected_vehicle,selected_vehicle)
 	for id in vehicle_buttons:
 		var choice_button: Button=vehicle_buttons[id]
-		choice_button.modulate=Color("ead58f") if id==selected_vehicle else Color.WHITE
+		choice_button.modulate=Color.WHITE
+		if id==selected_vehicle:
+			var selected_style := StyleBoxFlat.new()
+			selected_style.bg_color=Color("294044")
+			selected_style.border_color=DesignSystem.ACCENT
+			selected_style.set_border_width_all(2)
+			selected_style.set_corner_radius_all(10)
+			selected_style.content_margin_left=18;selected_style.content_margin_right=18;selected_style.content_margin_top=12;selected_style.content_margin_bottom=12
+			choice_button.add_theme_stylebox_override("normal",selected_style)
+			choice_button.add_theme_color_override("font_color",DesignSystem.ACCENT)
+		else:
+			choice_button.remove_theme_stylebox_override("normal")
+			choice_button.remove_theme_color_override("font_color")
 
 func build_how(root: VBoxContainer):
 	label(root,"HOW DOES THE FLY CONTROL A TANK?",34)

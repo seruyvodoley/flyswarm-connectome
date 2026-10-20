@@ -160,10 +160,16 @@ func _sync_viewport_size() -> void:
 		var depth := point.dot(toward_camera)
 		distance = maxf(distance, depth + absf(point.x) / tan_horizontal)
 		distance = maxf(distance, depth + absf(point.dot(camera_up)) / tan_vertical)
-	# Bounds corners are conservative for this long, narrow insect model; use a
-	# calibrated close crop while deriving it again for each viewing angle.
-	var rear_view_adjustment := clampf(-cos(deg_to_rad(yaw_degrees)), 0.0, 1.0)
-	distance = distance * lerpf(0.64, 0.92, rear_view_adjustment) + 0.08
+	# Bounds corners are conservative for this long, narrow insect model; use an
+	# angle-dependent fit so wings and legs stay inside during inspection.
+	var yaw_radians := deg_to_rad(yaw_degrees)
+	var side_view_adjustment := absf(sin(yaw_radians))
+	var rear_view_adjustment := clampf(-cos(yaw_radians), 0.0, 1.0)
+	var pitch_adjustment := clampf(absf(pitch_degrees) / MAX_PITCH_DEGREES, 0.0, 1.0)
+	var zoom_for_side := lerpf(0.55, 0.64, side_view_adjustment)
+	var zoom_for_rear := lerpf(0.55, 0.92, rear_view_adjustment)
+	var zoom_for_pitch := lerpf(0.55, 0.70, pitch_adjustment)
+	distance = distance * maxf(zoom_for_side, maxf(zoom_for_rear, zoom_for_pitch)) + 0.08
 	var look_target := Vector3(0.0, 0.0, 0.0)
 	preview_camera.position = look_target + Vector3(0.0, distance * 0.18, distance)
 	preview_camera.look_at(look_target, Vector3.UP)

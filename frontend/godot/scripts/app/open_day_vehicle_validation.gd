@@ -37,6 +37,30 @@ func run() -> void:
 		_fail("Open Day main page must expose its real fly and vehicle previews")
 		quit(1)
 		return
+	var fly_preview := fly as FlyPreview
+	if not is_instance_valid(fly_preview.fly_skeleton):
+		_fail("Ebony Drosophila preview must load its articulated skeleton")
+	else:
+		for bone_name in ["wing_left", "wing_right", "foreleg_upper_left", "foreleg_lower_left", "foreleg_upper_right", "foreleg_lower_right"]:
+			if fly_preview.fly_skeleton.find_bone(bone_name) < 0:
+				_fail("Ebony Drosophila preview is missing animation bone %s" % bone_name)
+	var visible_wing_count := 0
+	for node in fly_preview.viewport.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		if "wing" in mesh_node.name.to_lower():
+			visible_wing_count += 1
+			var wing_material := mesh_node.material_override as StandardMaterial3D
+			if wing_material == null or wing_material.albedo_color.b <= wing_material.albedo_color.r or not wing_material.emission_enabled:
+				_fail("Open Day fly wings must use the pale blue visible glass material")
+	if visible_wing_count < 2:
+		_fail("Open Day fly preview must display both pale blue wings")
+	await _frames(30)
+	if fly_preview.foreleg_bone_indices.size() == 4 and fly_preview.foreleg_bone_rest_rotations.size() == 4:
+		var current_foreleg_pose := fly_preview.fly_skeleton.get_bone_pose_rotation(fly_preview.foreleg_bone_indices[0])
+		if absf(current_foreleg_pose.dot(fly_preview.foreleg_bone_rest_rotations[0])) > 0.99999:
+			_fail("Ebony Drosophila forelegs must animate during the Open Day preview")
+	else:
+		_fail("Ebony Drosophila preview did not initialize both animated forelegs")
 	if not is_equal_approx(fly.custom_minimum_size.y, 155.0) or not is_equal_approx(tank.custom_minimum_size.y, 155.0):
 		_fail("Fly and vehicle preview panes must share the same minimum height")
 	if app.view.find_child("OpenDaySelectionControl", true, false) == null:

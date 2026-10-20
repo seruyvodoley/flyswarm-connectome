@@ -15,6 +15,13 @@ var floor_stage: MeshInstance3D
 var fit_bounds := AABB()
 var viewport: SubViewport
 var wing_pivots: Array[Node3D] = []
+var fly_skeleton: Skeleton3D
+var wing_bone_indices: Array[int] = []
+var wing_bone_rest_rotations: Array[Quaternion] = []
+var wing_bone_local_axes: Array[Vector3] = []
+var foreleg_bone_indices: Array[int] = []
+var foreleg_bone_rest_rotations: Array[Quaternion] = []
+var foreleg_bone_local_axes: Array[Vector3] = []
 var preview_elapsed := 0.0
 var yaw_degrees := INITIAL_YAW_DEGREES
 var pitch_degrees := 0.0
@@ -85,17 +92,58 @@ func _ready() -> void:
 		push_error("Missing FlySwarm Drosophila preview model: fly.glb")
 		return
 	var fly_model := fly_scene.instantiate() as Node3D
-	fly_model.name = "DrosophilaMaleModel"
+	fly_model.name = "DrosophilaModel"
 	orientation_correction.add_child(fly_model)
-	for pivot_name in ["WingPivot_L", "WingPivot_R"]:
-		var pivot := fly_model.find_child(pivot_name, true, false) as Node3D
-		if is_instance_valid(pivot):
-			wing_pivots.append(pivot)
+	_apply_preview_wing_material(fly_model)
+	_setup_wing_animation(fly_model)
 	_center_and_fit_model(fly_root, fly_model, 3.2)
 	yaw_degrees = INITIAL_YAW_DEGREES
 	fly_root.rotation.y = deg_to_rad(yaw_degrees)
 	_sync_viewport_size()
 	_request_viewport_frame()
+
+func _apply_preview_wing_material(model: Node3D) -> void:
+	var wing_material := StandardMaterial3D.new()
+	wing_material.albedo_color = Color(0.68, 0.84, 1.0, 0.62)
+	wing_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wing_material.roughness = 0.58
+	wing_material.metallic = 0.0
+	wing_material.emission_enabled = true
+	wing_material.emission = Color(0.40, 0.64, 0.94)
+	wing_material.emission_energy_multiplier = 0.35
+	wing_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	wing_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		if "wing" in mesh_node.name.to_lower():
+			mesh_node.material_override = wing_material
+
+func _setup_wing_animation(model: Node3D) -> void:
+	var skeleton_nodes := model.find_children("*", "Skeleton3D", true, false)
+	fly_skeleton = skeleton_nodes[0] as Skeleton3D if not skeleton_nodes.is_empty() else null
+	if is_instance_valid(fly_skeleton):
+		for bone_name in ["wing_left", "wing_right"]:
+			var bone_index := fly_skeleton.find_bone(bone_name)
+			if bone_index < 0:
+				continue
+			wing_bone_indices.append(bone_index)
+			wing_bone_rest_rotations.append(fly_skeleton.get_bone_pose_rotation(bone_index))
+			var body_axis_local := fly_skeleton.get_bone_global_rest(bone_index).basis.inverse() * Vector3.BACK
+			wing_bone_local_axes.append(body_axis_local.normalized())
+		for bone_name in ["foreleg_upper_left", "foreleg_lower_left", "foreleg_upper_right", "foreleg_lower_right"]:
+			var bone_index := fly_skeleton.find_bone(bone_name)
+			if bone_index < 0:
+				continue
+			foreleg_bone_indices.append(bone_index)
+			foreleg_bone_rest_rotations.append(fly_skeleton.get_bone_pose_rotation(bone_index))
+			var flex_axis_local := fly_skeleton.get_bone_global_rest(bone_index).basis.inverse() * Vector3.UP
+			foreleg_bone_local_axes.append(flex_axis_local.normalized())
+		if not wing_bone_indices.is_empty():
+			return
+	for pivot_name in ["WingPivot_L", "WingPivot_R"]:
+		var pivot := model.find_child(pivot_name, true, false) as Node3D
+		if is_instance_valid(pivot):
+			wing_pivots.append(pivot)
 
 func _add_directional_light(rotation: Vector3, color: Color, energy: float, cast_shadows := false) -> void:
 	var light := DirectionalLight3D.new()
@@ -249,10 +297,27 @@ func _process(delta: float) -> void:
 			_sync_viewport_size()
 			preview_elapsed += delta
 			var flap := sin(preview_elapsed * 47.0) * 0.22
-			for index in wing_pivots.size():
-				var pivot := wing_pivots[index]
-				if is_instance_valid(pivot):
-					pivot.rotation.x = flap * (1.0 if index == 0 else -1.0)
+			if is_instance_valid(fly_skeleton) and not wing_bone_indices.is_empty():
+				for index in wing_bone_indices.size():
+					var side := 1.0 if index == 0 else -1.0
+					var flutter := Quaternion(wing_bone_local_axes[index], flap * side)
+					fly_skeleton.set_bone_pose_rotation(wing_bone_indices[index], wing_bone_rest_rotations[index] * flutter)
+				var groom_envelope := pow(maxf(0.0, sin(preview_elapsed * 0.72)), 6.0)
+				var rub := sin(preview_elapsed * 15.0) * groom_envelope
+				for index in foreleg_bone_indices.size():
+					var foreleg_side := -1.0 if index < 2 else 1.0
+					var bend := 0.04
+					if index % 2 == 0:
+						bend += groom_envelope * 0.17 + rub * 0.055
+					else:
+						bend += groom_envelope * 0.27 + rub * 0.10
+					var movement := Quaternion(foreleg_bone_local_axes[index], foreleg_side * bend)
+					fly_skeleton.set_bone_pose_rotation(foreleg_bone_indices[index], foreleg_bone_rest_rotations[index] * movement)
+			else:
+				for index in wing_pivots.size():
+					var pivot := wing_pivots[index]
+					if is_instance_valid(pivot):
+						pivot.rotation.x = flap * (1.0 if index == 0 else -1.0)
 			render_pending = true
 	if preview_render_hz <= 0.0:
 		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS

@@ -1,0 +1,97 @@
+{
+  "backend_state": "NOT REQUIRED",
+  "battle_simulation_seconds": 9.11999999999989,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 7488.0,
+    "mean": 7151.77090301003,
+    "p99": 7488.0
+  },
+  "frame_ms": {
+    "max": 28.554,
+    "mean": 16.7163260869565,
+    "p99": 20.364
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "ipc_latency_ms_series": {
+    "available": false
+  },
+  "male_cns": "not used",
+  "male_cns_request_count": 0,
+  "male_cns_response_count": 0,
+  "male_cns_tick_ms": null,
+  "male_cns_tick_ms_series": {
+    "available": false
+  },
+  "mode": "battle-rule",
+  "physics_ms": {
+    "max": 10.365,
+    "mean": 3.87010702341138,
+    "p99": 10.365
+  },
+  "presentation_fps": 59.7923764719998,
+  "preview_rate_hz": 30.0,
+  "process_ms": {
+    "max": 25.005,
+    "mean": 17.9889648829432,
+    "p99": 25.005
+  },
+  "rendered_objects": {
+    "max": 8503.0,
+    "mean": 8160.91471571906,
+    "p99": 8503.0
+  },
+  "rendered_primitives": {
+    "max": 6138532.0,
+    "mean": 6035552.44314381,
+    "p99": 6135564.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 10.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sample_neural_response_rate_hz": 0.0,
+  "sample_neural_responses": 0,
+  "sample_physics_steps": 456,
+  "sample_realtime_factor": 0.911883734823799,
+  "sample_simulation_elapsed_seconds": 9.11999999999989,
+  "sample_wall_elapsed_seconds": 10.001275,
+  "sampled_frames": 598,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "static_memory_bytes": {
+    "max": 350460479.0,
+    "mean": 349305416.73913,
+    "p99": 350460239.0
+  },
+  "subviewport_count": 0,
+  "video_memory_bytes": {
+    "max": 243875840.0,
+    "mean": 243849948.896321,
+    "p99": 243875840.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

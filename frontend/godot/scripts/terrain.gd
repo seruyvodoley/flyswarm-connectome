@@ -9,6 +9,8 @@ var map_seed = 1944
 var extent = 750.0
 var forest_center = Vector2(-380, -20)
 var forest_radius = 170.0
+var forest_zones:Array[Dictionary]=[]
+const HistoricalEnvironmentScript=preload("res://scripts/maps/historical_environment.gd")
 
 func height_at(x: float, z: float) -> float:
 	if demo_mode:
@@ -89,7 +91,7 @@ func build(is_training: bool, seed_value: int, size: float):
 		return
 	var st=SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var steps=100 if environment_profile == "legacy" else (200 if environment_profile == "enhanced_visual" else 180)
+	var steps=100 if environment_profile == "legacy" else (128 if environment_profile == "historical_krasny" else (200 if environment_profile == "enhanced_visual" else 180))
 	var spacing=size/steps
 	# Cache the regular height grid once. The old path recomputed five height
 	# samples for every duplicated triangle vertex (nearly a million terrain
@@ -139,8 +141,12 @@ func build(is_training: bool, seed_value: int, size: float):
 	terrain_mesh.name="FieldGround"
 	terrain_mesh.mesh=st.commit()
 	var m=ShaderMaterial.new()
-	m.shader=load("res://shaders/field_ground.gdshader") if environment_profile != "legacy" else load("res://shaders/ground.gdshader")
-	if environment_profile != "legacy":
+	if environment_profile=="historical_krasny":
+		m.shader=load("res://shaders/historical_ground.gdshader")
+		_configure_historical_ground(m)
+	else:
+		m.shader=load("res://shaders/field_ground.gdshader") if environment_profile != "legacy" else load("res://shaders/ground.gdshader")
+	if environment_profile != "legacy" and environment_profile!="historical_krasny":
 		_configure_field_material(m)
 	terrain_mesh.material_override=m
 	add_child(terrain_mesh)
@@ -148,7 +154,13 @@ func build(is_training: bool, seed_value: int, size: float):
 		_create_legacy_resolution_collision()
 	else:
 		terrain_mesh.create_trimesh_collision()
-	if range_flat or environment_profile != "legacy":return
+	if range_flat:return
+	if environment_profile=="historical_krasny" and not training:
+		var historical_environment:Node3D=HistoricalEnvironmentScript.new()
+		add_child(historical_environment)
+		historical_environment.build(self,vegetation_density,map_seed)
+		return
+	if environment_profile != "legacy":return
 	var rng=RandomNumberGenerator.new()
 	rng.seed=map_seed
 	for i in range(18 if not training else 4):
@@ -268,6 +280,8 @@ func forest_blocks(a: Vector3,b: Vector3) -> bool:
 	for i in range(20):
 		var p=a.lerp(b,(i+.5)/20.0)
 		var blocked: bool = Vector2(p.x,p.z).distance_to(forest_center)<forest_radius
+		for zone in forest_zones:
+			if Vector2(p.x,p.z).distance_to(zone.center)<float(zone.radius):blocked=true;break
 		if environment_profile == "enhanced_physical":
 			for patch in _physical_forest_patches():
 				if Vector2(p.x,p.z).distance_to(patch[0]) < patch[1]:
@@ -294,3 +308,9 @@ func _configure_field_material(material_value: ShaderMaterial) -> void:
 	material_value.set_shader_parameter("environment_seed",float(map_seed % 997))
 	material_value.set_shader_parameter("physical_profile",environment_profile == "enhanced_physical")
 	material_value.set_shader_parameter("main_road_offset",-92.0)
+
+func _configure_historical_ground(material_value:ShaderMaterial)->void:
+	for key in ["grass_diffuse","grass_normal","grass_roughness","dirt_diffuse","dirt_normal","dirt_roughness","road_diffuse","road_normal","road_roughness"]:
+		var suffix:="diffuse" if key.ends_with("diffuse") else ("normal" if key.ends_with("normal") else "roughness")
+		var resource_path:String="res://assets/environment/textures/"+key.replace("_"+suffix,"")+"_"+suffix+"_1k.jpg"
+		material_value.set_shader_parameter(key,load(resource_path))

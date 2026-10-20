@@ -16,7 +16,10 @@ func run():
 	DirAccess.make_dir_recursive_absolute(screenshot_dir)
 	app=root.get_node("AppState");app.configure_demo("t34_85");app.session.seconds=1.0;app.launch()
 	check(await wait_battle(),"Real Open Day battle starts")
-	if not is_instance_valid(app.battle):quit(1);return
+	if not is_instance_valid(app.battle):
+		print("OPEN DAY REAL BACKEND START FAILURE state=",app.backend_state," message=",app.loading_message)
+		quit(1)
+		return
 	var battle=app.battle;var fly_start=battle.vehicles[8].position;battle.demo_intro_left=0;battle.demo_intro.visible=false
 	for attempt in range(150):
 		if app.current_page=="DemoResult" or (battle.bridge.connected() and battle.bridge.last_reply.has("traces")):break

@@ -273,7 +273,7 @@ func settings_menu():
 	toggle("Fullscreen",s.fullscreen,func(v):s.fullscreen=v)
 	toggle("Shadows",s.shadows,func(v):s.shadows=v)
 	dropdown("Vegetation density",["Sparse","Balanced","Full"],[.25,.6,1.0],s.vegetation,func(v):s.vegetation=v)
-	dropdown("Environment profile",["Enhanced visuals","Enhanced physical","Legacy experiment"],["enhanced_visual","enhanced_physical","legacy"],str(s.get("environment_profile","enhanced_visual")),func(v):s.environment_profile=v)
+	dropdown("Environment profile",["Enhanced visuals","Enhanced physical","Historical Krasny Valley","Legacy experiment"],["enhanced_visual","enhanced_physical","historical_krasny","legacy"],str(s.get("environment_profile","enhanced_visual")),func(v):s.environment_profile=v)
 	dropdown("LOD bias",["Performance","Balanced","Detail"],[2.0,1.0,.5],s.lod,func(v):s.lod=v)
 	dropdown("Effects quality",["Low","Medium","High"],[.3,.6,1.0],s.effects,func(v):s.effects=v)
 	toggle("Debug overlays by default",s.debug,func(v):s.debug=v)

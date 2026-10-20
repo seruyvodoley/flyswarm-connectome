@@ -320,7 +320,7 @@ func _ready():
 				scenario.blue[i]=replay_manifest.vehicles[i].id
 				scenario.red[i]=replay_manifest.vehicles[i+8].id
 		scenario.seed=int(replay_manifest.get("map_seed",scenario.seed))
-	if environment_profile not in ["legacy","enhanced_visual","enhanced_physical"]:
+	if environment_profile not in ["legacy","enhanced_visual","enhanced_physical","historical_krasny"]:
 		push_warning("Unknown environment profile '%s'; using legacy." % environment_profile)
 		environment_profile="legacy"
 	scenario.environment_profile=environment_profile
@@ -344,7 +344,7 @@ func _ready():
 		var demo_arena=DemoArena.instantiate()
 		demo_arena.configure(terrain,AppState.settings.vegetation if session_config!=null else 1.0)
 		add_child(demo_arena)
-	elif environment_profile != "legacy":
+	elif environment_profile in ["enhanced_visual","enhanced_physical"]:
 		var field_environment=BattlefieldEnvironment.instantiate()
 		field_environment.configure_world(terrain,AppState.settings.vegetation if session_config!=null else 1.0,environment_profile,is_range or training)
 		add_child(field_environment)

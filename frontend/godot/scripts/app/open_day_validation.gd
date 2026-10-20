@@ -208,6 +208,12 @@ func run():
 	check(battle.is_demo,"Demo runtime enabled")
 	check(battle.alive_count(0)==1 and battle.alive_count(1)==1,"Demo is isolated 1v1")
 	check(battle.terrain.height_at(0.0,0.0)<1.0,"Open Day keeps the valley traversable after the opening screen clears")
+	var demo_min=INF;var demo_max=-INF;var demo_grade=0.0
+	for x in range(-180,181,20):
+		for z in range(-160,161,20):
+			var height=battle.terrain.height_at(float(x),float(z));demo_min=minf(demo_min,height);demo_max=maxf(demo_max,height)
+			demo_grade=maxf(demo_grade,absf(battle.terrain.height_at(float(x)+5.0,float(z))-height)/5.0)
+	check(demo_max-demo_min>2.0 and demo_grade<.18,"Open Day has drivable shallow hull-down shoulders and swales instead of a flat plane")
 	check(battle.demo_smoke_screen!=null and battle.demo_smoke_screen.collision_layer==4 and battle.demo_smoke_screen.visible,"A visible collidable smoke curtain physically separates the teams at spawn")
 	check(battle.demo_sight_locked(battle.vehicles[0],battle.vehicles[8]),"Open Day enemy sensing is locked during the first ten seconds")
 	battle.sim_time=9.99

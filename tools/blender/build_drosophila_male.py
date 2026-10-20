@@ -31,7 +31,9 @@ def make_material(name, color, roughness=0.38, metallic=0.0, alpha=1.0, coat=0.0
         shader.inputs["Coat Weight"].default_value = coat
         shader.inputs["Coat Roughness"].default_value = 0.24
     if alpha < 1.0:
-        material.surface_render_method = "DITHERED"
+        # Blender's dithered transparency exported as a speckled membrane in
+        # the Godot preview. BLENDED maps to glTF alphaMode=BLEND.
+        material.surface_render_method = "BLENDED"
     material.use_backface_culling = False
     return material
 
@@ -44,13 +46,13 @@ def init_materials():
     DARK = make_material("Abdominal terminal segments", (0.105, 0.038, 0.026), 0.48, 0.01, coat=0.05)
     LEG = make_material("Legs · dark amber", (0.24, 0.105, 0.044), 0.5, 0.0, coat=0.035)
     JOINT = make_material("Leg joints", (0.15, 0.06, 0.03), 0.5)
-    EYE = make_material("Compound eye · deep carmine", (0.22, 0.008, 0.016), 0.31, 0.01, coat=0.2)
+    EYE = make_material("Compound eye · deep carmine", (0.22, 0.008, 0.016), 0.36, 0.005, coat=0.12)
     FACETS = [
-        make_material("Ommatidium · carmine", (0.36, 0.012, 0.022), 0.29, 0.005, coat=0.2),
-        make_material("Ommatidium · ruby", (0.22, 0.006, 0.014), 0.31, 0.005, coat=0.18),
-        make_material("Ommatidium · glint", (0.48, 0.035, 0.04), 0.27, 0.0, coat=0.22),
+        make_material("Ommatidium · carmine", (0.36, 0.012, 0.022), 0.34, 0.003, coat=0.12),
+        make_material("Ommatidium · ruby", (0.22, 0.006, 0.014), 0.36, 0.003, coat=0.11),
+        make_material("Ommatidium · glint", (0.48, 0.035, 0.04), 0.32, 0.0, coat=0.14),
     ]
-    WING = make_material("Wing membrane · translucent amber", (0.42, 0.35, 0.22), 0.58, 0.0, alpha=0.19)
+    WING = make_material("Wing membrane · translucent amber", (0.48, 0.40, 0.28), 0.66, 0.0, alpha=0.30)
     VEIN = make_material("Wing veins · ochre", (0.27, 0.15, 0.065), 0.56)
     BRISTLE = make_material("Sensory bristles", (0.105, 0.051, 0.026), 0.65)
     HALTERE = make_material("Halteres · amber", (0.56, 0.37, 0.17), 0.48, 0.0, coat=0.04)

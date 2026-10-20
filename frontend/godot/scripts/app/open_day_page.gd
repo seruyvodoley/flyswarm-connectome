@@ -13,6 +13,7 @@ var vehicle_buttons: Dictionary={}
 var selected_vehicle_label: Label
 var attract_phase=0
 var attract_clock=0.0
+
 const RU_COPY={
 	"OPEN DAY":"ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ","FLYSWARM":"FLYSWARM","A fly controls a tank.":"Муха управляет танком.",
 	"Fight a reconstructed model of the Drosophila nervous system.":"Сразись с реконструированной моделью нервной системы дрозофилы.",
@@ -21,6 +22,8 @@ const RU_COPY={
 	"This is Drosophila.":"Это дрозофила.","We use a reconstructed model of its nervous system to control an agent in a virtual environment.":"Реконструированная модель её нервной системы управляет агентом в виртуальном мире.",
 	"We use a reconstructed nervous system model to control an agent in a virtual world.":"Реконструированная модель нервной системы управляет агентом в виртуальном мире.",
 	"CHOOSE YOUR VEHICLE":"ВЫБЕРИ ТАНК","WHY A FLY?":"ПОЧЕМУ МУХА?","EYES":"ЗРИТЕЛЬНЫЕ СИГНАЛЫ",
+	"DROSOPHILA · 3D VIEW":"ДРОЗОФИЛА · 3D-ПРОСМОТР","VEHICLE · 3D VIEW":"ТЕХНИКА · 3D-ПРОСМОТР",
+	"DRAG TO INSPECT · DOUBLE-CLICK TO RESET":"ПЕРЕТАСКИВАЙ ДЛЯ ОСМОТРА · ДВОЙНОЙ ЩЕЛЧОК — СБРОС",
 	"Visual signals enter the reconstructed sensory pathways.":"Зрительные сигналы поступают в реконструированные сенсорные пути.","NERVOUS SYSTEM":"НЕРВНАЯ СИСТЕМА",
 	"The fixed MaleCNS model processes those signals.":"Зафиксированная модель MaleCNS обрабатывает сигналы.","MOVEMENT":"УПРАВЛЕНИЕ",
 	"Descending-neuron signals pass through an external engineered motor adapter.":"Сигналы нисходящих нейронов преобразует внешний инженерный адаптер.","START DEMO":"НАЧАТЬ ДЕМО","RESEARCH INTERFACE":"ИССЛЕДОВАТЕЛЬСКИЙ РЕЖИМ",
@@ -70,30 +73,62 @@ func panel(parent: Node) -> VBoxContainer:
 func preview(parent: Node,min_size=Vector2(480,340)):
 	var fly=FlyPreview.new();fly.custom_minimum_size=min_size;fly.size_flags_vertical=Control.SIZE_EXPAND_FILL;fly.size_flags_horizontal=Control.SIZE_EXPAND_FILL;parent.add_child(fly);return fly
 
+func preview_stage(parent: Node, title: String, preview_script: Script, min_size: Vector2, vehicle_id := "") -> Control:
+	var appearance := str(AppState.settings.get("appearance", "dark"))
+	var frame := PanelContainer.new()
+	frame.name = title.to_pascal_case().replace(" ", "") + "PreviewFrame"
+	frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	frame.size_flags_stretch_ratio = 1.0
+	frame.add_theme_stylebox_override("panel", DesignSystem.preview_frame_style(appearance))
+	parent.add_child(frame)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 3)
+	frame.add_child(content)
+	var heading := HBoxContainer.new()
+	content.add_child(heading)
+	var title_label := label(heading, title, 10)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.add_theme_color_override("font_color", DesignSystem.text_for(appearance))
+	var instructions := label(heading, "DRAG TO INSPECT · DOUBLE-CLICK TO RESET", 8)
+	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	instructions.autowrap_mode = TextServer.AUTOWRAP_OFF
+	instructions.add_theme_color_override("font_color", DesignSystem.muted_for(appearance))
+	var model = preview_script.new()
+	model.custom_minimum_size = min_size
+	model.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	model.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if not vehicle_id.is_empty():
+		model.vehicle_id = vehicle_id
+	content.add_child(model)
+	return model
+
 func build_main(root: VBoxContainer):
 	var columns=HBoxContainer.new();columns.size_flags_vertical=Control.SIZE_EXPAND_FILL;columns.add_theme_constant_override("separation",18);root.add_child(columns)
 	columns.name="OpenDayColumns"
-	var left=panel(columns);left.name="OpenDayLeft";left.custom_minimum_size.x=310
-	label(left,"OPEN DAY",14).modulate=Color("c1a573");label(left,"FLYSWARM",44);label(left,"A fly controls a tank.",27);label(left,"Fight a reconstructed model of the Drosophila nervous system.",16).modulate=Color("aebcb4")
+	var left=panel(columns);left.name="OpenDayLeft";left.custom_minimum_size.x=300;left.size_flags_stretch_ratio=0.80
+	label(left,"OPEN DAY",14).modulate=Color("c1a573");label(left,"FLYSWARM",44);label(left,"A fly controls a tank.",31);label(left,"Fight a reconstructed model of the Drosophila nervous system.",16).modulate=Color("aebcb4")
 	var start=button(left,"QUICK BATTLE: VISITOR VS FLY",func():AppState.start_demo(selected_vehicle));start.custom_minimum_size.y=72
 	button(left,"AUTONOMOUS BATTLE",func():AppState.configure("battle"))
 	button(left,"HOW IT WORKS",AppState.show_page.bind("HowItWorks"))
 	button(left,"TEST RANGE",func():AppState.configure("range"))
 	button(left,"REPLAYS",AppState.show_page.bind("ReplayBrowser"))
 	button(left,"SETTINGS",AppState.show_page.bind("Settings"))
-	var center=panel(columns);center.name="OpenDayCenter";center.custom_minimum_size.x=450
-	preview(center,Vector2(400,185))
-	label(center,"This is Drosophila.",20)
-	var summary=label(center,"We use a reconstructed nervous system model to control an agent in a virtual world.",14);summary.modulate=Color("aebcb4")
-	label(center,"CHOOSE YOUR VEHICLE",13).modulate=Color("c1a573")
-	var choices=GridContainer.new();choices.columns=3;choices.add_theme_constant_override("h_separation",6);choices.add_theme_constant_override("v_separation",4);center.add_child(choices)
+	var center=panel(columns);center.name="OpenDayCenter";center.custom_minimum_size.x=570;center.size_flags_stretch_ratio=1.50
+	center.add_theme_constant_override("separation", 6)
+	preview_stage(center,"DROSOPHILA · 3D VIEW",FlyPreview,Vector2(400,155))
+	var selection=VBoxContainer.new();selection.name="OpenDaySelectionControl";selection.size_flags_horizontal=Control.SIZE_EXPAND_FILL;selection.add_theme_constant_override("separation",6);center.add_child(selection)
+	var fly_caption=label(selection,"This is Drosophila.",20);fly_caption.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var summary=label(selection,"We use a reconstructed nervous system model to control an agent in a virtual world.",14);summary.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;summary.modulate=Color("aebcb4")
+	var choose_caption=label(selection,"CHOOSE YOUR VEHICLE",13);choose_caption.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;choose_caption.modulate=Color("c1a573")
+	var choices=GridContainer.new();choices.columns=3;choices.add_theme_constant_override("h_separation",6);choices.add_theme_constant_override("v_separation",4);selection.add_child(choices)
 	for choice in [["T-34-85","t34_85"],["IS-2 (44)","is2_1944"],["PANTHER G","panther_g"],["TIGER I","tiger_i"],["JAGDPANTHER","jagdpanther"],["SU-100","su100"]]:
 		var choice_button=button(choices,choice[0],func(id=choice[1]):select_vehicle(id));choice_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;choice_button.custom_minimum_size.y=44;choice_button.add_theme_font_size_override("font_size",15)
 		vehicle_buttons[choice[1]]=choice_button
-	selected_vehicle_label=label(center,"T-34-85",12);selected_vehicle_label.modulate=Color("c1a573")
-	vehicle_preview=VehiclePreview.new();vehicle_preview.custom_minimum_size=Vector2(400,155);vehicle_preview.size_flags_horizontal=Control.SIZE_EXPAND_FILL;vehicle_preview.vehicle_id=selected_vehicle;center.add_child(vehicle_preview)
+	selected_vehicle_label=label(selection,"T-34-85",12);selected_vehicle_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;selected_vehicle_label.modulate=Color("c1a573")
+	vehicle_preview=preview_stage(center,"VEHICLE · 3D VIEW",VehiclePreview,Vector2(400,155),selected_vehicle)
 	_update_vehicle_selection()
-	var right=panel(columns);right.name="OpenDayRight";right.custom_minimum_size.x=285
+	var right=panel(columns);right.name="OpenDayRight";right.custom_minimum_size.x=280;right.size_flags_stretch_ratio=0.80
 	label(right,"WHY A FLY?",22);label(right,"EYES",14).modulate=Color("c1a573");label(right,"Visual signals enter the reconstructed sensory pathways.",15)
 	label(right,"NERVOUS SYSTEM",14).modulate=Color("c1a573");label(right,"The fixed MaleCNS model processes those signals.",15)
 	label(right,"MOVEMENT",14).modulate=Color("c1a573");label(right,"Descending-neuron signals pass through an external engineered motor adapter.",15)
@@ -112,19 +147,21 @@ func select_vehicle(vehicle_id: String) -> void:
 
 func _update_vehicle_selection() -> void:
 	if is_instance_valid(selected_vehicle_label):
-		selected_vehicle_label.text={"t34_85":"T-34-85","is2_1944":"IS-2 (1944)","panther_g":"PANTHER G","tiger_i":"TIGER I","jagdpanther":"JAGDPANTHER","su100":"SU-100"}.get(selected_vehicle,selected_vehicle)
+		var vehicle_name: String = {"t34_85":"T-34-85","is2_1944":"IS-2 (1944)","panther_g":"PANTHER G","tiger_i":"TIGER I","jagdpanther":"JAGDPANTHER","su100":"SU-100"}.get(selected_vehicle,selected_vehicle)
+		selected_vehicle_label.text = ("ВЫБРАНО · " if str(AppState.settings.language) == "ru" else "SELECTED · ") + vehicle_name
+		selected_vehicle_label.add_theme_color_override("font_color", DesignSystem.text_for(str(AppState.settings.get("appearance", "dark"))))
 	for id in vehicle_buttons:
 		var choice_button: Button=vehicle_buttons[id]
 		choice_button.modulate=Color.WHITE
 		if id==selected_vehicle:
 			var selected_style := StyleBoxFlat.new()
-			selected_style.bg_color=Color("294044")
-			selected_style.border_color=DesignSystem.ACCENT
+			selected_style.bg_color=Color("34433d") if not DesignSystem.is_light(str(AppState.settings.get("appearance", "dark"))) else Color("e3e9dd")
+			selected_style.border_color=DesignSystem.gold_for(str(AppState.settings.get("appearance", "dark")))
 			selected_style.set_border_width_all(2)
 			selected_style.set_corner_radius_all(10)
 			selected_style.content_margin_left=18;selected_style.content_margin_right=18;selected_style.content_margin_top=12;selected_style.content_margin_bottom=12
 			choice_button.add_theme_stylebox_override("normal",selected_style)
-			choice_button.add_theme_color_override("font_color",DesignSystem.ACCENT)
+			choice_button.add_theme_color_override("font_color",DesignSystem.text_for(str(AppState.settings.get("appearance", "dark"))))
 		else:
 			choice_button.remove_theme_stylebox_override("normal")
 			choice_button.remove_theme_color_override("font_color")

@@ -120,6 +120,18 @@ static func panel_style(appearance: String = "dark") -> StyleBoxFlat:
 	style.content_margin_bottom = 20
 	return style
 
+static func preview_frame_style(appearance: String = "dark") -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("edf0ec") if is_light(appearance) else Color("303840")
+	style.border_color = Color("9ba39e") if is_light(appearance) else Color("626d75")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	return style
+
 static func tab_style(appearance: String, selected: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("ffffff") if is_light(appearance) and selected else Color("e5e8df") if is_light(appearance) else Color("2b352b") if selected else Color("202720")

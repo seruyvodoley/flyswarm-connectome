@@ -152,18 +152,32 @@ func result_outcome(human_alive: bool,fly_alive: bool) -> String:
 
 func _process(delta):
 	if page!="OpenDayMain":return
+	# The attract-mode advertisement must never obscure controller navigation,
+	# even when the player keeps the stick still while choosing a menu item.
+	if not Input.get_connected_joypads().is_empty():
+		attract_elapsed=0.0
+		attract_active=false
+		if is_instance_valid(attract_label):attract_label.get_parent().visible=false
+		return
 	attract_elapsed+=delta
 	if attract_elapsed>=30.0:
-		attract_active=true;attract_clock+=delta
+		attract_active=true
+		attract_clock+=delta
 		if attract_clock>=4.0:attract_clock=0;attract_phase=(attract_phase+1)%3
 		attract_label.get_parent().visible=true
 		attract_label.text=copy_text(["A FLY CONTROLS A TANK","REAL MALECNS ACTIVITY","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT"][attract_phase])
 
 func _input(event):
-	if handle_controller_navigation():return
-	if page=="OpenDayMain" and attract_active and event is InputEventMouseButton and event.pressed:
+	# Controller navigation belongs exclusively to AppState.
+	if page!="OpenDayMain":return
+	if attract_active and event is InputEventMouseButton and event.pressed:
 		get_viewport().set_input_as_handled()
 		AppState.start_demo(selected_vehicle)
+		return
+	if event is InputEventMouseMotion or event is InputEventKey:
+		attract_elapsed=0.0
+		attract_active=false
+		if is_instance_valid(attract_label):attract_label.get_parent().visible=false
 
 func focus_first_controller_button() -> void:
 	var buttons=controller_buttons()
@@ -175,25 +189,3 @@ func controller_buttons() -> Array[Button]:
 		if node is Button and node.visible and not node.disabled and node.focus_mode!=Control.FOCUS_NONE:buttons.append(node)
 	return buttons
 
-func handle_controller_navigation() -> bool:
-	if page not in ["OpenDayMain","HowItWorks","DemoResult"]:return false
-	var back=Input.is_action_just_pressed("od_back")
-	var confirm=Input.is_action_just_pressed("od_confirm")
-	var direction=AppState.menu_navigation_direction()
-	if not back and not confirm and direction==0:return false
-	get_viewport().set_input_as_handled()
-	if back:
-		if page=="OpenDayMain":AppState.research_menu()
-		else:AppState.open_day_menu()
-		return true
-	var buttons=controller_buttons()
-	if buttons.is_empty():return true
-	var focus=get_viewport().gui_get_focus_owner()
-	var current=buttons.find(focus)
-	if current<0:current=0
-	if direction!=0:
-		current=(current+direction+buttons.size())%buttons.size()
-		buttons[current].grab_focus()
-	elif confirm:
-		buttons[current].emit_signal("pressed")
-	return true

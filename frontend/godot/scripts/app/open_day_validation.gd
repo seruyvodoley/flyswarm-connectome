@@ -80,29 +80,45 @@ func run():
 		check(left!=null and center!=null and right!=null,"Three Open Day columns exist at "+str(size))
 		if left and center and right:
 			check(not left.get_global_rect().intersects(center.get_global_rect()) and not center.get_global_rect().intersects(right.get_global_rect()),"Open Day columns do not overlap at "+str(size))
+	# Directional menu navigation must follow the screen geometry, not the
+	# order in which buttons were added to the scene tree.
+	for page_name in ["MainMenu","OpenDayMain","HowItWorks","DemoResult","HistoricalBattleSetup","ResearchLab","TrainingMenu","TestRangeSetup","ReplayBrowser","Settings","LoadingScreen","ResultsScreen","PauseMenu","JobProgress","MarlLaboratory","MarlViewer"]:
+		app.show_page(page_name)
+		await process_frame
+		check(not app._menu_targets().is_empty(),"Focusable controller targets in "+page_name)
 	app.show_page("HowItWorks");await process_frame
 	var how_page=app.view
 	var how_buttons=how_page.controller_buttons()
-	check(how_buttons.size()==2,"How It Works provides a compact controller focus order")
+	check(how_buttons.size()==2,"How It Works has two horizontal menu actions")
 	if how_buttons.size()==2:
 		how_buttons[0].grab_focus()
-		var dpad=InputEventJoypadButton.new();dpad.device=0;dpad.button_index=JoyButton.JOY_BUTTON_DPAD_DOWN;dpad.pressed=true;Input.parse_input_event(dpad);await process_frame
-		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"D-pad advances exactly one focused Open Day menu button")
+		var dpad=InputEventJoypadButton.new()
+		dpad.device=0;dpad.button_index=JoyButton.JOY_BUTTON_DPAD_RIGHT;dpad.pressed=true
+		Input.parse_input_event(dpad);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"D-pad RIGHT reaches the adjacent button, not an unrelated row")
 		dpad.pressed=false;Input.parse_input_event(dpad);await process_frame
-		if not Input.get_connected_joypads().is_empty():
-			how_buttons[0].grab_focus()
-			var nav_stick=InputEventJoypadMotion.new();nav_stick.device=Input.get_connected_joypads()[0];nav_stick.axis=JoyAxis.JOY_AXIS_LEFT_Y;nav_stick.axis_value=.72;Input.parse_input_event(nav_stick);await process_frame
-			var first_stick_focus=root.get_viewport().gui_get_focus_owner()
-			nav_stick=InputEventJoypadMotion.new();nav_stick.device=Input.get_connected_joypads()[0];nav_stick.axis=JoyAxis.JOY_AXIS_LEFT_Y;nav_stick.axis_value=.78;Input.parse_input_event(nav_stick);await process_frame
-			check(first_stick_focus==how_buttons[1] and root.get_viewport().gui_get_focus_owner()==how_buttons[1],"Holding or gently varying the left stick advances only one menu item")
-			nav_stick.axis_value=0.0;Input.parse_input_event(nav_stick);await process_frame
-			nav_stick.axis_value=.76;Input.parse_input_event(nav_stick);await process_frame
-			check(root.get_viewport().gui_get_focus_owner()==how_buttons[0],"Returning the stick to neutral rearms one next menu step")
-		else:
-			print("OPEN DAY ANALOG NAVIGATION CHECK SKIPPED: no physical controller connected")
+		dpad.pressed=true;Input.parse_input_event(dpad);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"Navigation stays at the right boundary instead of wrapping across the screen")
+		dpad.pressed=false;Input.parse_input_event(dpad);await process_frame
+		# The analog input is synthesized even without a physical controller.
+		how_buttons[0].grab_focus()
+		var nav_stick=InputEventJoypadMotion.new()
+		nav_stick.device=0;nav_stick.axis=JoyAxis.JOY_AXIS_LEFT_X;nav_stick.axis_value=.76
+		Input.parse_input_event(nav_stick);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"First stick tilt advances exactly one cell to the right")
+		nav_stick.axis_value=.92;Input.parse_input_event(nav_stick);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"Held stick cannot move to another item")
+		nav_stick.axis_value=-.92;Input.parse_input_event(nav_stick);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[1],"Reversing without neutral does not create a second gesture")
+		nav_stick.axis_value=0.0;Input.parse_input_event(nav_stick);await process_frame
+		nav_stick.axis_value=-.76;Input.parse_input_event(nav_stick);await process_frame
+		check(root.get_viewport().gui_get_focus_owner()==how_buttons[0],"Return to neutral re-arms one move to the left")
+		nav_stick.axis_value=0.0;Input.parse_input_event(nav_stick);await process_frame
 		how_buttons[1].grab_focus()
-		var cross=InputEventJoypadButton.new();cross.device=0;cross.button_index=JoyButton.JOY_BUTTON_A;cross.pressed=true;Input.parse_input_event(cross);await process_frame
-		check(app.current_page=="OpenDayMain","Cross confirms one focused menu action without double activation")
+		var cross=InputEventJoypadButton.new()
+		cross.device=0;cross.button_index=JoyButton.JOY_BUTTON_A;cross.pressed=true
+		Input.parse_input_event(cross);await process_frame
+		check(app.current_page=="OpenDayMain","Cross/A confirms one focused menu action without double activation")
 		cross.pressed=false;Input.parse_input_event(cross);await process_frame
 		for _frame in 4:await process_frame
 	check(InputMap.has_action("od_move_forward") and InputMap.has_action("od_look_right") and InputMap.has_action("od_fire") and InputMap.has_action("od_zoom"),"Open Day registers named DualSense InputMap actions")
@@ -144,6 +160,13 @@ func run():
 	check(is_equal_approx(app.session.seconds,120.0),"Open Day starts with a two-minute battle limit")
 	var battle=load("res://scenes/Battle.tscn").instantiate();battle.session_config=app.session;root.add_child(battle)
 	for _frame in range(8):await process_frame
+	var pvp_pause_events=[0]
+	battle.pause_requested.connect(func():pvp_pause_events[0]+=1)
+	var circle=InputEventJoypadButton.new()
+	circle.device=0;circle.button_index=JoyButton.JOY_BUTTON_B;circle.pressed=true
+	battle._input(circle)
+	check(pvp_pause_events[0]==1,"Circle/B opens the PvP pause/exit menu")
+	circle.pressed=false
 	check(is_equal_approx(battle.time_limit,120.0),"The live Open Day battle honors the two-minute limit")
 	check(battle.demo_status.get_script()==load("res://scripts/app/demo_health_hud.gd"),"Open Day uses visual health bars instead of text hash meters")
 	battle.paused=true

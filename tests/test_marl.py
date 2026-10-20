@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import sys
+from unittest.mock import patch
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 from pettingzoo.test import parallel_api_test
@@ -9,7 +10,7 @@ from flyswarm.marl import FlySwarmParallelEnv
 from flyswarm.marl.policy import SharedPPOPolicy
 from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features,vehicle_profile
 from flyswarm.bridge.server import load_policy,ppo_features
-from flyswarm.marl.experiments import TeamGymnasiumEnv, run_random_baseline
+from flyswarm.marl.experiments import TeamGymnasiumEnv, run_random_baseline, train_sb3_ppo
 import json
 
 class MarlTests(unittest.TestCase):
@@ -101,4 +102,22 @@ class MarlTests(unittest.TestCase):
             self.assertEqual(final_state["tickets"],frames[-1]["tickets"])
             self.assertTrue((root/"baseline.csv").is_file())
             self.assertTrue((root/"summary.json").is_file())
+    def test_ppo_progress_reports_finalization_until_chart_is_ready(self):
+        from flyswarm.marl import experiments
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/"ppo"
+            progress=output/"progress.json"
+            observed=[]
+            def render_chart(csv_path,png_path):
+                state=json.loads(progress.read_text())
+                observed.append(state["state"])
+                self.assertEqual(state["phase"],"artifacts")
+                self.assertTrue(csv_path.is_file())
+            with patch.object(experiments,"_plot_learning_curve",side_effect=render_chart):
+                result=train_sb3_ppo(output,timesteps=16,seed=41,max_steps=2,progress_path=progress)
+            state=json.loads(progress.read_text())
+            self.assertEqual(observed,["finalizing"])
+            self.assertEqual(state["state"],"complete")
+            self.assertEqual(state["timesteps"],16)
+            self.assertTrue(Path(result["checkpoint"]).is_file())
 if __name__=="__main__":unittest.main()

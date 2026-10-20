@@ -104,13 +104,16 @@ func _ready() -> void:
 
 func _apply_preview_wing_material(model: Node3D) -> void:
 	var wing_material := StandardMaterial3D.new()
-	wing_material.albedo_color = Color(0.96, 0.97, 1.0, 1.0)
+	# The source GLB's membrane is tinted blue-grey. Override it with a neutral,
+	# emissive white so it stays visibly white against both the dark body and
+	# the preview's dark studio background.
+	wing_material.albedo_color = Color.WHITE
 	wing_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	wing_material.roughness = 0.58
+	wing_material.roughness = 0.82
 	wing_material.metallic = 0.0
 	wing_material.emission_enabled = true
-	wing_material.emission = Color(0.72, 0.75, 0.82)
-	wing_material.emission_energy_multiplier = 0.3
+	wing_material.emission = Color.WHITE
+	wing_material.emission_energy_multiplier = 0.9
 	wing_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	wing_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wing_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY

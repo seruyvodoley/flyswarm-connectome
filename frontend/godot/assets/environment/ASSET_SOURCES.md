@@ -6,7 +6,7 @@ The files in this directory are visual assets only. Geometry and textures are bu
 
 | Local file | Source and credit | License | Changes |
 | --- | --- | --- | --- |
-| `fly/fly.glb` | [Ebony Mutation Female Drosophila Melanogaster](https://sketchfab.com/3d-models/ebony-mutation-female-drosophila-melanogaster-4a7bd311d95849a1a6448ac3f0aed04f) by **mlykouretzos** (Sketchfab model `4a7bd311d95849a1a6448ac3f0aed04f`). | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Attribution: “Ebony Mutation Female Drosophila Melanogaster” by mlykouretzos, used under CC BY 4.0. | Recolored to ebony blue-black cuticle with deep red compound eyes and translucent smoky wings, optimized, given fine cuticular setae, and rigged for preview animation by `tools/blender/build_ebony_drosophila.py`. Visual-only adult-fly model; it does not participate in MaleCNS calculations. |
+| `fly/fly.glb` | [Ebony Mutation Female Drosophila Melanogaster](https://sketchfab.com/3d-models/ebony-mutation-female-drosophila-melanogaster-4a7bd311d95849a1a6448ac3f0aed04f) by **mlykouretzos** (Sketchfab model `4a7bd311d95849a1a6448ac3f0aed04f`). | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Attribution: “Ebony Mutation Female Drosophila Melanogaster” by mlykouretzos, used under CC BY 4.0. | Recolored to ebony blue-black cuticle with deep red compound eyes and opaque white preview wings, optimized, given fine cuticular setae, and rigged for preview animation by `tools/blender/build_ebony_drosophila.py`. Visual-only adult-fly model; it does not participate in MaleCNS calculations. |
 
 ## Vegetation and rocks
 

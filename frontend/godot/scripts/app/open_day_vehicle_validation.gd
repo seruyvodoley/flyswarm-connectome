@@ -50,7 +50,7 @@ func run() -> void:
 		if "wing" in mesh_node.name.to_lower():
 			visible_wing_count += 1
 			var wing_material := mesh_node.material_override as StandardMaterial3D
-			if wing_material == null or wing_material.albedo_color.r < 0.9 or wing_material.albedo_color.g < 0.9 or wing_material.albedo_color.b < 0.9 or wing_material.albedo_color.a < 0.99 or wing_material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not wing_material.emission_enabled:
+			if wing_material == null or wing_material.albedo_color.r < 0.98 or wing_material.albedo_color.g < 0.98 or wing_material.albedo_color.b < 0.98 or wing_material.albedo_color.a < 0.99 or wing_material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not wing_material.emission_enabled or wing_material.emission.r < 0.98 or wing_material.emission.g < 0.98 or wing_material.emission.b < 0.98 or wing_material.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
 				_fail("Open Day fly wings must use an opaque, bright white material")
 	if visible_wing_count < 2:
 		_fail("Open Day fly preview must display both white wings")

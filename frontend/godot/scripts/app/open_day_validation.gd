@@ -172,7 +172,7 @@ func run():
 	battle.paused=true
 	var connected_controllers=Input.get_connected_joypads()
 	check(battle.demo_gamepad_active==not connected_controllers.is_empty(),"Open Day automatically selects a connected joypad when present")
-	check(battle.demo_intro.autowrap_mode==TextServer.AUTOWRAP_WORD_SMART and battle.demo_intro.offset_left==375 and battle.demo_intro.offset_right==-280,"Open Day intro instructions wrap inside a centered safe area")
+	check(battle.demo_intro.autowrap_mode==TextServer.AUTOWRAP_WORD_SMART and is_equal_approx(battle.demo_intro.anchor_left,.5) and is_equal_approx(battle.demo_intro.anchor_right,.5) and is_equal_approx(battle.demo_intro.offset_left,-battle.demo_intro.offset_right) and is_equal_approx(battle.demo_intro.offset_top,-battle.demo_intro.offset_bottom),"Open Day intro instructions wrap in a symmetric area centered on the viewport")
 	if capture_enabled:
 		battle.demo_intro_left=0.0
 		battle.demo_intro.text="ТВОЙ ТАНК: ИС-2 (обр. 1944)\nЛЕВЫЙ СТИК — ДВИЖЕНИЕ · ПРАВЫЙ — ВЗГЛЯД И ПРИЦЕЛ · L2 — ПРИБЛИЖЕНИЕ · R2 — ВЫСТРЕЛ"

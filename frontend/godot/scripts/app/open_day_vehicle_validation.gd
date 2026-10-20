@@ -41,9 +41,9 @@ func run() -> void:
 	if not is_instance_valid(fly_preview.fly_skeleton):
 		_fail("Ebony Drosophila preview must load its articulated skeleton")
 	else:
-		for bone_name in ["wing_left", "wing_right", "foreleg_upper_left", "foreleg_lower_left", "foreleg_upper_right", "foreleg_lower_right"]:
+		for bone_name in ["wing_left", "wing_right"]:
 			if fly_preview.fly_skeleton.find_bone(bone_name) < 0:
-				_fail("Ebony Drosophila preview is missing animation bone %s" % bone_name)
+				_fail("Ebony Drosophila preview is missing wing animation bone %s" % bone_name)
 	var visible_wing_count := 0
 	for node in fly_preview.viewport.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := node as MeshInstance3D
@@ -68,19 +68,24 @@ func run() -> void:
 		elif "wing" not in mesh_node.name.to_lower() and "compound_eye" not in mesh_node.name.to_lower() and (material.albedo_color.r > 0.08 or material.albedo_color.g > 0.08 or material.albedo_color.b > 0.08):
 			_fail("Fly body and legs must stay dark; wrong mesh may have been labeled as a wing")
 	var largest_wing_pose_change := 0.0
-	for _frame in 60:
+	var leg_bone_indices: Array[int] = []
+	var leg_rest_rotations: Array[Quaternion] = []
+	for bone_index in fly_preview.fly_skeleton.get_bone_count():
+		if "leg" in fly_preview.fly_skeleton.get_bone_name(bone_index).to_lower():
+			leg_bone_indices.append(bone_index)
+			leg_rest_rotations.append(fly_preview.fly_skeleton.get_bone_pose_rotation(bone_index))
+	for _frame in 180:
 		await _frames(1)
 		for index in fly_preview.wing_bone_indices.size():
 			var pose := fly_preview.fly_skeleton.get_bone_pose_rotation(fly_preview.wing_bone_indices[index])
 			largest_wing_pose_change = maxf(largest_wing_pose_change, 1.0 - absf(pose.dot(fly_preview.wing_bone_rest_rotations[index])))
+	for index in leg_bone_indices.size():
+		var leg_pose := fly_preview.fly_skeleton.get_bone_pose_rotation(leg_bone_indices[index])
+		if absf(leg_pose.dot(leg_rest_rotations[index])) < 0.999999:
+			_fail("Open Day preview must keep leg animation disabled")
+			break
 	if fly_preview.wing_bone_indices.size() != 2 or largest_wing_pose_change < 0.005:
 		_fail("Both real wing bones must visibly flap in the Open Day preview")
-	if fly_preview.foreleg_bone_indices.size() == 4 and fly_preview.foreleg_bone_rest_rotations.size() == 4:
-		var current_foreleg_pose := fly_preview.fly_skeleton.get_bone_pose_rotation(fly_preview.foreleg_bone_indices[0])
-		if absf(current_foreleg_pose.dot(fly_preview.foreleg_bone_rest_rotations[0])) > 0.99999:
-			_fail("Ebony Drosophila forelegs must animate gently during the Open Day preview")
-	else:
-		_fail("Ebony Drosophila preview did not initialize both animated forelegs")
 	if not is_equal_approx(fly.custom_minimum_size.y, 155.0) or not is_equal_approx(tank.custom_minimum_size.y, 155.0):
 		_fail("Fly and vehicle preview panes must share the same minimum height")
 	if app.view.find_child("OpenDaySelectionControl", true, false) == null:

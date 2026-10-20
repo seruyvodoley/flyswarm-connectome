@@ -20,9 +20,6 @@ var fly_skeleton: Skeleton3D
 var wing_bone_indices: Array[int] = []
 var wing_bone_rest_rotations: Array[Quaternion] = []
 var wing_bone_local_axes: Array[Vector3] = []
-var foreleg_bone_indices: Array[int] = []
-var foreleg_bone_rest_rotations: Array[Quaternion] = []
-var foreleg_bone_local_axes: Array[Vector3] = []
 var preview_elapsed := 0.0
 var yaw_degrees := INITIAL_YAW_DEGREES
 var pitch_degrees := 0.0
@@ -152,14 +149,6 @@ func _setup_wing_animation(model: Node3D) -> void:
 			# camera depth only folds the membranes and makes the flap hard to see.
 			var body_axis_local := fly_skeleton.get_bone_global_rest(bone_index).basis.inverse() * Vector3.RIGHT
 			wing_bone_local_axes.append(body_axis_local.normalized())
-		for bone_name in ["foreleg_upper_left", "foreleg_lower_left", "foreleg_upper_right", "foreleg_lower_right"]:
-			var bone_index := fly_skeleton.find_bone(bone_name)
-			if bone_index < 0:
-				continue
-			foreleg_bone_indices.append(bone_index)
-			foreleg_bone_rest_rotations.append(fly_skeleton.get_bone_pose_rotation(bone_index))
-			var flex_axis_local := fly_skeleton.get_bone_global_rest(bone_index).basis.inverse() * Vector3.UP
-			foreleg_bone_local_axes.append(flex_axis_local.normalized())
 		if not wing_bone_indices.is_empty():
 			return
 	for pivot_name in ["WingPivot_L", "WingPivot_R"]:
@@ -222,11 +211,12 @@ func _sync_viewport_size() -> void:
 	var camera_up := Vector3(0.0, cos(camera_angle), -sin(camera_angle))
 	var toward_camera := Vector3(0.0, sin(camera_angle), cos(camera_angle))
 	var model_rotation := Basis(Vector3.UP, deg_to_rad(yaw_degrees)) * Basis(Vector3.RIGHT, deg_to_rad(pitch_degrees))
+	var look_target := Vector3(0.0, -fit_bounds.size.y * 0.15, 0.0)
 	var distance := 0.0
 	# Fit the actual rotated bounds so inspection from every side and the full
 	# allowed pitch keep the legs and wing tips inside the viewport.
 	for corner in _corners(fit_bounds):
-		var point: Vector3 = model_rotation * corner
+		var point: Vector3 = model_rotation * corner - look_target
 		var depth := point.dot(toward_camera)
 		distance = maxf(distance, depth + absf(point.x) / tan_horizontal)
 		distance = maxf(distance, depth + absf(point.dot(camera_up)) / tan_vertical)
@@ -241,8 +231,10 @@ func _sync_viewport_size() -> void:
 	# clipping the wing tips when the user rotated the model. Keep a small safety
 	# margin for the low-poly scan's sparse points and the animated wing bones.
 	var inspection_margin := 1.06 + 0.08 * side_view_adjustment + 0.02 * rear_view_adjustment + 0.02 * pitch_adjustment
-	distance = distance * inspection_margin + 0.08
-	var look_target := Vector3(0.0, 0.0, 0.0)
+	# The Open Day fly is a hero object, so use the spare margins in its preview
+	# frame while retaining the full angle-aware fit. Lowering the camera target
+	# moves the complete stage upward in the window without changing the model.
+	distance = (distance * inspection_margin + 0.08) * 0.95
 	preview_camera.position = look_target + Vector3(0.0, distance * 0.18, distance)
 	preview_camera.look_at(look_target, Vector3.UP)
 	_request_viewport_frame()
@@ -326,17 +318,6 @@ func _process(delta: float) -> void:
 					var side := 1.0 if index == 0 else -1.0
 					var flutter := Quaternion(wing_bone_local_axes[index], flap * side)
 					fly_skeleton.set_bone_pose_rotation(wing_bone_indices[index], wing_bone_rest_rotations[index] * flutter)
-				var groom_envelope := pow(maxf(0.0, sin(preview_elapsed * 0.34)), 6.0)
-				var rub := sin(preview_elapsed * 4.2) * groom_envelope
-				for index in foreleg_bone_indices.size():
-					var foreleg_side := -1.0 if index < 2 else 1.0
-					var bend := 0.012
-					if index % 2 == 0:
-						bend += groom_envelope * 0.10 + rub * 0.025
-					else:
-						bend += groom_envelope * 0.16 + rub * 0.045
-					var movement := Quaternion(foreleg_bone_local_axes[index], foreleg_side * bend)
-					fly_skeleton.set_bone_pose_rotation(foreleg_bone_indices[index], foreleg_bone_rest_rotations[index] * movement)
 			else:
 				for index in wing_pivots.size():
 					var pivot := wing_pivots[index]

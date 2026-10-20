@@ -32,6 +32,14 @@ var objectives=[]
 var tickets=[300.0,300.0]
 var shells=[]
 var effects=[]
+var effect_quad_cache: Dictionary = {}
+var effect_material_cache: Dictionary = {}
+var impact_particle_pool: Array = []
+var impact_particle_process: ParticleProcessMaterial
+var impact_particle_quad: QuadMesh
+var impact_particle_material: ShaderMaterial
+var shell_visual_mesh: CapsuleMesh
+var shell_visual_material: StandardMaterial3D
 var scenario={}
 var environment_profile := "legacy"
 var bridge=Bridge.new()
@@ -77,6 +85,7 @@ var research_record: FileAccess
 var neural_record: FileAccess
 var research_event_record: FileAccess
 var research_event_seq: int = 0
+var research_event_flush_elapsed := 0.0
 var research_shot_seq: int = 0
 var cosmetic_rng := RandomNumberGenerator.new()
 var start_wall=0
@@ -722,7 +731,7 @@ func setup_demo_ui(canvas: CanvasLayer):
 	initialize_demo_controller()
 	if not Input.joy_connection_changed.is_connected(_on_demo_joy_connection_changed):Input.joy_connection_changed.connect(_on_demo_joy_connection_changed)
 	hud.visible=false;detail.visible=true;camera_button.visible=false;previous_vehicle_button.visible=false;next_vehicle_button.visible=false;comm_toggle.visible=false;comm_panel.visible=false;gunner_reticle.visible=true;gunner_reticle.camera_center_marker=true;update_camera_button()
-	demo_status=DemoHealthHud.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(390,116);demo_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_status)
+	demo_status=DemoHealthHud.new();demo_status.position=Vector2(24,22);demo_status.size=Vector2(390,138);demo_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_status)
 	demo_controls=Label.new();demo_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);demo_controls.offset_left=24;demo_controls.offset_right=820;demo_controls.offset_top=-76;demo_controls.offset_bottom=-18;demo_controls.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;demo_controls.add_theme_font_size_override("font_size",14);demo_controls.add_theme_color_override("font_color",Color("f1ead2"));demo_controls.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controls.add_theme_constant_override("shadow_offset_x",2);demo_controls.add_theme_constant_override("shadow_offset_y",2);demo_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controls);update_demo_control_hint()
 	demo_controller_status=Label.new();demo_controller_status.set_anchors_preset(Control.PRESET_CENTER);demo_controller_status.offset_left=-350;demo_controller_status.offset_right=350;demo_controller_status.offset_top=-75;demo_controller_status.offset_bottom=75;demo_controller_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;demo_controller_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;demo_controller_status.add_theme_font_size_override("font_size",26);demo_controller_status.add_theme_color_override("font_color",Color("ead58f"));demo_controller_status.add_theme_color_override("font_shadow_color",Color.BLACK);demo_controller_status.add_theme_constant_override("shadow_offset_x",2);demo_controller_status.add_theme_constant_override("shadow_offset_y",2);demo_controller_status.visible=false;demo_controller_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;canvas.add_child(demo_controller_status)
 	var brain_button=Button.new();brain_button.set_anchors_preset(Control.PRESET_TOP_RIGHT);brain_button.offset_left=-324;brain_button.offset_right=-24;brain_button.offset_top=20;brain_button.offset_bottom=62;brain_button.text=AppState.tr_text("SHOW / HIDE FLY BRAIN" if str(AppState.settings.language)!="ru" else "ПОКАЗАТЬ / СКРЫТЬ СИГНАЛЫ МУХИ");brain_button.add_theme_font_size_override("font_size",13);brain_button.pressed.connect(func():demo_brain_visible=not demo_brain_visible;demo_brain_panel.visible=demo_brain_visible);canvas.add_child(brain_button)
@@ -1462,7 +1471,6 @@ func record_research_event(event_type: String, details: Dictionary) -> void:
 		"wall_time_monotonic_s":Time.get_ticks_usec()/1000000.0}
 	row.merge(details,true)
 	research_event_record.store_line(JSON.stringify(row))
-	research_event_record.flush()
 
 func fire(v):
 	var p=v.muzzle.global_position
@@ -1475,17 +1483,10 @@ func fire(v):
 	dir=dir.rotated(Vector3.UP,rng.randfn(0,dispersion)).rotated(v.global_basis.x,rng.randfn(0,dispersion))
 	research_shot_seq+=1
 	var shot_id="%s:%08d" % [option("--run-id","interactive"),research_shot_seq]
+	_ensure_combat_vfx_resources()
 	var vis=MeshInstance3D.new()
-	var mesh=CapsuleMesh.new()
-	mesh.radius=.045
-	mesh.height=.34
-	mesh.radial_segments=6
-	mesh.rings=2
-	vis.mesh=mesh
-	var material=terrain.material(Color(1,.65,.17))
-	material.emission_enabled=true
-	material.emission=Color(1,.5,.1)
-	vis.material_override=material
+	vis.mesh=shell_visual_mesh
+	vis.material_override=shell_visual_material
 	add_child(vis)
 	vis.position=p
 	vis.look_at(p+dir,Vector3.UP)
@@ -2164,12 +2165,22 @@ func effect(
 		if effects.size()>=maxi(6,limit):
 			return
 
+	_ensure_combat_vfx_resources()
 	var mesh=MeshInstance3D.new()
-	var quad=QuadMesh.new();quad.size=Vector2(size*2.0,size*2.0);mesh.mesh=quad
-	var material=ShaderMaterial.new();material.shader=EffectSpriteShader
-	material.set_shader_parameter("tint",c)
-	material.set_shader_parameter("irregularity",.12 if c.r<.4 else .28)
-	material.set_shader_parameter("glow",.9 if c.r>.7 else .0)
+	var mesh_key=snappedf(size,0.01)
+	if not effect_quad_cache.has(mesh_key):
+		var quad=QuadMesh.new();quad.size=Vector2(size*2.0,size*2.0);effect_quad_cache[mesh_key]=quad
+	mesh.mesh=effect_quad_cache[mesh_key]
+	var irregularity=.12 if c.r<.4 else .28
+	var glow=.9 if c.r>.7 else 0.0
+	var material_key="%s:%.2f:%.2f" % [c.to_html(true),irregularity,glow]
+	if not effect_material_cache.has(material_key):
+		var material=ShaderMaterial.new();material.shader=EffectSpriteShader
+		material.set_shader_parameter("tint",c)
+		material.set_shader_parameter("irregularity",irregularity)
+		material.set_shader_parameter("glow",glow)
+		effect_material_cache[material_key]=material
+	var material: ShaderMaterial=effect_material_cache[material_key]
 	mesh.material_override=material
 
 	add_child(mesh)
@@ -2186,14 +2197,28 @@ func effect(
 
 func effect_burst(p: Vector3,amount: int=20,lifetime: float=1.25):
 	if session_config!=null and effects.size()>=maxi(6,int(60*AppState.settings.effects)):return
-	var particles=GPUParticles3D.new();particles.name="ImpactBurst";particles.position=p
-	particles.amount=amount;particles.lifetime=lifetime;particles.one_shot=true;particles.explosiveness=.92;particles.emitting=true
-	var process=ParticleProcessMaterial.new();process.direction=Vector3(0,1,0);process.spread=180;process.initial_velocity_min=1.6;process.initial_velocity_max=4.8;process.gravity=Vector3(0,-2.6,0);process.scale_min=.22;process.scale_max=.58
-	particles.process_material=process
-	var quad=QuadMesh.new();quad.size=Vector2(.7,.7);particles.draw_pass_1=quad
-	var material=ShaderMaterial.new();material.shader=EffectSpriteShader;material.set_shader_parameter("tint",Color(.29,.25,.19,.76));material.set_shader_parameter("irregularity",.36);particles.material_override=material
-	add_child(particles)
+	_ensure_combat_vfx_resources()
+	var particles: GPUParticles3D
+	if not impact_particle_pool.is_empty():particles=impact_particle_pool.pop_back()
+	else:
+		particles=GPUParticles3D.new();particles.name="ImpactBurst"
+		particles.process_material=impact_particle_process
+		particles.draw_pass_1=impact_particle_quad
+		particles.material_override=impact_particle_material
+		particles.one_shot=true;particles.explosiveness=.92;particles.emitting=false
+		add_child(particles)
+	particles.position=p;particles.amount=amount;particles.lifetime=lifetime;particles.visible=true
+	particles.emitting=true;particles.restart()
 	effects.append({"node":particles,"life":lifetime+.15,"particles":true})
+
+func _ensure_combat_vfx_resources() -> void:
+	if shell_visual_mesh == null:
+		shell_visual_mesh=CapsuleMesh.new();shell_visual_mesh.radius=.045;shell_visual_mesh.height=.34;shell_visual_mesh.radial_segments=6;shell_visual_mesh.rings=2
+		shell_visual_material=terrain.material(Color(1,.65,.17));shell_visual_material.emission_enabled=true;shell_visual_material.emission=Color(1,.5,.1)
+	if impact_particle_process == null:
+		impact_particle_process=ParticleProcessMaterial.new();impact_particle_process.direction=Vector3(0,1,0);impact_particle_process.spread=180;impact_particle_process.initial_velocity_min=1.6;impact_particle_process.initial_velocity_max=4.8;impact_particle_process.gravity=Vector3(0,-2.6,0);impact_particle_process.scale_min=.22;impact_particle_process.scale_max=.58
+		impact_particle_quad=QuadMesh.new();impact_particle_quad.size=Vector2(.7,.7)
+		impact_particle_material=ShaderMaterial.new();impact_particle_material.shader=EffectSpriteShader;impact_particle_material.set_shader_parameter("tint",Color(.29,.25,.19,.76));impact_particle_material.set_shader_parameter("irregularity",.36)
 
 
 func vehicle_destroyed_effect(p: Vector3, catastrophic: bool=false):
@@ -2316,6 +2341,7 @@ func finish(notify_result=true):
 	if research_event_record:
 		research_event_record.flush()
 		research_event_record.close()
+		research_event_record=null
 	print("SUMMARY ",JSON.stringify({"sim_s":sim_time,"wall_s":wall,"xRT":report.realtime_factor,"physics_ms":report.mean_physics_ms,"brain_tick_ms":report.brain_tick_ms,"alive":[alive_count(0),alive_count(1)]}))
 	report_cache=report
 	if session_config!=null and notify_result:completed.emit(report)
@@ -2354,6 +2380,11 @@ func write_research_exports(report: Dictionary):
 	write_csv(record_path.path_join("per_agent.csv"),["sim_time","agent_id","team","vehicle","position","speed_m_s","alive","target","modules","metrics"],agents)
 	write_csv(record_path.path_join("actions.csv"),["sim_time","agent_id","raw_neural_action","decoder_action","objective_aux_action","gunnery_aux_action","adapter_action","final_action"],actions)
 func _process(dt):
+	if research_event_record != null:
+		research_event_flush_elapsed += dt
+		if research_event_flush_elapsed >= .2:
+			research_event_flush_elapsed = 0.0
+			research_event_record.flush()
 	if is_demo:update_demo_controller_input(dt)
 	if is_demo and demo_intro_left>0:
 		demo_intro_left=maxf(0,demo_intro_left-dt)
@@ -2377,7 +2408,8 @@ func _process(dt):
 		fx["life"]=float(fx["life"])-dt
 		if fx.get("particles",false):
 			if float(fx["life"])<=0.0:
-				fx["node"].queue_free();effects.remove_at(i)
+				var particles: GPUParticles3D=fx["node"]
+				particles.emitting=false;particles.visible=false;impact_particle_pool.append(particles);effects.remove_at(i)
 			continue
 
 		var initial=maxf(
@@ -3423,3 +3455,5 @@ func save_replay():
 func _exit_tree():
 	bridge.tcp.disconnect_from_host()
 	if recorder:recorder.flush();recorder.close()
+	if research_event_record:
+		research_event_record.flush();research_event_record.close()

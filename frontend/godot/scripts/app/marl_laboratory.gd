@@ -1,7 +1,9 @@
 extends Control
+const DesignSystem = preload("res://scripts/app/design_system.gd")
 
 var status_label: Label
 var detail_label: Label
+var status_progress: ProgressBar
 var checkpoint_path=""
 var seed_value=101
 var episode_steps=600
@@ -16,7 +18,8 @@ var student_reward_path=""
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var bg=ColorRect.new();bg.color=Color("0b1414");bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
+	theme=DesignSystem.make_theme(18)
+	var bg=ColorRect.new();bg.color=DesignSystem.INK;bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,42)
 	add_child(margin)
@@ -60,6 +63,7 @@ func _ready():
 	var right=VBoxContainer.new();right.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_theme_constant_override("separation",14);split.add_child(right)
 	_section(right,"EXPERIMENT STATUS","СТАТУС ЭКСПЕРИМЕНТА")
 	status_label=Label.new();status_label.text=_t("Готово к запуску","Ready");status_label.add_theme_font_size_override("font_size",24);right.add_child(status_label)
+	status_progress=ProgressBar.new();status_progress.min_value=0;status_progress.max_value=1;status_progress.indeterminate=true;status_progress.custom_minimum_size.y=12;right.add_child(status_progress)
 	detail_label=Label.new();detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;detail_label.modulate=Color("b4c0b6");right.add_child(detail_label)
 	var caveat=Label.new();caveat.text=_t("Визуальный replay показывает записанную аналитическую траекторию. Godot не пересчитывает урон и победу. PPO обучает внешнее управление, не MaleCNS. Сравнивайте числа по нескольким независимым seed.","Replay renders the recorded analytical trajectory. Godot does not recalculate damage or winner. PPO trains an external controller, not MaleCNS. Compare metrics across independent seeds.");caveat.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;caveat.modulate=Color("c9b48a");right.add_child(caveat)
 	_build_programming_tab(tabs)
@@ -196,7 +200,24 @@ func _show_history():
 func update_marl_status(progress:Dictionary,output_path:String):
 	if not is_instance_valid(status_label):return
 	var state=str(progress.get("state","ready"))
-	status_label.text=_t("Обучение…","Training…") if state=="training" else (_t("Готово","Complete") if state=="complete" else (_t("Остановлено","Stopped") if state=="cancelled" else state))
+	var labels={
+		"ready":_t("Готово к запуску","Ready to start"),
+		"starting":_t("Запуск Python…","Starting Python…"),
+		"initializing":_t("Подготовка модели…","Preparing model…"),
+		"training":_t("Обучение PPO…","Training PPO…"),
+		"finalizing":_t("Сохранение результатов…","Saving results…"),
+		"complete":_t("Готово","Complete"),
+		"error":_t("Ошибка","Error"),
+		"cancelled":_t("Остановлено","Cancelled"),
+	}
+	status_label.text=str(labels.get(state,state.capitalize()))
+	var current=float(progress.get("timesteps",progress.get("completed",0)))
+	var target=float(progress.get("target_timesteps",progress.get("total",0)))
+	var terminal=state in ["complete","error","cancelled"]
+	status_progress.visible=state!="ready"
+	status_progress.indeterminate=not terminal and (target<=0.0 or state in ["starting","initializing","finalizing"])
+	status_progress.max_value=maxf(1.0,target)
+	status_progress.value=target if state=="complete" else current
 	var lines=[]
 	for key in ["timesteps","target_timesteps","episodes","elapsed_seconds","latest_episode_reward"]:
 		if progress.has(key):lines.append("%s: %s" % [key,str(progress[key])])

@@ -31,6 +31,8 @@ func _draw() -> void:
 	draw_string(font, Vector2(14, 72), "МУХА" if russian else "FLY", HORIZONTAL_ALIGNMENT_LEFT, row_width, 12, title_color)
 	draw_string(font, Vector2(14, 91), "%d%%" % roundi(fly_health * 100.0), HORIZONTAL_ALIGNMENT_RIGHT, row_width, 10, muted)
 	_draw_health_bar(Vector2(14, 97), row_width, fly_health, Color("e79a62"))
+	draw_string(font, Vector2(14, 121), "MATCH" if not russian else "БОЙ", HORIZONTAL_ALIGNMENT_LEFT, row_width, 10, muted)
+	_draw_health_bar(Vector2(14, 126), row_width, 1.0 - clampf(remaining_seconds / 120.0, 0.0, 1.0), Color("67d7ce"))
 
 func _draw_health_bar(position: Vector2, width: float, value: float, colour: Color) -> void:
 	draw_rect(Rect2(position, Vector2(width, 8)), Color(0.12, 0.16, 0.15, 0.95), true)

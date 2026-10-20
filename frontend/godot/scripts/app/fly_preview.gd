@@ -121,6 +121,9 @@ func _apply_preview_wing_material(model: Node3D) -> void:
 		var mesh_node := node as MeshInstance3D
 		if "wing" in mesh_node.name.to_lower():
 			mesh_node.material_override = wing_material
+			if mesh_node.mesh != null:
+				for surface_index in mesh_node.mesh.get_surface_count():
+					mesh_node.set_surface_override_material(surface_index, wing_material)
 
 func _setup_wing_animation(model: Node3D) -> void:
 	var skeleton_nodes := model.find_children("*", "Skeleton3D", true, false)

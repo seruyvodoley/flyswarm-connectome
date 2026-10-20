@@ -92,6 +92,49 @@ def add_third_party_licenses(destination: Path) -> None:
     (destination / "THIRD_PARTY_LICENSES.txt").write_text("\n\n".join(sections), encoding="utf-8")
 
 
+def add_malecns_dataset(source: Path, resources: Path) -> None:
+    """Bundle the validated MaleCNS runtime data with its required attribution."""
+    from flybrain.data import FILES
+    import hashlib
+
+    source = source.expanduser().resolve()
+    dataset = resources / "MaleCNS"
+    dataset.mkdir(parents=True, exist_ok=True)
+    for name, expected in FILES.items():
+        path = source / name
+        if not path.is_file():
+            raise RuntimeError(f"MaleCNS dataset file is missing: {path}")
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(block)
+        if digest.hexdigest() != expected:
+            raise RuntimeError(f"MaleCNS dataset checksum does not match FlyBrain: {path}")
+        shutil.copy2(path, dataset / name)
+    notice = """MaleCNS v1.0 connectome data notice
+
+The bundled brain.npz and weights.npz are prebuilt derived runtime files for
+the MaleCNS v1.0 connectome. The dataset is from FlyEM at HHMI Janelia, in
+collaboration with the University of Cambridge, the MRC Laboratory of Molecular
+Biology, and Google Research.
+
+Source and dataset information: https://male-cns.janelia.org/download/
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License text: https://creativecommons.org/licenses/by/4.0/
+Scientific reference: Berg et al., Sexual dimorphism in the complete connectome
+of the Drosophila male central nervous system, Cell (2026).
+
+The two prebuilt files are distributed by the FlyBrain package and are derived
+from the CC BY 4.0 connectome. FlyBrain documents these derived files as covered
+by the source dataset's CC BY 4.0 terms:
+https://github.com/alextitonis/fly.ai
+
+The bundled data files are unchanged. Their SHA-256 checksums are validated by
+FlyBrain and by FlySwarm before the neural backend starts.
+"""
+    (resources / "MALECNS_DATA_NOTICE.txt").write_text(notice, encoding="utf-8")
+
+
 def build_backend(python: Path, build_root: Path, output: Path) -> Path:
     dist = output / "FlySwarmBackend"
     shutil.rmtree(dist, ignore_errors=True)
@@ -205,6 +248,8 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     (support / "tools").mkdir(parents=True)
     shutil.copy2(ROOT / "tools/app_job.py", support / "tools/app_job.py")
     add_third_party_licenses(resources)
+    if args.dataset:
+        add_malecns_dataset(Path(args.dataset), resources)
     shutil.copy2(ROOT / "docs/macos_packaging.md", resources / "INSTALLATION.txt")
     update_plist(app, args.version)
     remove_macos_metadata(app)
@@ -257,6 +302,7 @@ def main() -> None:
     parser.add_argument("--version", default=VERSION_DEFAULT)
     parser.add_argument("--output", default=str(ROOT / "build/releases"))
     parser.add_argument("--reuse-backend", action="store_true", help="Reuse an already-built backend in this version's output directory")
+    parser.add_argument("--dataset", help="Bundle a MaleCNS data folder after validating the official FlyBrain SHA-256 checksums")
     args = parser.parse_args()
     if not args.build:
         parser.error("Use --build; frontend-only exports are not distributable releases.")

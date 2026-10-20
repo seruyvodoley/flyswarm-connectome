@@ -57,8 +57,12 @@ func _ready():
 	if file.load("user://settings.cfg")==OK:
 		for key in settings:settings[key]=file.get_value("settings",key,settings[key])
 	if str(settings.dataset_path)=="":
-		settings.dataset_path=OS.get_environment("FLY_DATA")
-		if str(settings.dataset_path)=="":settings.dataset_path=user_home_path().path_join("fly-data")
+		var bundled_dataset=bundle_resources.path_join("MaleCNS") if packaged_app else ""
+		if not bundled_dataset.is_empty() and FileAccess.file_exists(bundled_dataset.path_join("brain.npz")) and FileAccess.file_exists(bundled_dataset.path_join("weights.npz")):
+			settings.dataset_path=bundled_dataset
+		else:
+			settings.dataset_path=OS.get_environment("FLY_DATA")
+			if str(settings.dataset_path)=="":settings.dataset_path=user_home_path().path_join("fly-data")
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	if str(settings.appearance) not in ["dark", "light"]:settings.appearance="dark"
 	get_tree().auto_accept_quit=false

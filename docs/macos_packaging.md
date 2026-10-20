@@ -33,14 +33,18 @@ environment variables. Developer mode continues to use `.venv`, `src/` and the
 local checkout. Research and training jobs run through the packaged backend
 entry point and the bundled job supervisor.
 
-MaleCNS `brain.npz` and `weights.npz` are external data and are never copied
-into the public app. In Settings, choose the folder containing both files and
-press **Check MaleCNS data**. The app validates the files against FlyBrain's
-published SHA-256 values, saves the location in user settings, and supplies
-`FLY_DATA` to its child backend. The Open Day launch then waits for the actual
+MaleCNS `brain.npz` and `weights.npz` are not included by default. A release may
+include a local dataset after its license and redistribution terms have been
+verified by passing `--dataset <folder>` to the same packaging command. The
+packager checks both files against FlyBrain's published SHA-256 values, copies
+them into `Contents/Resources/MaleCNS`, and includes `MALECNS_DATA_NOTICE.txt`
+with attribution and license information. MaleCNS v1.0 and the prebuilt derived
+runtime files are CC BY 4.0. The app selects a bundled dataset by default when
+present. In Settings, users can choose another folder containing both files
+and press **Check MaleCNS data**. The app validates checksums, saves the path,
+and supplies `FLY_DATA` to its child backend. Open Day waits for actual
 FlyBrain(batch=1) initialization and warm-up before reporting the backend
-ready. The official MaleCNS download page identifies its dataset as CC-BY; the
-release still avoids redistributing the 260 MB derived runtime files.
+ready.
 
 The build ad-hoc signs the app bundle for internal consistency. It has no
 Developer ID signature and is not notarized. macOS Gatekeeper may show an

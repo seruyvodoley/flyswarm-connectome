@@ -296,7 +296,9 @@ func malecns_dataset_settings() -> void:
 	dataset_validation_russian=russian
 	dataset_check_button=Button.new();dataset_check_button.text="Проверить MaleCNS" if russian else "Check MaleCNS data";body.add_child(dataset_check_button)
 	dataset_status_label=Label.new();dataset_status_label.name="DatasetCheckStatus";dataset_status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;dataset_status_label.custom_minimum_size.y=32;body.add_child(dataset_status_label)
-	dataset_status_label.text="Два файла данных не включены в приложение." if russian else "The connectome files are not included in the app."
+	var bundled_dataset=AppState.bundle_resources.path_join("MaleCNS") if AppState.packaged_app else ""
+	var dataset_is_bundled=not bundled_dataset.is_empty() and FileAccess.file_exists(bundled_dataset.path_join("brain.npz")) and FileAccess.file_exists(bundled_dataset.path_join("weights.npz"))
+	dataset_status_label.text=("Данные MaleCNS включены в приложение." if russian else "MaleCNS data is included in this app build.") if dataset_is_bundled else ("Два файла данных не включены в приложение." if russian else "The connectome files are not included in the app.")
 	dataset_status_label.modulate=Color("b3c0b8")
 	dataset_check_progress=ProgressBar.new();dataset_check_progress.name="DatasetCheckProgress";dataset_check_progress.indeterminate=true;dataset_check_progress.custom_minimum_size.y=10;dataset_check_progress.visible=false;body.add_child(dataset_check_progress)
 	browse.pressed.connect(func():

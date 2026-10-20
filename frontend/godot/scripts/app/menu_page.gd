@@ -1,9 +1,12 @@
 extends Control
+const DesignSystem = preload("res://scripts/app/design_system.gd")
+const HeroMap = preload("res://scripts/app/hero_map.gd")
 @export var page="MainMenu"
 var body: VBoxContainer
 var status: Label
 var headline: Label
 var progress: ProgressBar
+var loading_progress: ProgressBar
 var job_text: Label
 var results_button: Button
 var replay_items=[]
@@ -15,24 +18,11 @@ const IDS=["panther_g","tiger_i","jagdpanther","t34_85","is2_1944","su100"]
 const VEHICLES=["Panther Ausf. G","Tiger I · late 1944","Jagdpanther","T-34-85 · 1944","IS-2 · 1944","SU-100"]
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var theme_resource=Theme.new()
-	theme_resource.default_font_size=19
-	for kind in ["normal","hover","pressed","focus","disabled"]:
-		var style=StyleBoxFlat.new()
-		style.bg_color=Color("253532") if kind=="hover" else Color("172622")
-		if kind=="disabled":style.bg_color=Color("151c1c")
-		style.border_color=Color("bba16c") if kind in ["hover","focus"] else Color("35433e")
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(3)
-		style.content_margin_left=18;style.content_margin_right=18;style.content_margin_top=12;style.content_margin_bottom=12
-		theme_resource.set_stylebox(kind,"Button",style)
-		theme_resource.set_stylebox(kind,"OptionButton",style)
-	theme_resource.set_color("font_color","Button",Color("e7e6dc"))
-	theme_resource.set_color("font_disabled_color","Button",Color("78817b"))
-	theme=theme_resource
-	var bg=ColorRect.new();bg.color=Color("0b1414");bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
+	var appearance=str(AppState.settings.get("appearance","dark"))
+	theme=DesignSystem.make_theme(18,appearance)
+	var bg=ColorRect.new();bg.color=DesignSystem.ink_for(appearance);bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var layout=MarginContainer.new();layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left","right","top","bottom"]:layout.add_theme_constant_override("margin_"+side,40)
+	for side in ["left","right","top","bottom"]:layout.add_theme_constant_override("margin_"+side,32)
 	add_child(layout)
 	var col=VBoxContainer.new();col.add_theme_constant_override("separation",18);layout.add_child(col)
 	var top=HBoxContainer.new();col.add_child(top)
@@ -49,7 +39,7 @@ func _ready():
 		"TestRangeSetup":test_range()
 		"ReplayBrowser":replays()
 		"Settings":settings_menu()
-		"LoadingScreen":title("SESSION PREPARATION","Loading");headline=label(body,"Preparing simulation…",28);button(body,"Cancel",AppState.menu)
+		"LoadingScreen":title("SESSION PREPARATION","Loading");headline=label(body,"Preparing simulation…",28);loading_progress=ProgressBar.new();loading_progress.indeterminate=true;loading_progress.custom_minimum_size.y=12;body.add_child(loading_progress);button(body,"Cancel",AppState.menu)
 		"ResultsScreen":results()
 		"PauseMenu":pause_screen()
 		"JobProgress":job_progress()
@@ -89,24 +79,27 @@ func policy_field(text: String,field: String):
 		dialog.popup_centered_ratio(.75))
 func back():button(body,"Back",AppState.menu)
 func menu_entry(parent: VBoxContainer,title_text: String,description_text: String,callback: Callable):
+	var frame=PanelContainer.new()
+	frame.custom_minimum_size=Vector2(440,94)
+	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style(str(AppState.settings.get("appearance","dark"))))
+	parent.add_child(frame)
 	var card=VBoxContainer.new()
-	card.custom_minimum_size=Vector2(520,94)
 	card.add_theme_constant_override("separation",5)
-	parent.add_child(card)
+	frame.add_child(card)
 	var entry_button=button(card,title_text,callback)
-	entry_button.custom_minimum_size=Vector2(520,52)
+	entry_button.custom_minimum_size=Vector2(420,52)
 	entry_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	entry_button.alignment=HORIZONTAL_ALIGNMENT_LEFT
 	var description=label(card,description_text,14)
-	description.custom_minimum_size=Vector2(520,34)
+	description.custom_minimum_size=Vector2(420,34)
 	description.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	description.modulate=Color("9aaba2")
 func main_menu():
 	var split=HBoxContainer.new();split.add_theme_constant_override("separation",40);body.add_child(split)
 	var left=VBoxContainer.new();left.custom_minimum_size.x=520;left.add_theme_constant_override("separation",8);split.add_child(left)
-	label(left,"CONNECTOME / EMBODIMENT",14).modulate=Color("c1a573")
-	label(left,"FLYSWARM",58)
+	label(left,"CONNECTOME / EMBODIMENT",14).modulate=DesignSystem.ACCENT
+	label(left,"FLYSWARM",58).add_theme_color_override("font_color",DesignSystem.text_for(str(AppState.settings.get("appearance","dark"))))
 	label(left,"A world to observe. A network to study.",16)
 	var spacer=Control.new();spacer.custom_minimum_size.y=20;left.add_child(spacer)
 	menu_entry(left,"OPEN DAY DEMO","A fast 1v1: a visitor against a tank controlled by the reconstructed MaleCNS model.",AppState.open_day_menu)
@@ -124,16 +117,8 @@ func main_menu():
 	var language_button=button(secondary,AppState.language_switch_label(),AppState.toggle_language);language_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var exit_button=button(secondary,"EXIT",AppState.quit_app);exit_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var right=VBoxContainer.new();right.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_theme_constant_override("separation",20);split.add_child(right)
-	var map_view=TextureRect.new();map_view.custom_minimum_size=Vector2(450,330);map_view.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;map_view.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var image=Image.create(600,360,false,Image.FORMAT_RGB8)
-	for y in range(360):
-		for x in range(600):
-			var height=sin(x*.016)*cos(y*.023)+.5*sin((x+y)*.019)
-			var contour=absf(fmod(height*10,1))<.08
-			var grid=x%60==0 or y%60==0
-			image.set_pixel(x,y,Color("506553") if contour else (Color("253b32") if grid else Color("14241f")))
-	map_view.texture=ImageTexture.create_from_image(image);right.add_child(map_view)
-	label(right,"KRASNY VALLEY  /  1944",24)
+	var map_view=HeroMap.new();map_view.custom_minimum_size=Vector2(450,330);map_view.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_child(map_view)
+	label(right,"KRASNY VALLEY  /  1944",24).add_theme_color_override("font_color",DesignSystem.GOLD)
 	var copy=label(right,"16 embodied agents · 6 vehicle families\nTwo independent MaleCNS instances: 2 × batch 8\n2,667,200 simulated neuron states\n\nRule AI and the manual test range work offline.",18);copy.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;copy.modulate=Color("bac5bb")
 func common_battle():
 	var s=AppState.session
@@ -277,6 +262,7 @@ func settings_menu():
 	title("LOCAL PREFERENCES","Settings")
 	var s=AppState.settings
 	dropdown("Language",["English","Русский"],["en","ru"],str(s.get("language","en")),func(v):AppState.set_language(str(v)))
+	dropdown("Appearance",["Dark · charcoal and olive","Light · paper and spruce"],["dark","light"],str(s.get("appearance","dark")),func(v):s.appearance=v;AppState.show_page("Settings"))
 	dropdown("Graphics preset",["Low","Medium","High"],[0,1,2],s.preset,func(v):s.preset=v;s.shadows=v>0;s.vegetation=[.25,.6,1.0][v];s.effects=[.3,.6,1.0][v];AppState.show_page("Settings"))
 	dropdown("Window resolution",["1280 × 800","1440 × 900","1920 × 1080"],[0,1,2],s.resolution,func(v):s.resolution=v)
 	toggle("Fullscreen",s.fullscreen,func(v):s.fullscreen=v)
@@ -292,7 +278,7 @@ func settings_menu():
 	dropdown("Default communication",["No Audio","Team Audio","All Audio"],["no_audio","team_audio","all_audio"],s.audio,func(v):s.audio=v)
 	text_block("Enhanced visuals preserve the old heightfield collision and forest visibility. Enhanced physical changes terrain and obstacle collision and is a separate experiment condition. Legacy restores the previous scenery. Replays keep the profile they recorded. LOD bias uses imported mesh LODs where present.")
 	button(body,"SAVE SETTINGS",func():AppState.save_settings();AppState.menu())
-	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"dataset_path":str(AppState.settings.get("dataset_path","")),"environment_profile":"enhanced_visual"};AppState.save_settings();AppState.show_page("Settings"))
+	button(body,"RESET DEFAULTS",func():AppState.settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":.6,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":str(AppState.settings.get("language","en")),"appearance":"dark","dataset_path":str(AppState.settings.get("dataset_path","")),"environment_profile":"enhanced_visual"};AppState.save_settings();AppState.show_page("Settings"))
 	back()
 
 func malecns_dataset_settings() -> void:
@@ -350,7 +336,7 @@ func results():
 func job_progress():
 	title("MEASURED EXPERIMENT","Running session")
 	job_text=text_block("Starting worker…")
-	progress=ProgressBar.new();progress.max_value=1;body.add_child(progress)
+	progress=ProgressBar.new();progress.max_value=1;progress.indeterminate=true;progress.custom_minimum_size.y=12;body.add_child(progress)
 	if AppState.session.mode=="combat_training":
 		text_block("External PPO policy · frozen MaleCNS · analytical tank-duel environment. Training reward is not proof of combat quality.")
 		reward_curve=Control.new();reward_curve.name="CombatRewardCurve";reward_curve.custom_minimum_size=Vector2(0,150);reward_curve.size_flags_horizontal=Control.SIZE_EXPAND_FILL;reward_curve.set_script(load("res://scripts/app/training_curve.gd"));body.add_child(reward_curve)
@@ -363,7 +349,8 @@ func job_progress():
 	button(body,"RETURN",AppState.menu)
 func update_job(data: Dictionary):
 	if not is_instance_valid(job_text):return
-	if AppState.session.mode=="combat_training":
+	var combat_training: bool = AppState.session.mode=="combat_training"
+	if combat_training:
 		var state=str(data.get("state","starting"));var current=int(data.get("timesteps",0));var target=int(data.get("target_timesteps",AppState.session.training_steps))
 		var male="MALECNS ACTIVE" if data.get("male_cns_active",AppState.session.training_stage=="malecns") else "GAMEPLAY PRETRAINING · NO MALECNS"
 		job_text.text="%s\n%s · %s\nSteps: %d / %d · %.1f steps/sec · ETA %.1f min\nEpisodes: %s · Elapsed: %.1f min\nReward: %s\nCheckpoint: %s\n%s" % [state.to_upper(),male,str(data.get("stage","—")),current,target,float(data.get("steps_per_second",0)),float(data.get("eta_seconds",0))/60.0,str(data.get("episodes",0)),float(data.get("elapsed_seconds",0))/60.0,str(data.get("latest_episode_reward","not enough episodes")),str(data.get("checkpoint",AppState.tr_text("not saved yet"))),str(data.get("message",""))]
@@ -372,6 +359,7 @@ func update_job(data: Dictionary):
 			var score=evaluation.get("current_policy",{})
 			if not score.is_empty():
 				job_text.text+="\nIndependent evaluation · %d paired seeds\nWins %.0f%% · accuracy %.1f%% · damage %.2f\nShots %.1f · distance %.1f m · stuck recovery %.2f" % [evaluation.get("baseline_rule",{}).get("episodes",[]).size(),float(score.get("win_rate",0))*100.0,float(score.get("accuracy",0))*100.0,float(score.get("mean_damage",0)),float(score.get("mean_shots",0)),float(score.get("mean_distance_m",0)),float(score.get("mean_stuck_recoveries",0))]
+		progress.indeterminate=target<=0 or state in ["starting","initializing","finalizing"]
 		progress.max_value=maxf(1,target);progress.value=current
 		var pause_button=find_child("PauseJob",true,false)
 		if pause_button:pause_button.text="RESUME" if state=="paused" else "PAUSE"
@@ -379,7 +367,10 @@ func update_job(data: Dictionary):
 		job_text.text=AppState.tr_format("job.progress",[AppState.tr_text(str(data.get("state","starting"))),data.get("condition","—"),data.get("seed","—"),data.get("run",0),data.get("total",0),data.get("sim_time",0),data.get("wall_time",0),AppState.tr_text(str(data.get("message",""))),AppState.job_path,data.get("checkpoint",AppState.tr_text("not saved yet"))])
 	var again=find_child("RunAgain",true,false)
 	if again:again.disabled=not data.get("state","") in ["complete","cancelled","error"]
-	progress.max_value=maxf(1,data.get("total",1));progress.value=data.get("completed",0)
+	if not combat_training:
+		var total=int(data.get("total",0));var completed=int(data.get("completed",0))
+		progress.indeterminate=total<=0
+		progress.max_value=maxi(1,total);progress.value=completed
 	results_button.disabled=not data.get("state","") in ["complete","cancelled","error"]
 func notice(message: String):
 	var dialog=AcceptDialog.new();dialog.dialog_text=AppState.tr_text(message);add_child(dialog);dialog.popup_centered(Vector2i(650,220))
@@ -414,7 +405,9 @@ func _refresh_training_curve():
 	reward_curve.call("set_samples",samples)
 func _process(dt):
 	status.text=AppState.tr_text("BACKEND")+"  ·  "+AppState.tr_text(AppState.backend_state)
-	if page=="LoadingScreen" and not AppState.backend_state in ["ERROR","DISCONNECTED"]:headline.text=AppState.tr_text(AppState.loading_message)
+	if page=="LoadingScreen" and not AppState.backend_state in ["ERROR","DISCONNECTED"]:
+		headline.text=AppState.tr_text(AppState.loading_message)
+		if is_instance_valid(loading_progress):loading_progress.indeterminate=AppState.backend_state in ["STARTING","CONNECTING","BUSY"]
 	if page=="JobProgress" and AppState.session.mode=="combat_training":
 		reward_curve_refresh+=dt
 		if reward_curve_refresh>=.5:reward_curve_refresh=0.0;_refresh_training_curve()

@@ -50,10 +50,10 @@ func run() -> void:
 		if "wing" in mesh_node.name.to_lower():
 			visible_wing_count += 1
 			var wing_material := mesh_node.material_override as StandardMaterial3D
-			if wing_material == null or wing_material.albedo_color.b <= wing_material.albedo_color.r or not wing_material.emission_enabled:
-				_fail("Open Day fly wings must use the pale blue visible glass material")
+			if wing_material == null or wing_material.albedo_color.r < 0.9 or wing_material.albedo_color.g < 0.9 or wing_material.albedo_color.b < 0.9 or wing_material.albedo_color.a < 0.99 or wing_material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not wing_material.emission_enabled:
+				_fail("Open Day fly wings must use an opaque, bright white material")
 	if visible_wing_count < 2:
-		_fail("Open Day fly preview must display both pale blue wings")
+		_fail("Open Day fly preview must display both white wings")
 	await _frames(30)
 	if fly_preview.foreleg_bone_indices.size() == 4 and fly_preview.foreleg_bone_rest_rotations.size() == 4:
 		var current_foreleg_pose := fly_preview.fly_skeleton.get_bone_pose_rotation(fly_preview.foreleg_bone_indices[0])

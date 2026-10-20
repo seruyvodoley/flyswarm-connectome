@@ -104,14 +104,15 @@ func _ready() -> void:
 
 func _apply_preview_wing_material(model: Node3D) -> void:
 	var wing_material := StandardMaterial3D.new()
-	wing_material.albedo_color = Color(0.68, 0.84, 1.0, 0.62)
-	wing_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wing_material.albedo_color = Color(0.96, 0.97, 1.0, 1.0)
+	wing_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	wing_material.roughness = 0.58
 	wing_material.metallic = 0.0
 	wing_material.emission_enabled = true
-	wing_material.emission = Color(0.40, 0.64, 0.94)
-	wing_material.emission_energy_multiplier = 0.35
+	wing_material.emission = Color(0.72, 0.75, 0.82)
+	wing_material.emission_energy_multiplier = 0.3
 	wing_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	wing_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wing_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := node as MeshInstance3D

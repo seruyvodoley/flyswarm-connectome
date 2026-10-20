@@ -78,10 +78,10 @@ def import_meshes() -> list[bpy.types.Object]:
 def add_materials(meshes: list[bpy.types.Object]) -> None:
     body = make_material("Ebony cuticle · blue-black graphite", (0.004, 0.006, 0.009), 0.66, metallic=0.015)
     eye = make_material("Compound eyes · deep scarlet", (0.16, 0.002, 0.009), 0.32, metallic=0.01)
-    wing = make_material("Wing membrane · pale blue glass", (0.48, 0.70, 0.91), 0.48, alpha=0.14)
+    wing = make_material("Wing membrane · satin white", (0.96, 0.97, 1.0), 0.58)
     wing_shader = wing.node_tree.nodes.get("Principled BSDF")
-    wing_shader.inputs["Emission Color"].default_value = (0.34, 0.54, 0.78, 1.0)
-    wing_shader.inputs["Emission Strength"].default_value = 0.28
+    wing_shader.inputs["Emission Color"].default_value = (0.72, 0.75, 0.82, 1.0)
+    wing_shader.inputs["Emission Strength"].default_value = 0.24
     hair = make_material("Fine cuticular setae", (0.026, 0.034, 0.042), 0.62, metallic=0.02)
     for obj in meshes:
         if obj.name == "Drosophila_Compound_Eyes":

@@ -50,21 +50,35 @@ func run() -> void:
 		if "wing" in mesh_node.name.to_lower():
 			visible_wing_count += 1
 			var wing_material := mesh_node.material_override as StandardMaterial3D
-			if wing_material == null or wing_material.albedo_color.r < 0.98 or wing_material.albedo_color.g < 0.98 or wing_material.albedo_color.b < 0.98 or wing_material.albedo_color.a < 0.99 or wing_material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not wing_material.emission_enabled or wing_material.emission.r < 0.98 or wing_material.emission.g < 0.98 or wing_material.emission.b < 0.98 or wing_material.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
-				_fail("Open Day fly wings must use an opaque, bright white material")
+			if wing_material == null or wing_material.albedo_color.r >= wing_material.albedo_color.b or wing_material.albedo_color.g >= wing_material.albedo_color.b or wing_material.albedo_color.a < 0.99 or wing_material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not wing_material.emission_enabled or wing_material.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
+				_fail("Open Day fly wings must use an opaque pale-blue material")
 			if mesh_node.mesh == null:
 				_fail("Open Day fly wing node must have a mesh")
 			else:
 				for surface_index in mesh_node.mesh.get_surface_count():
 					if mesh_node.get_surface_override_material(surface_index) != wing_material:
-						_fail("Open Day fly wing surfaces must explicitly use the white material")
-	if visible_wing_count < 2:
-		_fail("Open Day fly preview must display both white wings")
-	await _frames(30)
+						_fail("Open Day fly wing surfaces must explicitly use the pale-blue material")
+	if visible_wing_count != 6:
+		_fail("Open Day fly preview must color all six wing membrane/vein meshes pale blue (found %d)" % visible_wing_count)
+	for node in fly_preview.fly_model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		var material := mesh_node.material_override as StandardMaterial3D
+		if material == null:
+			_fail("Every visible fly mesh must have an explicit preview material")
+		elif "wing" not in mesh_node.name.to_lower() and "compound_eye" not in mesh_node.name.to_lower() and (material.albedo_color.r > 0.08 or material.albedo_color.g > 0.08 or material.albedo_color.b > 0.08):
+			_fail("Fly body and legs must stay dark; wrong mesh may have been labeled as a wing")
+	var largest_wing_pose_change := 0.0
+	for _frame in 60:
+		await _frames(1)
+		for index in fly_preview.wing_bone_indices.size():
+			var pose := fly_preview.fly_skeleton.get_bone_pose_rotation(fly_preview.wing_bone_indices[index])
+			largest_wing_pose_change = maxf(largest_wing_pose_change, 1.0 - absf(pose.dot(fly_preview.wing_bone_rest_rotations[index])))
+	if fly_preview.wing_bone_indices.size() != 2 or largest_wing_pose_change < 0.005:
+		_fail("Both real wing bones must visibly flap in the Open Day preview")
 	if fly_preview.foreleg_bone_indices.size() == 4 and fly_preview.foreleg_bone_rest_rotations.size() == 4:
 		var current_foreleg_pose := fly_preview.fly_skeleton.get_bone_pose_rotation(fly_preview.foreleg_bone_indices[0])
 		if absf(current_foreleg_pose.dot(fly_preview.foreleg_bone_rest_rotations[0])) > 0.99999:
-			_fail("Ebony Drosophila forelegs must animate during the Open Day preview")
+			_fail("Ebony Drosophila forelegs must animate gently during the Open Day preview")
 	else:
 		_fail("Ebony Drosophila preview did not initialize both animated forelegs")
 	if not is_equal_approx(fly.custom_minimum_size.y, 155.0) or not is_equal_approx(tank.custom_minimum_size.y, 155.0):

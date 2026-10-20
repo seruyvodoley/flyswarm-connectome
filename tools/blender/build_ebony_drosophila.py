@@ -24,7 +24,8 @@ OUTPUT = Path(os.environ.get(
     str(ROOT / "frontend/godot/assets/environment/fly/fly.glb"),
 ))
 BODY_RATIO = float(os.environ.get("FLYSWARM_BODY_DECIMATE", "0.32"))
-WING_RATIO = float(os.environ.get("FLYSWARM_WING_DECIMATE", "0.46"))
+WING_RATIO = float(os.environ.get("FLYSWARM_WING_DECIMATE", "0.88"))
+WING_SOURCE_NAMES = {f"Object_{index}" for index in range(11, 17)}
 
 
 def make_material(name: str, color: tuple[float, float, float], roughness: float,
@@ -59,8 +60,12 @@ def import_meshes() -> list[bpy.types.Object]:
             polygon.use_smooth = True
         obj.data.materials.clear()
         source_name = obj.name
-        if source_name in {"Object_8", "Object_9"}:
-            obj.name = "Drosophila_Wing_L" if source_name == "Object_8" else "Drosophila_Wing_R"
+        # The source GLB uses generic node names. Isolated visual QA renders
+        # show that Object_8/9 are legs and Objects_11..16 are six pieces of
+        # the two wing membranes/veins. Tinting only Object_15/16 left the
+        # other wing surfaces black in the Godot preview.
+        if source_name in WING_SOURCE_NAMES:
+            obj.name = f"Drosophila_Wing_Part_{source_name.removeprefix('Object_')}"
         elif source_name == "Object_10":
             obj.name = "Drosophila_Compound_Eyes"
         else:
@@ -190,14 +195,20 @@ def rig(meshes: list[bpy.types.Object]) -> bpy.types.Object:
     root.head = body_center
     root.tail = body_center + Vector((0, 0, 0.18))
 
-    wing_bones: dict[str, bpy.types.EditBone] = {}
+    wing_points: dict[str, list[Vector]] = {"left": [], "right": []}
     for obj in wings:
-        coords = [Vector(tuple(v.co)) for v in obj.data.vertices]
-        nearest_index = min(range(len(coords)), key=lambda i: (coords[i] - body_center).length)
-        root_point = coords[nearest_index]
-        tip_point = max(coords, key=lambda p: (p - root_point).length)
-        bone_name = "wing_left" if obj.name.endswith("_L") else "wing_right"
-        wing_bones[bone_name] = new_bone(armature_data, bone_name, root_point, tip_point, root)
+        for vertex in obj.data.vertices:
+            side = "left" if vertex.co.x < body_center.x else "right"
+            wing_points[side].append(Vector(tuple(vertex.co)))
+    wing_bones: dict[str, bpy.types.EditBone] = {}
+    for side in ["left", "right"]:
+        coords = wing_points[side]
+        if not coords:
+            raise RuntimeError(f"The selected model has no {side} wing geometry")
+        root_point = min(coords, key=lambda point: (point - body_center).length)
+        tip_point = max(coords, key=lambda point: (point - root_point).length)
+        bone_name = f"wing_{side}"
+        wing_bones[side] = new_bone(armature_data, bone_name, root_point, tip_point, root)
 
     # Two compact, independent foreleg controls drive the rubbing/grooming
     # motion. Vertex falloff is tied only to the corresponding scan surface.
@@ -228,8 +239,13 @@ def rig(meshes: list[bpy.types.Object]) -> bpy.types.Object:
         root_weight = np.ones(len(points), dtype=np.float64)
 
         if obj in wings:
-            bone_name = "wing_left" if obj.name.endswith("_L") else "wing_right"
-            group_weights[bone_name] = np.ones(len(points), dtype=np.float64)
+            # The downloaded scan split the wings into several generic mesh
+            # objects, including one bilateral object. Drive each vertex by
+            # its side of the thorax so every membrane/vein piece follows the
+            # correct wing bone.
+            left = points[:, 0] < body_center.x
+            group_weights["wing_left"] = left.astype(np.float64)
+            group_weights["wing_right"] = (~left).astype(np.float64)
             root_weight.fill(0.0)
         else:
             for side, segments in front_legs.items():

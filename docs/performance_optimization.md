@@ -41,3 +41,35 @@ The small hit sample is not enough to guarantee every first hit stays below the 
 - Physical DualSense, packaged app, and real MaleCNS dataset startup were not part of this performance run.
 
 Profiles are stored outside the repository on the RisingSail SSD under `FlySwarm-Build/performance-qa-before/` and `FlySwarm-Build/performance-qa-after/`.
+
+## Follow-up verification — 2026-10-21
+
+After the fly preview mesh and materials were corrected, I repeated the current
+performance samples on the same Apple M2 / Godot 4.7.2 / Metal Forward Mobile
+environment at 1280 × 800 with VSync enabled. The Open Day menu was sampled for
+15 seconds after warm-up; the battle used rule controllers and synthetic fire
+input for 30 seconds, camera mode 3, and vegetation density 0.6. These are
+post-change measurements; the earlier before/after comparison above remains a
+cumulative comparison and does not isolate every code change.
+
+| Scenario | Frames / events | Mean | p99 | Maximum |
+| --- | ---: | ---: | ---: | ---: |
+| Open Day menu frame time | 900 frames | 16.64 ms | 19.05 ms | 31.69 ms |
+| Open Day menu presentation | 900 frames | 60.00 FPS | — | — |
+| Rule battle frame time | 1,751 frames | 17.10 ms | 26.12 ms | 418.23 ms |
+| Rule battle shot frames | 9 shots | 17.00 ms | — | 18.31 ms |
+| Rule battle hit frames | 3 hits | 17.00 ms | — | 17.51 ms |
+| Rule battle physics time | 1,304 steps | 11.71 ms | 75.34 ms | 75.34 ms |
+
+The hit and shot frames stayed close to ordinary frame time in this run. A
+separate 418 ms frame and a 75 ms physics step remain in the full battle sample,
+so this does not establish that every battle frame is hitch-free. Godot does not
+expose GPU time or total CPU/GPU utilization for this renderer; those were not
+inferred from frame time. The menu reported 53.1 MB mean static memory and 248.4
+MB video memory; these values are Godot monitors, not total process RSS.
+
+The interactive Open Day vehicle validation also captured the fly at 0°, 90°,
+180°, 270°, 360°, maximum inspection pitch, and side view. All six wing meshes
+now have the pale-blue material, the two wing bones move, the body and legs stay
+dark, and the model remains inside its preview at every captured angle. It
+passed with zero failures after the camera fit margin was corrected.

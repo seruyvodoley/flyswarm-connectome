@@ -10,6 +10,7 @@ const MAX_PITCH_DEGREES := 24.0
 var fly_root: Node3D
 var fly_tilt: Node3D
 var orientation_correction: Node3D
+var fly_model: Node3D
 var preview_camera: Camera3D
 var floor_stage: MeshInstance3D
 var fit_bounds := AABB()
@@ -91,7 +92,7 @@ func _ready() -> void:
 	if fly_scene == null:
 		push_error("Missing FlySwarm Drosophila preview model: fly.glb")
 		return
-	var fly_model := fly_scene.instantiate() as Node3D
+	fly_model = fly_scene.instantiate() as Node3D
 	fly_model.name = "DrosophilaModel"
 	orientation_correction.add_child(fly_model)
 	_apply_preview_wing_material(fly_model)
@@ -104,26 +105,38 @@ func _ready() -> void:
 
 func _apply_preview_wing_material(model: Node3D) -> void:
 	var wing_material := StandardMaterial3D.new()
-	# The source GLB's membrane is tinted blue-grey. Override it with a neutral,
-	# emissive white so it stays visibly white against both the dark body and
-	# the preview's dark studio background.
-	wing_material.albedo_color = Color.WHITE
+	# Keep the user-requested pale-blue wing membrane opaque: the CT mesh has
+	# many fine gaps, and alpha blending let the dark thorax show through as a
+	# black wing in the small preview window.
+	wing_material.albedo_color = Color(0.66, 0.84, 1.0)
 	wing_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	wing_material.roughness = 0.82
+	wing_material.roughness = 0.54
 	wing_material.metallic = 0.0
 	wing_material.emission_enabled = true
-	wing_material.emission = Color.WHITE
-	wing_material.emission_energy_multiplier = 0.9
+	wing_material.emission = Color(0.48, 0.72, 0.92)
+	wing_material.emission_energy_multiplier = 0.24
 	wing_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	wing_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wing_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
+	wing_material.vertex_color_use_as_albedo = false
+	var body_material := StandardMaterial3D.new()
+	body_material.albedo_color = Color(0.018, 0.027, 0.038)
+	body_material.roughness = 0.62
+	body_material.metallic = 0.04
+	body_material.vertex_color_use_as_albedo = false
+	var eye_material := StandardMaterial3D.new()
+	eye_material.albedo_color = Color(0.54, 0.018, 0.045)
+	eye_material.roughness = 0.30
+	eye_material.metallic = 0.02
+	eye_material.vertex_color_use_as_albedo = false
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := node as MeshInstance3D
-		if "wing" in mesh_node.name.to_lower():
-			mesh_node.material_override = wing_material
-			if mesh_node.mesh != null:
-				for surface_index in mesh_node.mesh.get_surface_count():
-					mesh_node.set_surface_override_material(surface_index, wing_material)
+		var node_name := mesh_node.name.to_lower()
+		var selected_material := wing_material if "wing" in node_name else eye_material if "compound_eye" in node_name else body_material
+		mesh_node.material_override = selected_material
+		if mesh_node.mesh != null:
+			for surface_index in mesh_node.mesh.get_surface_count():
+				mesh_node.set_surface_override_material(surface_index, selected_material)
 
 func _setup_wing_animation(model: Node3D) -> void:
 	var skeleton_nodes := model.find_children("*", "Skeleton3D", true, false)
@@ -135,7 +148,9 @@ func _setup_wing_animation(model: Node3D) -> void:
 				continue
 			wing_bone_indices.append(bone_index)
 			wing_bone_rest_rotations.append(fly_skeleton.get_bone_pose_rotation(bone_index))
-			var body_axis_local := fly_skeleton.get_bone_global_rest(bone_index).basis.inverse() * Vector3.BACK
+			# The fly's thorax-to-abdomen axis runs along local X. Rotating around
+			# camera depth only folds the membranes and makes the flap hard to see.
+			var body_axis_local := fly_skeleton.get_bone_global_rest(bone_index).basis.inverse() * Vector3.RIGHT
 			wing_bone_local_axes.append(body_axis_local.normalized())
 		for bone_name in ["foreleg_upper_left", "foreleg_lower_left", "foreleg_upper_right", "foreleg_lower_right"]:
 			var bone_index := fly_skeleton.find_bone(bone_name)
@@ -221,10 +236,12 @@ func _sync_viewport_size() -> void:
 	var side_view_adjustment := absf(sin(yaw_radians))
 	var rear_view_adjustment := clampf(-cos(yaw_radians), 0.0, 1.0)
 	var pitch_adjustment := clampf(absf(pitch_degrees) / MAX_PITCH_DEGREES, 0.0, 1.0)
-	var zoom_for_side := lerpf(0.55, 0.64, side_view_adjustment)
-	var zoom_for_rear := lerpf(0.55, 0.92, rear_view_adjustment)
-	var zoom_for_pitch := lerpf(0.55, 0.70, pitch_adjustment)
-	distance = distance * maxf(zoom_for_side, maxf(zoom_for_rear, zoom_for_pitch)) + 0.08
+	# `distance` already accounts for the projected width and height of every
+	# transformed bounds corner. Multipliers below 1.0 zoomed inside that fit,
+	# clipping the wing tips when the user rotated the model. Keep a small safety
+	# margin for the low-poly scan's sparse points and the animated wing bones.
+	var inspection_margin := 1.06 + 0.08 * side_view_adjustment + 0.02 * rear_view_adjustment + 0.02 * pitch_adjustment
+	distance = distance * inspection_margin + 0.08
 	var look_target := Vector3(0.0, 0.0, 0.0)
 	preview_camera.position = look_target + Vector3(0.0, distance * 0.18, distance)
 	preview_camera.look_at(look_target, Vector3.UP)
@@ -303,21 +320,21 @@ func _process(delta: float) -> void:
 			fly_root.rotation.y = deg_to_rad(yaw_degrees)
 			_sync_viewport_size()
 			preview_elapsed += delta
-			var flap := sin(preview_elapsed * 47.0) * 0.22
+			var flap := sin(preview_elapsed * 69.0) * 0.62
 			if is_instance_valid(fly_skeleton) and not wing_bone_indices.is_empty():
 				for index in wing_bone_indices.size():
 					var side := 1.0 if index == 0 else -1.0
 					var flutter := Quaternion(wing_bone_local_axes[index], flap * side)
 					fly_skeleton.set_bone_pose_rotation(wing_bone_indices[index], wing_bone_rest_rotations[index] * flutter)
-				var groom_envelope := pow(maxf(0.0, sin(preview_elapsed * 0.72)), 6.0)
-				var rub := sin(preview_elapsed * 15.0) * groom_envelope
+				var groom_envelope := pow(maxf(0.0, sin(preview_elapsed * 0.34)), 6.0)
+				var rub := sin(preview_elapsed * 4.2) * groom_envelope
 				for index in foreleg_bone_indices.size():
 					var foreleg_side := -1.0 if index < 2 else 1.0
-					var bend := 0.04
+					var bend := 0.012
 					if index % 2 == 0:
-						bend += groom_envelope * 0.17 + rub * 0.055
+						bend += groom_envelope * 0.10 + rub * 0.025
 					else:
-						bend += groom_envelope * 0.27 + rub * 0.10
+						bend += groom_envelope * 0.16 + rub * 0.045
 					var movement := Quaternion(foreleg_bone_local_axes[index], foreleg_side * bend)
 					fly_skeleton.set_bone_pose_rotation(foreleg_bone_indices[index], foreleg_bone_rest_rotations[index] * movement)
 			else:

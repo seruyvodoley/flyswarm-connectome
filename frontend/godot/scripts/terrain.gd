@@ -10,12 +10,13 @@ var extent = 750.0
 var forest_center = Vector2(-380, -20)
 var forest_radius = 170.0
 var forest_zones:Array[Dictionary]=[]
+var relief_mounds:Array[Dictionary]=[]
 const HistoricalEnvironmentScript=preload("res://scripts/maps/historical_environment.gd")
 
 func height_at(x: float, z: float) -> float:
 	if demo_mode:
 		return demo_height_at(x,z)
-	var h := _legacy_height_at(x,z)
+	var h := _historical_height_at(x,z) if environment_profile=="historical_krasny" else _legacy_height_at(x,z)
 	if environment_profile == "enhanced_physical" and not training and not range_flat:
 		# Preserve the valley, ridge, and dry wash while adding gentle, repeatable
 		# field undulation. Road shoulders ease back to the original height field.
@@ -45,6 +46,20 @@ func _legacy_height_at(x: float, z: float) -> float:
 	if absf(x)<30: river = -1
 	return hills+ridge+valley+river
 
+func _historical_height_at(x:float,z:float)->float:
+	var phase=float(map_seed%37)*.03
+	var rolling=3.7*sin(x/205.0+phase)*cos(z/218.0)+2.8*sin(z/126.0+phase*.7)*sin(x/188.0)
+	var ridge_axis=13.0*sin(x/360.0+phase)
+	var north_ridge=9.0*exp(-pow((z-(132.0+ridge_axis))/82.0,2.0))
+	var south_ridge=8.0*exp(-pow((z-(-132.0+ridge_axis))/88.0,2.0))
+	var central_hollow=-3.5*exp(-pow(z/91.0,2.0))
+	var river=-2.2*exp(-pow((z-22.0*sin(x/230.0+phase))/31.0,2.0))
+	var landform=0.0
+	for mound in relief_mounds:
+		var dx=(x-float(mound.x))/float(mound.rx);var dz=(z-float(mound.z))/float(mound.rz)
+		landform+=float(mound.height)*exp(-.5*(dx*dx+dz*dz))
+	return rolling+north_ridge+south_ridge+central_hollow+river+landform
+
 func _main_road_z(x: float) -> float:
 	return sin(x * 0.012) * 11.0 + sin(x * 0.031 + 0.8) * 3.5 - 92.0
 
@@ -55,8 +70,13 @@ func _west_road_x(z: float) -> float:
 	return -248.0 + sin(z * 0.011 + 1.2) * 9.0
 
 func demo_height_at(x: float,z: float) -> float:
-	# Keep the valley gently rolling so tanks can engage after the opening smoke lifts.
-	return .38*sin(x/78.0)*cos(z/92.0)+.22*sin(z/46.0)*sin(x/61.0)
+	# Low, broad shoulders give hull-down approaches without putting a hard wall
+	# across the short 1v1 sight line or making any vehicle-class slope unsafe.
+	var base=.38*sin(x/78.0)*cos(z/92.0)+.22*sin(z/46.0)*sin(x/61.0)
+	var shoulders=2.4*exp(-pow((x+105.0)/48.0,2.0)-pow((z-32.0)/40.0,2.0))
+	shoulders+=2.6*exp(-pow((x-105.0)/50.0,2.0)-pow((z+34.0)/40.0,2.0))
+	var swales=-.9*exp(-pow(x/42.0,2.0)-pow((z-54.0)/33.0,2.0))-.8*exp(-pow(x/44.0,2.0)-pow((z+54.0)/33.0,2.0))
+	return base+shoulders+swales
 
 func material(c: Color) -> StandardMaterial3D:
 	var m=StandardMaterial3D.new()
@@ -86,6 +106,13 @@ func build(is_training: bool, seed_value: int, size: float):
 	training=is_training
 	map_seed=seed_value
 	extent=size/2
+	relief_mounds.clear();forest_zones.clear()
+	var relief_rng=RandomNumberGenerator.new();relief_rng.seed=map_seed^0x4b56594
+	if environment_profile=="historical_krasny" and not training and not range_flat:
+		for i in 10:
+			var mx=relief_rng.randf_range(-extent*.72,extent*.72);var mz=relief_rng.randf_range(-260.0,260.0)
+			if absf(mx)<78.0:mx=signf(mx if not is_zero_approx(mx) else 1.0)*relief_rng.randf_range(100.0,260.0)
+			relief_mounds.append({"x":mx,"z":mz,"rx":relief_rng.randf_range(105.0,195.0),"rz":relief_rng.randf_range(75.0,145.0),"height":relief_rng.randf_range(2.8,7.5)*(1.0 if i%2==0 else -0.62)})
 	if demo_mode:
 		build_demo_ground(size)
 		return

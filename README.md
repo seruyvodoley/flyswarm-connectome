@@ -16,18 +16,16 @@ Student Edition скрывает Open Day и MaleCNS Combat Training. В обе�
 
 ## Скриншоты
 
-Актуальный экран FlySwarm Student, снятый из запущенного приложения 22 октября
-2026 года:
+Снимки сделаны 22 октября 2026 года непосредственно из установленных приложений
+FlySwarm и FlySwarm Student на macOS.
 
-![Главный экран FlySwarm Student](docs/media/student-home-2026-10-22.png)
+### FlySwarm
 
-Экран Open Day полной версии:
+![Главный экран установленной полной версии FlySwarm](docs/media/flyswarm-installed-home-2026-10-22.png)
 
-![Open Day: «Муха управляет танком»](artifacts/open_day_graphics/main-ru.png)
+### FlySwarm Student
 
-Бой с живой панелью сигналов MaleCNS:
-
-![Бой Open Day с сигналами MaleCNS](artifacts/open_day_graphics/battle-live-malecns-1280x720.png)
+![Главный экран установленной FlySwarm Student](docs/media/flyswarm-student-installed-home-2026-10-22.png)
 
 ## Скачать
 

@@ -17,11 +17,15 @@ var student_agent_path=""
 var student_reward_path=""
 var code_status_label: Label
 var code_cursor_label: Label
-var code_file_tabs: Dictionary = {}
 var code_file_items: Dictionary = {}
 var code_explorer: VBoxContainer
 var code_search: LineEdit
 var code_search_results: Label
+var code_find_bar: HBoxContainer
+var code_find_input: LineEdit
+var code_find_status: Label
+var code_find_last_query := ""
+var code_find_last_match := -1
 var code_breadcrumb: Label
 var code_stop_button: Button
 var code_dirty := false
@@ -117,16 +121,9 @@ func _build_programming_tab(tabs:TabContainer):
 	if not FileAccess.file_exists(student_reward_path):FileAccess.open(student_reward_path,FileAccess.WRITE).store_string('def calculate_reward(components):\n    return float(3.0 * components["objective_capture"] + 0.01 * components["damage_dealt"] - 4.0 * components["own_death"])\n')
 	var toolbar_frame=PanelContainer.new();toolbar_frame.add_theme_stylebox_override("panel",_editor_toolbar_style(appearance));panel.add_child(toolbar_frame)
 	var toolbar=HBoxContainer.new();toolbar.add_theme_constant_override("separation",5);toolbar_frame.add_child(toolbar)
-	var agent_tab=Button.new();agent_tab.text="agent.py";agent_tab.pressed.connect(func():_switch_code("agent"));toolbar.add_child(agent_tab)
-	var reward_tab=Button.new();reward_tab.text="reward.py";reward_tab.pressed.connect(func():_switch_code("reward"));toolbar.add_child(reward_tab)
-	code_file_tabs={"agent":agent_tab,"reward":reward_tab}
-	for key in code_file_tabs:
-		var file_tab:Button=code_file_tabs[key];file_tab.toggle_mode=true;file_tab.button_pressed=key==active_code
-		file_tab.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("pressed",DesignSystem.tab_style(appearance,true));file_tab.add_theme_color_override("font_color",DesignSystem.text_for(appearance))
-	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;toolbar.add_child(spacer)
-	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.tooltip_text="⌘S / Ctrl+S";save_button.pressed.connect(_save_current_code);toolbar.add_child(save_button)
+	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.tooltip_text=_t("Сохранить текущий файл · ⌘S / Ctrl+S","Save current file · ⌘S / Ctrl+S");save_button.pressed.connect(_save_current_code);toolbar.add_child(save_button)
 	var check=Button.new();check.text=_t("Проверить код","Check code");check.tooltip_text=_t("Проверить agent.py и reward.py","Validate agent.py and reward.py");check.pressed.connect(func():_confirm_student_run("check"));toolbar.add_child(check)
-	var run=Button.new();run.text=_t("▶ Запустить агента","▶ Run agent");run.tooltip_text=_t("Оценить агента на трёх эпизодах","Evaluate the agent over three episodes");run.pressed.connect(func():_confirm_student_run("student"));toolbar.add_child(run)
+	var run=Button.new();run.text=_t("▶ Запустить агента","▶ Run agent");run.tooltip_text=_t("Оценить агента на трёх эпизодах · F5","Evaluate the agent over three episodes · F5");run.pressed.connect(func():_confirm_student_run("student"));toolbar.add_child(run)
 	code_stop_button=Button.new();code_stop_button.text=_t("Остановить","Stop");code_stop_button.visible=false;code_stop_button.pressed.connect(AppState.stop_marl_job);toolbar.add_child(code_stop_button)
 	var more=MenuButton.new();more.text="⋯";more.tooltip_text=_t("Другие действия","More actions");toolbar.add_child(more)
 	var more_menu=more.get_popup();more_menu.add_item(_t("Импортировать файл Python…","Import Python file…"),1);more_menu.add_item(_t("Восстановить шаблон","Restore template"),2);more_menu.add_separator();more_menu.add_item(_t("Экспортировать практическую…","Export practical…"),3)
@@ -134,7 +131,7 @@ func _build_programming_tab(tabs:TabContainer):
 	var workspace=HBoxContainer.new();workspace.size_flags_vertical=Control.SIZE_EXPAND_FILL;workspace.size_flags_horizontal=Control.SIZE_EXPAND_FILL;workspace.add_theme_constant_override("separation",0);panel.add_child(workspace)
 	var activity=VBoxContainer.new();activity.custom_minimum_size.x=42;activity.add_theme_constant_override("separation",8);workspace.add_child(activity)
 	var explorer_icon=Button.new();explorer_icon.text="▤";explorer_icon.tooltip_text=_t("Проводник","Explorer");explorer_icon.pressed.connect(func():code_explorer.visible=true;code_search.visible=false);activity.add_child(explorer_icon)
-	var search_icon=Button.new();search_icon.text="⌕";search_icon.tooltip_text=_t("Поиск по двум файлам","Search files");search_icon.pressed.connect(func():code_explorer.visible=true;code_search.visible=true;code_search.grab_focus());activity.add_child(search_icon)
+	var search_icon=Button.new();search_icon.text="⌕";search_icon.tooltip_text=_t("Поиск по двум файлам · ⇧⌘F / Ctrl+Shift+F","Search both files · ⇧⌘F / Ctrl+Shift+F");search_icon.pressed.connect(func():code_explorer.visible=true;code_search.visible=true;code_search.grab_focus());activity.add_child(search_icon)
 	var activity_spacer=Control.new();activity_spacer.size_flags_vertical=Control.SIZE_EXPAND_FILL;activity.add_child(activity_spacer)
 	var explorer_split=HSplitContainer.new();explorer_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;explorer_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;explorer_split.split_offset=205;explorer_split.dragger_visibility=SplitContainer.DRAGGER_VISIBLE;workspace.add_child(explorer_split)
 	var explorer_panel=PanelContainer.new();explorer_panel.custom_minimum_size=Vector2(176,0);explorer_panel.add_theme_stylebox_override("panel",DesignSystem.panel_style(appearance));explorer_split.add_child(explorer_panel)
@@ -143,12 +140,19 @@ func _build_programming_tab(tabs:TabContainer):
 	var explorer_title=Label.new();explorer_title.text=_t("ПРОВОДНИК","EXPLORER");explorer_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;explorer_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));explorer_header.add_child(explorer_title)
 	code_search=LineEdit.new();code_search.placeholder_text=_t("Поиск в agent.py и reward.py","Search agent.py and reward.py");code_search.visible=false;code_search.text_changed.connect(_search_code_files);code_explorer.add_child(code_search)
 	code_search_results=Label.new();code_search_results.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;code_search_results.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(code_search_results)
-	var files_header=Label.new();files_header.text=_t("ОТКРЫТЫЕ ФАЙЛЫ","OPEN FILES");files_header.add_theme_font_size_override("font_size",13);files_header.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(files_header)
+	var files_header=Label.new();files_header.text=_t("ФАЙЛЫ ПРОЕКТА","PROJECT FILES");files_header.add_theme_font_size_override("font_size",13);files_header.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(files_header)
 	for key in ["agent","reward"]:
 		var file_item=Button.new();file_item.alignment=HORIZONTAL_ALIGNMENT_LEFT;file_item.text="›  "+key+".py";file_item.tooltip_text=_t("Логика действий танка: act(...) возвращает шесть значений управления.","Tank policy: act(...) returns six control values.") if key=="agent" else _t("Награда за шаг: calculate_reward(...) возвращает одно число.","Per-step reward: calculate_reward(...) returns one number.");file_item.pressed.connect(func():_switch_code(key));file_item.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_item.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,true));file_item.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_explorer.add_child(file_item);code_file_items[key]=file_item
 	var editor_column=VBoxContainer.new();editor_column.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_column.add_theme_constant_override("separation",0);explorer_split.add_child(editor_column)
 	var breadcrumb_bar=HBoxContainer.new();breadcrumb_bar.custom_minimum_size.y=30;breadcrumb_bar.add_theme_constant_override("separation",6);editor_column.add_child(breadcrumb_bar)
 	code_breadcrumb=Label.new();code_breadcrumb.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_breadcrumb.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));breadcrumb_bar.add_child(code_breadcrumb)
+	code_find_bar=HBoxContainer.new();code_find_bar.add_theme_constant_override("separation",6);code_find_bar.visible=false;editor_column.add_child(code_find_bar)
+	code_find_input=LineEdit.new();code_find_input.placeholder_text=_t("Найти в текущем файле","Find in current file");code_find_input.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_find_input.text_changed.connect(_on_code_find_query_changed);code_find_bar.add_child(code_find_input)
+	var find_previous=Button.new();find_previous.text="↑";find_previous.tooltip_text=_t("Предыдущее совпадение · Shift+Enter","Previous match · Shift+Enter");find_previous.pressed.connect(func():_find_in_current_file(true));code_find_bar.add_child(find_previous)
+	var find_next=Button.new();find_next.text="↓";find_next.tooltip_text=_t("Следующее совпадение · Enter","Next match · Enter");find_next.pressed.connect(func():_find_in_current_file(false));code_find_bar.add_child(find_next)
+	code_find_status=Label.new();code_find_status.custom_minimum_size.x=75;code_find_bar.add_child(code_find_status)
+	var close_find=Button.new();close_find.text="×";close_find.tooltip_text=_t("Закрыть поиск · Esc","Close search · Esc");close_find.pressed.connect(_close_code_find);code_find_bar.add_child(close_find)
+	code_find_input.gui_input.connect(_on_find_input_key)
 	var editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_split.split_offset=-90;editor_column.add_child(editor_split)
 	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=200;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
 	var mono=SystemFont.new();mono.font_names=PackedStringArray(["SF Mono","Menlo","Monaco","monospace"]);code_editor.add_theme_font_override("font",mono);code_editor.add_theme_font_size_override("font_size",17);editor_split.add_child(code_editor)
@@ -233,14 +237,9 @@ func _on_code_changed():
 
 func _set_code_dirty(dirty:bool):
 	code_dirty=dirty
-	if code_file_tabs.is_empty():return
-	var button=code_file_tabs.get(active_code)
-	if is_instance_valid(button):button.text=("● " if dirty else "")+active_code+".py";button.button_pressed=true
 	var sidebar_item=code_file_items.get(active_code)
 	if is_instance_valid(sidebar_item):sidebar_item.text=("›  " if not dirty else "● ")+active_code+".py";sidebar_item.add_theme_stylebox_override("normal",DesignSystem.tab_style(str(AppState.settings.get("appearance","dark")),true))
-	for key in code_file_tabs:
-		var tab:Button=code_file_tabs[key]
-		if is_instance_valid(tab) and key!=active_code:tab.button_pressed=false
+	for key in code_file_items:
 		var item=code_file_items.get(key)
 		if is_instance_valid(item) and key!=active_code:item.text="   "+key+".py";item.add_theme_stylebox_override("normal",DesignSystem.tab_style(str(AppState.settings.get("appearance","dark")),false))
 	if is_instance_valid(code_status_label):code_status_label.text=_t("Не сохранено","Unsaved changes") if dirty else _t("Сохранено","Saved")
@@ -252,15 +251,67 @@ func _update_code_cursor():
 func _unhandled_key_input(event:InputEvent):
 	if not event is InputEventKey or not event.pressed or event.echo or not is_instance_valid(code_editor):return
 	var key=event as InputEventKey
-	if key.keycode==KEY_S and (key.ctrl_pressed or key.meta_pressed):
+	if not code_editor.is_visible_in_tree():return
+	var command_modifier=key.ctrl_pressed or key.meta_pressed
+	if key.keycode==KEY_S and command_modifier:
 		_save_current_code();get_viewport().set_input_as_handled()
+	elif key.keycode==KEY_F and command_modifier and not key.shift_pressed:
+		_open_code_find();get_viewport().set_input_as_handled()
+	elif key.keycode==KEY_F and command_modifier and key.shift_pressed:
+		code_explorer.visible=true;code_search.visible=true;code_search.grab_focus();get_viewport().set_input_as_handled()
+	elif key.keycode==KEY_F5:
+		_confirm_student_run("student");get_viewport().set_input_as_handled()
+	elif key.keycode==KEY_ESCAPE and code_find_bar.visible:
+		_close_code_find();get_viewport().set_input_as_handled()
+
+func _open_code_find():
+	code_find_bar.visible=true;code_find_input.grab_focus();code_find_input.select_all()
+
+func _close_code_find():
+	code_find_bar.visible=false;code_editor.grab_focus()
+
+func _on_code_find_query_changed(_query:String):
+	code_find_last_query=code_find_input.text;code_find_last_match=-1
+	_find_in_current_file(false)
+
+func _on_find_input_key(event:InputEvent):
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode==KEY_ENTER:
+			_find_in_current_file(event.shift_pressed);get_viewport().set_input_as_handled()
+		elif event.keycode==KEY_ESCAPE:
+			_close_code_find();get_viewport().set_input_as_handled()
+
+func _find_in_current_file(backwards:bool):
+	if not is_instance_valid(code_editor) or not is_instance_valid(code_find_input):return
+	var query=code_find_input.text
+	if query.is_empty():code_find_status.text="";return
+	var source=code_editor.text
+	if query!=code_find_last_query:code_find_last_query=query;code_find_last_match=-1
+	var start_offset=code_find_last_match if backwards else code_find_last_match+query.length()
+	if code_find_last_match<0:
+		for line_index in range(code_editor.get_caret_line()):start_offset+=code_editor.get_line(line_index).length()+1
+		start_offset+=code_editor.get_caret_column()
+	var match_offset=source.rfind(query,start_offset-1) if backwards else source.find(query,start_offset)
+	if match_offset<0:match_offset=source.rfind(query) if backwards else source.find(query)
+	if match_offset<0:code_find_status.text=_t("Нет совпадений","No match");return
+	code_find_last_match=match_offset
+	var before=source.substr(0,match_offset).split("\n")
+	var line_index=before.size()-1
+	var column=before[before.size()-1].length()
+	code_editor.set_caret_line(line_index);code_editor.set_caret_column(column);code_editor.select(line_index,column,line_index,column+query.length());code_editor.center_viewport_to_caret()
+	var total=source.count(query);var current=1;var count_offset=0
+	while count_offset<match_offset:
+		var next_match=source.find(query,count_offset)
+		if next_match<0 or next_match>=match_offset:break
+		current+=1;count_offset=next_match+query.length()
+	code_find_status.text="%d/%d" % [current,total]
 func _active_code_path()->String:return student_agent_path if active_code=="agent" else student_reward_path
 func _switch_code(next:String):
 	if is_instance_valid(code_editor):_save_current_code()
 	active_code=next
 	if is_instance_valid(code_editor):
 		loading_code=true;code_editor.text=FileAccess.get_file_as_string(_active_code_path()) if FileAccess.file_exists(_active_code_path()) else "";loading_code=false
-		_set_code_dirty(false);_update_code_cursor()
+		_set_code_dirty(false);_update_code_cursor();_update_code_breadcrumb()
 func _save_current_code():
 	if not is_instance_valid(code_editor):return
 	var file=FileAccess.open(_active_code_path(),FileAccess.WRITE)

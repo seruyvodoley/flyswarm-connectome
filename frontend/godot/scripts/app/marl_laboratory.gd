@@ -19,15 +19,29 @@ var code_status_label: Label
 var code_cursor_label: Label
 var code_file_items: Dictionary = {}
 var code_explorer: VBoxContainer
-var code_search: LineEdit
-var code_search_results: Label
-var code_find_bar: HBoxContainer
+var code_search_popup: PanelContainer
+var code_search_layer: CanvasLayer
+var code_search_mode: OptionButton
 var code_find_input: LineEdit
 var code_find_status: Label
 var code_find_last_query := ""
 var code_find_last_match := -1
 var code_breadcrumb: Label
 var code_stop_button: Button
+var editor_split: VSplitContainer
+var terminal_cwd_input: LineEdit
+var terminal_command_input: LineEdit
+var terminal_environment_button: Button
+var terminal_stop_button: Button
+var terminal_cwd := ""
+var terminal_venv := ""
+var terminal_pid := -1
+var terminal_output_path := ""
+var terminal_status_path := ""
+var terminal_last_output := ""
+var terminal_console_prefix := ""
+var terminal_poll_elapsed := 0.0
+var console_mode := "jobs"
 var code_dirty := false
 var loading_code := false
 
@@ -129,41 +143,53 @@ func _build_programming_tab(tabs:TabContainer):
 	var more_menu=more.get_popup();more_menu.add_item(_t("Импортировать файл Python…","Import Python file…"),1);more_menu.add_item(_t("Восстановить шаблон","Restore template"),2);more_menu.add_separator();more_menu.add_item(_t("Экспортировать практическую…","Export practical…"),3)
 	more_menu.id_pressed.connect(_on_editor_menu_action)
 	var workspace=HBoxContainer.new();workspace.size_flags_vertical=Control.SIZE_EXPAND_FILL;workspace.size_flags_horizontal=Control.SIZE_EXPAND_FILL;workspace.add_theme_constant_override("separation",0);panel.add_child(workspace)
-	var activity=VBoxContainer.new();activity.custom_minimum_size.x=42;activity.add_theme_constant_override("separation",8);workspace.add_child(activity)
-	var explorer_icon=Button.new();explorer_icon.text="▤";explorer_icon.tooltip_text=_t("Проводник","Explorer");explorer_icon.pressed.connect(func():code_explorer.visible=true;code_search.visible=false);activity.add_child(explorer_icon)
-	var search_icon=Button.new();search_icon.text="⌕";search_icon.tooltip_text=_t("Поиск по двум файлам · ⇧⌘F / Ctrl+Shift+F","Search both files · ⇧⌘F / Ctrl+Shift+F");search_icon.pressed.connect(func():code_explorer.visible=true;code_search.visible=true;code_search.grab_focus());activity.add_child(search_icon)
+	var activity=VBoxContainer.new();activity.custom_minimum_size.x=48;activity.add_theme_constant_override("separation",8);workspace.add_child(activity)
+	var explorer_icon=Button.new();explorer_icon.text="▤";explorer_icon.tooltip_text=_t("Проводник","Explorer");explorer_icon.pressed.connect(func():code_explorer.visible=true);activity.add_child(explorer_icon)
+	var search_icon=Button.new();search_icon.text="⌕";search_icon.tooltip_text=_t("Поиск · ⌘F / Ctrl+F; поиск по проекту · ⇧⌘F / Ctrl+Shift+F","Search · ⌘F / Ctrl+F; search project · ⇧⌘F / Ctrl+Shift+F");search_icon.custom_minimum_size=Vector2(44,44);search_icon.add_theme_font_size_override("font_size",24);search_icon.pressed.connect(func():_open_code_search(false));activity.add_child(search_icon)
 	var activity_spacer=Control.new();activity_spacer.size_flags_vertical=Control.SIZE_EXPAND_FILL;activity.add_child(activity_spacer)
 	var explorer_split=HSplitContainer.new();explorer_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;explorer_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;explorer_split.split_offset=205;explorer_split.dragger_visibility=SplitContainer.DRAGGER_VISIBLE;workspace.add_child(explorer_split)
 	var explorer_panel=PanelContainer.new();explorer_panel.custom_minimum_size=Vector2(176,0);explorer_panel.add_theme_stylebox_override("panel",DesignSystem.panel_style(appearance));explorer_split.add_child(explorer_panel)
 	code_explorer=VBoxContainer.new();code_explorer.add_theme_constant_override("separation",6);explorer_panel.add_child(code_explorer)
 	var explorer_header=HBoxContainer.new();code_explorer.add_child(explorer_header)
 	var explorer_title=Label.new();explorer_title.text=_t("ПРОВОДНИК","EXPLORER");explorer_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;explorer_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));explorer_header.add_child(explorer_title)
-	code_search=LineEdit.new();code_search.placeholder_text=_t("Поиск в agent.py и reward.py","Search agent.py and reward.py");code_search.visible=false;code_search.text_changed.connect(_search_code_files);code_explorer.add_child(code_search)
-	code_search_results=Label.new();code_search_results.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;code_search_results.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(code_search_results)
 	var files_header=Label.new();files_header.text=_t("ФАЙЛЫ ПРОЕКТА","PROJECT FILES");files_header.add_theme_font_size_override("font_size",13);files_header.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(files_header)
 	for key in ["agent","reward"]:
-		var file_item=Button.new();file_item.alignment=HORIZONTAL_ALIGNMENT_LEFT;file_item.text="›  "+key+".py";file_item.tooltip_text=_t("Логика действий танка: act(...) возвращает шесть значений управления.","Tank policy: act(...) returns six control values.") if key=="agent" else _t("Награда за шаг: calculate_reward(...) возвращает одно число.","Per-step reward: calculate_reward(...) returns one number.");file_item.pressed.connect(func():_switch_code(key));file_item.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_item.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,true));file_item.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_explorer.add_child(file_item);code_file_items[key]=file_item
+		var file_item=Button.new();file_item.alignment=HORIZONTAL_ALIGNMENT_LEFT;file_item.custom_minimum_size.y=44;file_item.text="›  "+key+".py";file_item.tooltip_text="";file_item.pressed.connect(func():_switch_code(key));file_item.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_item.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,true));file_item.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_explorer.add_child(file_item);code_file_items[key]=file_item
 	var editor_column=VBoxContainer.new();editor_column.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_column.add_theme_constant_override("separation",0);explorer_split.add_child(editor_column)
 	var breadcrumb_bar=HBoxContainer.new();breadcrumb_bar.custom_minimum_size.y=30;breadcrumb_bar.add_theme_constant_override("separation",6);editor_column.add_child(breadcrumb_bar)
 	code_breadcrumb=Label.new();code_breadcrumb.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_breadcrumb.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));breadcrumb_bar.add_child(code_breadcrumb)
-	var find_button=Button.new();find_button.text="⌕";find_button.tooltip_text=_t("Найти в текущем файле · ⌘F / Ctrl+F","Find in current file · ⌘F / Ctrl+F");find_button.pressed.connect(_open_code_find);breadcrumb_bar.add_child(find_button)
-	code_find_bar=HBoxContainer.new();code_find_bar.add_theme_constant_override("separation",6);code_find_bar.visible=false;editor_column.add_child(code_find_bar)
-	code_find_input=LineEdit.new();code_find_input.placeholder_text=_t("Найти в текущем файле","Find in current file");code_find_input.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_find_input.text_changed.connect(_on_code_find_query_changed);code_find_bar.add_child(code_find_input)
-	var find_previous=Button.new();find_previous.text="↑";find_previous.tooltip_text=_t("Предыдущее совпадение · Shift+Enter","Previous match · Shift+Enter");find_previous.pressed.connect(func():_find_in_current_file(true));code_find_bar.add_child(find_previous)
-	var find_next=Button.new();find_next.text="↓";find_next.tooltip_text=_t("Следующее совпадение · Enter","Next match · Enter");find_next.pressed.connect(func():_find_in_current_file(false));code_find_bar.add_child(find_next)
-	code_find_status=Label.new();code_find_status.custom_minimum_size.x=75;code_find_bar.add_child(code_find_status)
-	var close_find=Button.new();close_find.text="×";close_find.tooltip_text=_t("Закрыть поиск · Esc","Close search · Esc");close_find.pressed.connect(_close_code_find);code_find_bar.add_child(close_find)
+	code_search_layer=CanvasLayer.new();code_search_layer.layer=10;add_child(code_search_layer)
+	code_search_popup=PanelContainer.new();code_search_popup.visible=false;code_search_popup.custom_minimum_size=Vector2(420,0);code_search_popup.z_index=100;code_search_popup.add_theme_stylebox_override("panel",DesignSystem.panel_style(appearance));code_search_layer.add_child(code_search_popup);code_search_popup.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	var search_popup_content=VBoxContainer.new();search_popup_content.add_theme_constant_override("separation",6);code_search_popup.add_child(search_popup_content)
+	var search_popup_header=HBoxContainer.new();search_popup_content.add_child(search_popup_header)
+	var search_popup_title=Label.new();search_popup_title.text=_t("ПОИСК","SEARCH");search_popup_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;search_popup_header.add_child(search_popup_title)
+	var close_search=Button.new();close_search.text="×";close_search.tooltip_text=_t("Закрыть · Esc","Close · Esc");close_search.pressed.connect(_close_code_search);search_popup_header.add_child(close_search)
+	var search_mode_row=HBoxContainer.new();search_mode_row.add_theme_constant_override("separation",6);search_popup_content.add_child(search_mode_row)
+	code_search_mode=OptionButton.new();code_search_mode.add_item(_t("В текущем файле","Current file"),0);code_search_mode.add_item(_t("В файлах проекта","Project files"),1);code_search_mode.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_search_mode.item_selected.connect(_on_code_search_mode_changed);search_mode_row.add_child(code_search_mode)
+	code_find_input=LineEdit.new();code_find_input.placeholder_text=_t("Найти","Find");code_find_input.text_changed.connect(_on_code_search_query_changed);search_popup_content.add_child(code_find_input)
+	var search_results_scroll=ScrollContainer.new();search_results_scroll.custom_minimum_size.y=96;search_results_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;search_popup_content.add_child(search_results_scroll)
+	code_find_status=Label.new();code_find_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;code_find_status.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_find_status.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));search_results_scroll.add_child(code_find_status)
 	code_find_input.gui_input.connect(_on_find_input_key)
-	var editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_split.split_offset=-90;editor_column.add_child(editor_split)
-	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=200;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
+	code_search_popup.resized.connect(_schedule_code_search_position);editor_column.resized.connect(_schedule_code_search_position)
+	editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_split.split_offset=390;editor_split.dragger_visibility=SplitContainer.DRAGGER_VISIBLE;editor_column.add_child(editor_split)
+	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=130;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
 	var mono=SystemFont.new();mono.font_names=PackedStringArray(["SF Mono","Menlo","Monaco","monospace"]);code_editor.add_theme_font_override("font",mono);code_editor.add_theme_font_size_override("font_size",17);editor_split.add_child(code_editor)
 	code_editor.syntax_highlighter=_make_python_highlighter(appearance)
 	code_editor.text_changed.connect(_on_code_changed);code_editor.caret_changed.connect(_update_code_cursor);code_editor.caret_changed.connect(_update_code_breadcrumb)
-	var output_panel=VBoxContainer.new();output_panel.custom_minimum_size.y=220;output_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL;output_panel.add_theme_constant_override("separation",4);editor_split.add_child(output_panel)
-	var output_header=HBoxContainer.new();output_panel.add_child(output_header)
-	var output_title=Label.new();output_title.text=_t("ВЫВОД И ОШИБКИ","OUTPUT & ERRORS");output_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;output_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));output_header.add_child(output_title)
+	var output_panel=VBoxContainer.new();output_panel.custom_minimum_size.y=84;output_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL;output_panel.add_theme_constant_override("separation",4);editor_split.add_child(output_panel)
+	var output_header=HBoxContainer.new();output_header.add_theme_constant_override("separation",6);output_panel.add_child(output_header)
+	var output_title=Label.new();output_title.text=_t("Терминал","Terminal");output_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));output_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;output_header.add_child(output_title)
+	terminal_environment_button=Button.new();terminal_environment_button.text=_t("Python: системный","Python: system");terminal_environment_button.tooltip_text=_t("Выбрать виртуальное окружение Python","Choose a Python virtual environment");terminal_environment_button.pressed.connect(_choose_terminal_environment);output_header.add_child(terminal_environment_button)
 	var clear_output=Button.new();clear_output.text=_t("Очистить","Clear");clear_output.pressed.connect(func():code_console.clear());output_header.add_child(clear_output)
-	code_console=TextEdit.new();code_console.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_console.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_console.editable=false;code_console.wrap_mode=TextEdit.LINE_WRAPPING_BOUNDARY;code_console.placeholder_text=_t("Здесь появятся результат проверки, ход запуска и сообщения об ошибках.","Validation results, run progress, and errors will appear here.");code_console.add_theme_color_override("font_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("font_readonly_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("caret_color",DesignSystem.muted_for(appearance));code_console.add_theme_stylebox_override("read_only",_code_panel_style(appearance));code_console.add_theme_font_override("font",mono);code_console.add_theme_font_size_override("font_size",14);output_panel.add_child(code_console)
+	terminal_stop_button=Button.new();terminal_stop_button.text=_t("Остановить","Stop");terminal_stop_button.visible=false;terminal_stop_button.pressed.connect(_stop_terminal_command);output_header.add_child(terminal_stop_button)
+	var collapse_terminal=Button.new();collapse_terminal.text="⌄";collapse_terminal.tooltip_text=_t("Свернуть или развернуть терминал","Collapse or expand terminal");collapse_terminal.pressed.connect(func():editor_split.collapsed=not editor_split.collapsed);output_header.add_child(collapse_terminal)
+	var terminal_path_row=HBoxContainer.new();terminal_path_row.add_theme_constant_override("separation",6);output_panel.add_child(terminal_path_row)
+	terminal_cwd=_workspace_dir();terminal_cwd_input=LineEdit.new();terminal_cwd_input.text=terminal_cwd;terminal_cwd_input.placeholder_text=_t("Рабочая папка — введите путь или используйте «Обзор»","Working folder — enter a path or use Browse");terminal_cwd_input.tooltip_text=_t("Команды выполняются в этой папке","Commands run in this folder");terminal_cwd_input.size_flags_horizontal=Control.SIZE_EXPAND_FILL;terminal_cwd_input.custom_minimum_size.x=160;terminal_cwd_input.text_submitted.connect(_set_terminal_cwd);terminal_path_row.add_child(terminal_cwd_input)
+	var browse_cwd=Button.new();browse_cwd.text=_t("Обзор…","Browse…");browse_cwd.tooltip_text=_t("Выбрать папку на любом подключённом диске","Choose a folder on any mounted drive");browse_cwd.pressed.connect(_choose_terminal_cwd);terminal_path_row.add_child(browse_cwd)
+	code_console=TextEdit.new();code_console.custom_minimum_size.y=52;code_console.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_console.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_console.editable=false;code_console.wrap_mode=TextEdit.LINE_WRAPPING_BOUNDARY;code_console.placeholder_text=_t("Вывод команд, проверки и ошибок","Command output, checks, and errors");code_console.add_theme_color_override("font_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("font_readonly_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("caret_color",DesignSystem.muted_for(appearance));code_console.add_theme_stylebox_override("read_only",_code_panel_style(appearance));code_console.add_theme_font_override("font",mono);code_console.add_theme_font_size_override("font_size",14);output_panel.add_child(code_console)
+	var terminal_input_row=HBoxContainer.new();terminal_input_row.add_theme_constant_override("separation",6);output_panel.add_child(terminal_input_row)
+	var prompt=Label.new();prompt.text="❯";prompt.add_theme_color_override("font_color",DesignSystem.accent_for(appearance));terminal_input_row.add_child(prompt)
+	terminal_command_input=LineEdit.new();terminal_command_input.placeholder_text=_t("Команда · например: python3 -m venv .venv","Command · for example: python3 -m venv .venv");terminal_command_input.tooltip_text=_t("После создания окружения выполните source .venv/bin/activate или выберите его кнопкой Python","After creating an environment, run source .venv/bin/activate or choose it with the Python button");terminal_command_input.size_flags_horizontal=Control.SIZE_EXPAND_FILL;terminal_command_input.text_submitted.connect(_run_terminal_command);terminal_input_row.add_child(terminal_command_input)
 	var status_bar=HBoxContainer.new();status_bar.add_theme_constant_override("separation",18);panel.add_child(status_bar)
 	code_status_label=Label.new();code_status_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_status_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_status_label)
 	code_cursor_label=Label.new();code_cursor_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_cursor_label)
@@ -174,15 +200,61 @@ func _editor_toolbar_style(appearance:String)->StyleBoxFlat:
 	var style=StyleBoxFlat.new();style.bg_color=DesignSystem.surface_for(appearance);style.border_color=Color("c5c8bd") if DesignSystem.is_light(appearance) else Color("465044");style.set_border_width_all(1);style.set_corner_radius_all(10);style.content_margin_left=7;style.content_margin_right=7;style.content_margin_top=4;style.content_margin_bottom=4;return style
 
 func _search_code_files(query:String):
-	if not is_instance_valid(code_search_results):return
+	if not is_instance_valid(code_find_status):return
 	var q=query.strip_edges().to_lower()
-	if q=="":code_search_results.text="";return
+	if q=="":code_find_status.text="";return
 	var matches=[]
 	for key in ["agent","reward"]:
-		var source=FileAccess.get_file_as_string(_code_path_for(key)).to_lower()
-		var count=source.count(q)
-		if count>0:matches.append("%s.py · %d" % [key,count])
-	code_search_results.text="\n".join(matches) if not matches.is_empty() else _t("Совпадений нет","No matches")
+		var lines=FileAccess.get_file_as_string(_code_path_for(key)).split("\n")
+		for index in range(lines.size()):
+			if String(lines[index]).to_lower().contains(q):matches.append("%s.py:%d  %s" % [key,index+1,String(lines[index]).strip_edges()])
+	code_find_status.text="\n".join(matches.slice(0,24)) if not matches.is_empty() else _t("Совпадений нет","No matches")
+	if matches.size()>24:code_find_status.text+="\n… %d %s" % [matches.size()-24,_t("ещё совпадений","more matches")]
+
+func _open_code_search(project_wide:bool):
+	if not is_instance_valid(code_search_popup):return
+	code_search_mode.select(1 if project_wide else 0)
+	code_find_input.clear()
+	code_find_status.text=""
+	code_find_last_query=""
+	code_find_last_match=-1
+	code_search_popup.visible=true
+	call_deferred("_position_code_search_popup")
+	code_find_input.grab_focus()
+
+func _close_code_search():
+	code_search_popup.visible=false
+	if is_instance_valid(code_editor):code_editor.grab_focus()
+
+func _position_code_search_popup():
+	if not is_instance_valid(code_search_popup) or not is_instance_valid(code_editor):return
+	var viewport_size=get_viewport_rect().size
+	var popup_size=code_search_popup.get_combined_minimum_size()
+	popup_size.x=minf(420.0,maxf(300.0,viewport_size.x-32.0))
+	popup_size.y=minf(popup_size.y,maxf(220.0,viewport_size.y-32.0))
+	code_search_popup.size=popup_size
+	var editor_rect=code_editor.get_global_rect()
+	var target=Vector2(editor_rect.end.x-popup_size.x-8.0,editor_rect.position.y+8.0)
+	target.x=clampf(target.x,8.0,maxf(8.0,viewport_size.x-popup_size.x-8.0))
+	target.y=clampf(target.y,8.0,maxf(8.0,viewport_size.y-popup_size.y-8.0))
+	code_search_popup.position=target
+
+func _schedule_code_search_position():
+	if code_search_popup.visible:call_deferred("_position_code_search_popup")
+
+func _on_code_search_mode_changed(index:int):
+	code_find_input.placeholder_text=_t("Найти в agent.py и reward.py","Search agent.py and reward.py") if index==1 else _t("Найти в текущем файле","Find in current file")
+	code_find_status.text=""
+	code_find_last_query=""
+	code_find_last_match=-1
+	if not code_find_input.text.is_empty():_on_code_search_query_changed(code_find_input.text)
+
+func _on_code_search_query_changed(query:String):
+	code_find_status.text=""
+	code_find_last_query=""
+	code_find_last_match=-1
+	if code_search_mode.selected==1:_search_code_files(query)
+	else:_find_in_current_file(false)
 
 func _code_path_for(key:String)->String:return student_agent_path if key=="agent" else student_reward_path
 
@@ -257,30 +329,157 @@ func _unhandled_key_input(event:InputEvent):
 	if key.keycode==KEY_S and command_modifier:
 		_save_current_code();get_viewport().set_input_as_handled()
 	elif key.keycode==KEY_F and command_modifier and not key.shift_pressed:
-		_open_code_find();get_viewport().set_input_as_handled()
+		_open_code_search(false);get_viewport().set_input_as_handled()
 	elif key.keycode==KEY_F and command_modifier and key.shift_pressed:
-		code_explorer.visible=true;code_search.visible=true;code_search.grab_focus();get_viewport().set_input_as_handled()
+		_open_code_search(true);get_viewport().set_input_as_handled()
 	elif key.keycode==KEY_F5:
 		_confirm_student_run("student");get_viewport().set_input_as_handled()
-	elif key.keycode==KEY_ESCAPE and code_find_bar.visible:
-		_close_code_find();get_viewport().set_input_as_handled()
-
-func _open_code_find():
-	code_find_bar.visible=true;code_find_input.grab_focus();code_find_input.select_all()
-
-func _close_code_find():
-	code_find_bar.visible=false;code_editor.grab_focus()
-
-func _on_code_find_query_changed(_query:String):
-	code_find_last_query=code_find_input.text;code_find_last_match=-1
-	_find_in_current_file(false)
+	elif key.keycode==KEY_ESCAPE and code_search_popup.visible:
+		_close_code_search();get_viewport().set_input_as_handled()
 
 func _on_find_input_key(event:InputEvent):
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_ENTER:
-			_find_in_current_file(event.shift_pressed);get_viewport().set_input_as_handled()
+			if code_search_mode.selected==1:_search_code_files(code_find_input.text)
+			else:_find_in_current_file(event.shift_pressed)
+			get_viewport().set_input_as_handled()
 		elif event.keycode==KEY_ESCAPE:
-			_close_code_find();get_viewport().set_input_as_handled()
+			_close_code_search();get_viewport().set_input_as_handled()
+
+func _process(delta:float):
+	if terminal_pid<=0:return
+	terminal_poll_elapsed+=delta
+	if terminal_poll_elapsed<.2:return
+	terminal_poll_elapsed=0.0
+	var live_output=FileAccess.get_file_as_string(terminal_output_path) if FileAccess.file_exists(terminal_output_path) else ""
+	if live_output!=terminal_last_output:
+		terminal_last_output=live_output
+		code_console.text=terminal_console_prefix+live_output
+		code_console.scroll_vertical=code_console.get_line_count()
+	if not OS.is_process_running(terminal_pid):
+		terminal_pid=-1
+		terminal_stop_button.visible=false
+		terminal_command_input.editable=true
+		var exit_code=FileAccess.get_file_as_string(terminal_status_path) if FileAccess.file_exists(terminal_status_path) else "?"
+		code_console.text=terminal_console_prefix+live_output+"\n[exit %s]" % exit_code
+		code_console.scroll_vertical=code_console.get_line_count()
+
+func _exit_tree():
+	if terminal_pid>0 and OS.is_process_running(terminal_pid):OS.kill(terminal_pid)
+
+func _terminal_note(message:String):
+	console_mode="terminal"
+	code_console.text+=message+"\n"
+	code_console.scroll_vertical=code_console.get_line_count()
+
+func _shell_quote(value:String)->String:
+	return "'"+value.replace("'","'\\''")+"'"
+
+func _set_terminal_cwd(value:String):
+	var target=value.strip_edges().trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+	if target=="":return
+	if target=="~":target=OS.get_environment("HOME")
+	elif target.begins_with("~/"):target=OS.get_environment("HOME").path_join(target.substr(2))
+	elif not target.is_absolute_path():target=terminal_cwd.path_join(target)
+	target=target.simplify_path()
+	if not DirAccess.dir_exists_absolute(target):_terminal_note(_t("Папка не найдена: ","Folder not found: ")+target);return
+	terminal_cwd=target
+	terminal_cwd_input.text=target
+	_terminal_note("%s %s" % [_t("Рабочая папка:","Working directory:"),terminal_cwd])
+
+func _choose_terminal_cwd():
+	var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_DIR;dialog.current_dir=terminal_cwd;add_child(dialog)
+	dialog.dir_selected.connect(func(path):_set_terminal_cwd(path);dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.8)
+
+func _choose_terminal_environment():
+	var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_DIR;dialog.current_dir=terminal_cwd;add_child(dialog)
+	dialog.dir_selected.connect(func(path):_activate_terminal_environment(path);dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.8)
+
+func _activate_terminal_environment(path:String):
+	var candidate=path.strip_edges().trim_suffix("/bin").trim_suffix("/Scripts")
+	var python_path=candidate.path_join("Scripts/python.exe") if OS.get_name()=="Windows" else candidate.path_join("bin/python")
+	if not FileAccess.file_exists(python_path):
+		_terminal_note(_t("В папке не найден Python виртуального окружения.","No virtual-environment Python was found in that folder."));return
+	terminal_venv=candidate.simplify_path()
+	terminal_environment_button.text="Python: "+terminal_venv.get_file()
+	terminal_environment_button.tooltip_text=terminal_venv
+	_terminal_note(_t("Активировано окружение: ","Activated environment: ")+terminal_venv)
+
+func _terminal_activate_from_command(path:String)->bool:
+	var target=path.strip_edges().trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+	if not target.is_absolute_path():target=terminal_cwd.path_join(target)
+	target=target.simplify_path()
+	if target.ends_with("/activate") or target.ends_with("/activate.fish") or target.ends_with("/Activate.ps1") or target.ends_with("/activate.bat"):
+		var environment=target.get_base_dir().get_base_dir()
+		_activate_terminal_environment(environment)
+		return true
+	return false
+
+func _run_terminal_command(command:String):
+	var text=command.strip_edges()
+	terminal_command_input.clear()
+	if text=="":return
+	if terminal_pid>0 and OS.is_process_running(terminal_pid):
+		_terminal_note(_t("Дождитесь завершения текущей команды.","Wait for the current command to finish."));return
+	console_mode="terminal"
+	if text=="clear":code_console.clear();return
+	if text=="pwd":_terminal_note(terminal_cwd);return
+	if text=="deactivate":terminal_venv="";terminal_environment_button.text=_t("Python: системный","Python: system");terminal_environment_button.tooltip_text=_t("Выбрать виртуальное окружение","Choose virtual environment");_terminal_note(_t("Виртуальное окружение отключено.","Virtual environment deactivated."));return
+	if text.begins_with("cd ") or text=="cd":_set_terminal_cwd(text.substr(2).strip_edges() if text.length()>2 else OS.get_environment("HOME"));return
+	if text.begins_with("use-venv "):_activate_terminal_environment(text.substr(9).strip_edges());return
+	if text.begins_with("source ") or text.begins_with(". "):
+		var source_path=text.substr(7).strip_edges() if text.begins_with("source ") else text.substr(2).strip_edges()
+		if _terminal_activate_from_command(source_path):return
+	terminal_console_prefix=code_console.text
+	if terminal_console_prefix!="" and not terminal_console_prefix.ends_with("\n"):terminal_console_prefix+="\n"
+	terminal_console_prefix+="%s %s\n" % [terminal_cwd.get_file()+" $",text]
+	terminal_last_output=""
+	var terminal_root=OS.get_user_data_dir().path_join("marl_terminal")
+	DirAccess.make_dir_recursive_absolute(terminal_root)
+	var stamp=str(Time.get_ticks_usec())
+	terminal_output_path=terminal_root.path_join(stamp+".log")
+	terminal_status_path=terminal_root.path_join(stamp+".exit")
+	var shell_script=""
+	var shell=""
+	var args=PackedStringArray()
+	if OS.get_name()=="Windows":
+		shell="powershell.exe"
+		shell_script="Set-Location -LiteralPath "+_powershell_quote(terminal_cwd)+"; "
+		if terminal_venv!="":
+			var environment_bin=terminal_venv.path_join("Scripts")
+			shell_script+="$env:VIRTUAL_ENV="+_powershell_quote(terminal_venv)+"; $env:Path="+_powershell_quote(environment_bin)+"+';'+$env:Path; "
+		shell_script+="& { "+text+" } *> "+_powershell_quote(terminal_output_path)+"; $flyswarm_exit=$LASTEXITCODE; Set-Content -NoNewline -LiteralPath "+_powershell_quote(terminal_status_path)+" -Value $flyswarm_exit"
+		args=PackedStringArray(["-NoProfile","-Command",shell_script])
+	else:
+		shell="/bin/zsh"
+		shell_script="cd "+_shell_quote(terminal_cwd)+" || exit 127; "
+		if terminal_venv!="":
+			var environment_bin=terminal_venv.path_join("bin")
+			shell_script+="export VIRTUAL_ENV="+_shell_quote(terminal_venv)+"; export PATH="+_shell_quote(environment_bin)+":$PATH; "
+		shell_script+="("+text+") > "+_shell_quote(terminal_output_path)+" 2>&1; flyswarm_exit=$?; printf '%s' \"$flyswarm_exit\" > "+_shell_quote(terminal_status_path)
+		args=PackedStringArray(["-lc",shell_script])
+	terminal_pid=OS.create_process(shell,args)
+	if terminal_pid<=0:
+		terminal_pid=-1
+		_terminal_note(_t("Не удалось запустить команду.","Could not start the command."));return
+	terminal_stop_button.visible=true
+	terminal_command_input.editable=false
+	code_console.text=terminal_console_prefix+_t("Выполняется…\n","Running…\n")
+	code_console.scroll_vertical=code_console.get_line_count()
+
+func _stop_terminal_command():
+	if terminal_pid>0 and OS.is_process_running(terminal_pid):
+		if OS.get_name()!="Windows":OS.execute("/usr/bin/pkill",["-TERM","-P",str(terminal_pid)])
+		OS.kill(terminal_pid)
+	terminal_pid=-1
+	terminal_stop_button.visible=false
+	terminal_command_input.editable=true
+	_terminal_note(_t("Команда остановлена.","Command stopped."))
+
+func _powershell_quote(value:String)->String:
+	return "'"+value.replace("'","''")+"'"
 
 func _find_in_current_file(backwards:bool):
 	if not is_instance_valid(code_editor) or not is_instance_valid(code_find_input):return
@@ -310,6 +509,8 @@ func _active_code_path()->String:return student_agent_path if active_code=="agen
 func _switch_code(next:String):
 	if is_instance_valid(code_editor):_save_current_code()
 	active_code=next
+	if is_instance_valid(code_find_input):code_find_input.clear()
+	if is_instance_valid(code_find_status):code_find_status.text=""
 	if is_instance_valid(code_editor):
 		loading_code=true;code_editor.text=FileAccess.get_file_as_string(_active_code_path()) if FileAccess.file_exists(_active_code_path()) else "";loading_code=false
 		_set_code_dirty(false);_update_code_cursor();_update_code_breadcrumb()
@@ -421,6 +622,7 @@ func _show_history():
 func update_marl_status(progress:Dictionary,output_path:String):
 	if not is_instance_valid(status_label):return
 	var state=str(progress.get("state","ready"))
+	if state=="starting":console_mode="jobs"
 	if is_instance_valid(code_stop_button):code_stop_button.visible=state in ["starting","initializing","training","finalizing"]
 	var labels={
 		"ready":_t("Готово к запуску","Ready to start"),
@@ -445,7 +647,7 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		if progress.has(key):lines.append("%s: %s" % [key,str(progress[key])])
 	if output_path!="":lines.append("\n"+output_path)
 	detail_label.text="\n".join(lines)
-	if is_instance_valid(code_console):
+	if is_instance_valid(code_console) and console_mode=="jobs":
 		var log_path=output_path.path_join("execution.log") if output_path!="" else ""
 		var log_text=FileAccess.get_file_as_string(log_path) if log_path!="" and FileAccess.file_exists(log_path) else ""
 		var message=str(progress.get("message",""))

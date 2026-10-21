@@ -15,6 +15,11 @@ var code_console: TextEdit
 var active_code="agent"
 var student_agent_path=""
 var student_reward_path=""
+var code_status_label: Label
+var code_cursor_label: Label
+var code_file_tabs: Dictionary = {}
+var code_dirty := false
+var loading_code := false
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -108,33 +113,101 @@ func _build_programming_tab(tabs:TabContainer):
 	var row=HBoxContainer.new();panel.add_child(row)
 	var agent_tab=Button.new();agent_tab.text="agent.py";agent_tab.pressed.connect(func():_switch_code("agent"));row.add_child(agent_tab)
 	var reward_tab=Button.new();reward_tab.text="reward.py";reward_tab.pressed.connect(func():_switch_code("reward"));row.add_child(reward_tab)
+	code_file_tabs={"agent":agent_tab,"reward":reward_tab}
+	for key in code_file_tabs:
+		var file_tab:Button=code_file_tabs[key];file_tab.toggle_mode=true;file_tab.button_pressed=key==active_code
+		file_tab.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("pressed",DesignSystem.tab_style(appearance,true));file_tab.add_theme_color_override("font_color",DesignSystem.text_for(appearance))
 	var import_button=Button.new();import_button.text=_t("Импортировать .py…","Import .py…");import_button.pressed.connect(_import_python);row.add_child(import_button)
 	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.pressed.connect(_save_current_code);row.add_child(save_button)
 	var restore_button=Button.new();restore_button.text=_t("Шаблон","Template");restore_button.pressed.connect(_restore_template);row.add_child(restore_button)
-	code_editor=CodeEdit.new();code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("e9eee2") if DesignSystem.is_light(appearance) else Color("283328"));code_editor.add_theme_color_override("line_number_color",DesignSystem.muted_for(appearance));panel.add_child(code_editor)
-	var highlighter=CodeHighlighter.new();highlighter.number_color=Color("82928a");highlighter.symbol_color=Color("d1b579");highlighter.function_color=Color("8cc8b2");highlighter.add_color_region("\"","\"",Color("a7c88b"));highlighter.add_color_region("'","'",Color("a7c88b"));highlighter.add_keyword_color("def",Color("ce9aef"));highlighter.add_keyword_color("return",Color("ce9aef"));highlighter.add_keyword_color("import",Color("ce9aef"));highlighter.add_keyword_color("from",Color("ce9aef"));highlighter.add_keyword_color("if",Color("ce9aef"));highlighter.add_keyword_color("for",Color("ce9aef"));highlighter.add_keyword_color("in",Color("ce9aef"));code_editor.syntax_highlighter=highlighter
-	var actions=HBoxContainer.new();panel.add_child(actions)
+	var actions=HBoxContainer.new();actions.add_theme_constant_override("separation",8);panel.add_child(actions)
 	var check=Button.new();check.text=_t("Проверить код","Check code");check.pressed.connect(func():_confirm_student_run("check"));actions.add_child(check)
 	var run=Button.new();run.text=_t("Запустить свою стратегию","Run strategy");run.pressed.connect(func():_confirm_student_run("student"));actions.add_child(run)
 	var export=Button.new();export.text=_t("Экспортировать работу","Export practical");export.pressed.connect(func():_save_current_code();AppState.run_marl_job("export",["--workspace",_workspace_dir(),"--sessions-root",AppState.results_root().path_join("marl")]));actions.add_child(export)
 	var stop=Button.new();stop.text=_t("Остановить","Stop");stop.pressed.connect(AppState.stop_marl_job);actions.add_child(stop)
-	code_console=TextEdit.new();code_console.custom_minimum_size.y=100;code_console.editable=false;code_console.placeholder_text=_t("Консоль и ошибки появятся здесь","Console and errors will appear here");panel.add_child(code_console)
-	code_editor.text=FileAccess.get_file_as_string(student_agent_path)
+	var editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;panel.add_child(editor_split)
+	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=300;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
+	var mono=SystemFont.new();mono.font_names=PackedStringArray(["SF Mono","Menlo","Monaco","monospace"]);code_editor.add_theme_font_override("font",mono);code_editor.add_theme_font_size_override("font_size",17);editor_split.add_child(code_editor)
+	code_editor.syntax_highlighter=_make_python_highlighter(appearance)
+	code_editor.text_changed.connect(_on_code_changed);code_editor.caret_changed.connect(_update_code_cursor)
+	var output_panel=VBoxContainer.new();output_panel.custom_minimum_size.y=140;output_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL;output_panel.add_theme_constant_override("separation",4);editor_split.add_child(output_panel)
+	var output_header=HBoxContainer.new();output_panel.add_child(output_header)
+	var output_title=Label.new();output_title.text=_t("ВЫВОД И ОШИБКИ","OUTPUT & ERRORS");output_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;output_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));output_header.add_child(output_title)
+	var clear_output=Button.new();clear_output.text=_t("Очистить","Clear");clear_output.pressed.connect(func():code_console.clear());output_header.add_child(clear_output)
+	code_console=TextEdit.new();code_console.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_console.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_console.editable=false;code_console.wrap_mode=TextEdit.LINE_WRAPPING_BOUNDARY;code_console.placeholder_text=_t("Проверка кода, запуск и ошибки появятся здесь","Code checks, runs and errors appear here");code_console.add_theme_color_override("font_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("font_readonly_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("caret_color",DesignSystem.muted_for(appearance));code_console.add_theme_stylebox_override("read_only",_code_panel_style(appearance));code_console.add_theme_font_override("font",mono);code_console.add_theme_font_size_override("font_size",14);output_panel.add_child(code_console)
+	var status_bar=HBoxContainer.new();status_bar.add_theme_constant_override("separation",18);panel.add_child(status_bar)
+	code_status_label=Label.new();code_status_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_status_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_status_label)
+	code_cursor_label=Label.new();code_cursor_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_cursor_label)
+	var language_label=Label.new();language_label.text="Python · UTF-8 · Spaces: 4";language_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(language_label)
+	loading_code=true;code_editor.text=FileAccess.get_file_as_string(student_agent_path);loading_code=false;_set_code_dirty(false);_update_code_cursor()
+
+func _make_python_highlighter(appearance:String)->CodeHighlighter:
+	var light=DesignSystem.is_light(appearance)
+	var keyword_color=Color("8157a6") if light else Color("d7a5f2")
+	var type_color=Color("12678d") if light else Color("83c9e8")
+	var builtin_color=Color("8c5a10") if light else Color("e4bf80")
+	var string_color=Color("477c38") if light else Color("a9cb8b")
+	var comment_color=Color("6a7662") if light else Color("879487")
+	var number_color=Color("ad4b27") if light else Color("f0a27e")
+	var function_color=Color("176d64") if light else Color("83cdb9")
+	var symbol_color=Color("725d3d") if light else Color("d9c59e")
+	var highlighter=CodeHighlighter.new()
+	highlighter.number_color=number_color;highlighter.symbol_color=symbol_color;highlighter.function_color=function_color
+	highlighter.add_color_region("\"\"\"","\"\"\"",string_color);highlighter.add_color_region("'''","'''",string_color)
+	highlighter.add_color_region("\"","\"",string_color);highlighter.add_color_region("'","'",string_color)
+	highlighter.add_color_region("#","",comment_color,true)
+	for word in ["def","class","return","yield","import","from","as","if","elif","else","for","while","in","not","and","or","is","try","except","finally","raise","pass","break","continue","with","lambda","global","nonlocal","assert","del","async","await"]:highlighter.add_keyword_color(word,keyword_color)
+	for word in ["True","False","None","NotImplemented","Ellipsis"]:highlighter.add_keyword_color(word,builtin_color)
+	# Keep Python and NumPy scalar/container types visibly distinct from plain identifiers.
+	for word in ["int","float","bool","str","bytes","list","tuple","dict","set","frozenset","complex","object","type","range","slice","bytearray","memoryview","int8","int16","int32","int64","uint8","uint16","uint32","uint64","float16","float32","float64","float128","bool_","ndarray"]:highlighter.add_keyword_color(word,type_color)
+	for word in ["np.int","np.float","np.bool","np.str","np.int8","np.int16","np.int32","np.int64","np.uint8","np.uint16","np.uint32","np.uint64","np.float16","np.float32","np.float64","np.bool_","np.ndarray"]:highlighter.add_keyword_color(word,type_color)
+	for word in ["print","len","enumerate","zip","map","filter","sum","min","max","abs","round","isinstance","super","open"]:highlighter.add_keyword_color(word,builtin_color)
+	return highlighter
+
+func _code_panel_style(appearance:String)->StyleBoxFlat:
+	var style=StyleBoxFlat.new();style.bg_color=Color("fbfaf6") if DesignSystem.is_light(appearance) else Color("1b211b");style.border_color=Color("c5c8bd") if DesignSystem.is_light(appearance) else Color("465044");style.set_border_width_all(1);style.set_corner_radius_all(6);style.content_margin_left=10;style.content_margin_right=10;style.content_margin_top=8;style.content_margin_bottom=8;return style
+
+func _on_code_changed():
+	if loading_code:return
+	_set_code_dirty(true);_update_code_cursor()
+
+func _set_code_dirty(dirty:bool):
+	code_dirty=dirty
+	if code_file_tabs.is_empty():return
+	var button=code_file_tabs.get(active_code)
+	if is_instance_valid(button):button.text=("● " if dirty else "")+active_code+".py";button.button_pressed=true
+	for key in code_file_tabs:
+		var tab:Button=code_file_tabs[key]
+		if is_instance_valid(tab) and key!=active_code:tab.button_pressed=false
+	if is_instance_valid(code_status_label):code_status_label.text=_t("Не сохранено","Unsaved changes") if dirty else _t("Сохранено","Saved")
+
+func _update_code_cursor():
+	if not is_instance_valid(code_editor) or not is_instance_valid(code_cursor_label):return
+	code_cursor_label.text="Ln %d, Col %d" % [code_editor.get_caret_line()+1,code_editor.get_caret_column()+1]
+
+func _unhandled_key_input(event:InputEvent):
+	if not event is InputEventKey or not event.pressed or event.echo or not is_instance_valid(code_editor):return
+	var key=event as InputEventKey
+	if key.keycode==KEY_S and (key.ctrl_pressed or key.meta_pressed):
+		_save_current_code();get_viewport().set_input_as_handled()
 func _active_code_path()->String:return student_agent_path if active_code=="agent" else student_reward_path
 func _switch_code(next:String):
 	if is_instance_valid(code_editor):_save_current_code()
 	active_code=next
-	if is_instance_valid(code_editor):code_editor.text=FileAccess.get_file_as_string(_active_code_path()) if FileAccess.file_exists(_active_code_path()) else ""
+	if is_instance_valid(code_editor):
+		loading_code=true;code_editor.text=FileAccess.get_file_as_string(_active_code_path()) if FileAccess.file_exists(_active_code_path()) else "";loading_code=false
+		_set_code_dirty(false);_update_code_cursor()
 func _save_current_code():
 	if not is_instance_valid(code_editor):return
 	var file=FileAccess.open(_active_code_path(),FileAccess.WRITE)
-	if file:file.store_string(code_editor.text)
+	if file:file.store_string(code_editor.text);file.close();_set_code_dirty(false)
 func _restore_template():
+	loading_code=true
 	code_editor.text='import numpy as np\n\ndef act(observation, context=None):\n    action = np.zeros(6, dtype=np.float32)\n    action[0] = 0.5\n    return action\n' if active_code=="agent" else 'def calculate_reward(components):\n    return float(3.0 * components["objective_capture"] + 0.01 * components["damage_dealt"] - 4.0 * components["own_death"])\n'
-	_save_current_code()
+	loading_code=false;_set_code_dirty(true);_save_current_code()
 func _import_python():
 	var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.py ; Python source"]);add_child(dialog)
-	dialog.file_selected.connect(func(path):code_editor.text=FileAccess.get_file_as_string(path);_save_current_code();dialog.queue_free());dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.75)
+	dialog.file_selected.connect(func(path):loading_code=true;code_editor.text=FileAccess.get_file_as_string(path);loading_code=false;_set_code_dirty(true);_save_current_code();_update_code_cursor();dialog.queue_free());dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.75)
 func _confirm_student_run(command:String):
 	_save_current_code()
 	var args=["--agent-file",student_agent_path,"--reward-file",student_reward_path]
@@ -255,3 +328,4 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		var log_text=FileAccess.get_file_as_string(log_path) if log_path!="" and FileAccess.file_exists(log_path) else ""
 		var message=str(progress.get("message",""))
 		code_console.text=log_text if log_text!="" else message
+		code_console.scroll_vertical=code_console.get_line_count()

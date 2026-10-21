@@ -16,12 +16,23 @@ Student Edition скрывает Open Day и MaleCNS Combat Training. В обе�
 
 ## Скриншоты
 
-Снимки сделаны 22 октября 2026 года непосредственно из установленных приложений
-FlySwarm и FlySwarm Student на macOS.
+Главные экраны ниже сняты 22 октября 2026 года непосредственно из установленных
+приложений FlySwarm и FlySwarm Student на macOS. Боевые сцены — кадры реальных
+запущенных сцен Godot с живой телеметрией MaleCNS; это отдельные проверочные
+запуски, а не скриншоты из установленного окна.
 
 ### FlySwarm
 
 ![Главный экран установленной полной версии FlySwarm](docs/media/flyswarm-installed-home-2026-10-22.png)
+
+### Боевые сцены FlySwarm
+
+| Open Day · Т-34-85 | Open Day · Panther G | Open Day · Tiger I |
+|---|---|---|
+| ![Бой Open Day на Т-34-85 с сигналами MaleCNS](artifacts/open_day_final_validation/battle-t34_85.png) | ![Бой Open Day на Panther G с сигналами MaleCNS](artifacts/open_day_final_validation/battle-panther_g.png) | ![Бой Open Day на Tiger I с сигналами MaleCNS](artifacts/open_day_final_validation/battle-tiger_i.png) |
+
+Кадры Open Day сняты во время проверки настоящего подключения MaleCNS и его
+сигналов. Валидационные сценарии проверяют три варианта техники.
 
 ### FlySwarm Student
 

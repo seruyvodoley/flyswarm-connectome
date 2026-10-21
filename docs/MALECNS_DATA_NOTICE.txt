@@ -1,0 +1,20 @@
+MaleCNS v1.0 connectome data notice
+
+The bundled brain.npz and weights.npz are prebuilt derived runtime files for
+the MaleCNS v1.0 connectome. The dataset is from FlyEM at HHMI Janelia, in
+collaboration with the University of Cambridge, the MRC Laboratory of Molecular
+Biology, and Google Research.
+
+Source and dataset information: https://male-cns.janelia.org/download/
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License text: https://creativecommons.org/licenses/by/4.0/
+Scientific reference: Berg et al., Sexual dimorphism in the complete connectome
+of the Drosophila male central nervous system, Cell (2026).
+
+The two prebuilt files are distributed by the FlyBrain package and are derived
+from the CC BY 4.0 connectome. FlyBrain documents these derived files as covered
+by the source dataset's CC BY 4.0 terms:
+https://github.com/alextitonis/fly.ai
+
+The bundled data files are unchanged. Their SHA-256 checksums are validated by
+FlyBrain and by FlySwarm before the neural backend starts.

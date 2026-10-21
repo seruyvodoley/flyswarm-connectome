@@ -1,14 +1,15 @@
 # Windows x64 build
 
-The Windows package is built on a Windows x64 GitHub Actions runner. The workflow
-exports the Godot project, builds a relocatable Python onedir runtime with
-PyInstaller, creates an Inno Setup installer, installs it into a clean runner
-directory, then smoke-tests the installed executable and MARL CLI. CI may retain
-temporary GitHub Actions artifacts for validation. Open Day Windows installers
-and portable archives are never attached to a GitHub Release; releases remain
-macOS-only.
+The Student Edition Windows package is built on a Windows x64 GitHub Actions
+runner. The workflow exports the student-only Godot project, builds a relocatable
+Python onedir runtime with PyInstaller, bundles the checksum-verified MaleCNS
+dataset and model attributions, creates an Inno Setup installer, installs it into
+a clean runner directory, then smoke-tests the installed executable and MARL CLI.
+Open Day routes are hidden in the Student Edition and rejected by the app router.
 
-The package contains no MaleCNS research dataset. The Windows automated checks
+The package includes `brain.npz` and `weights.npz` under `Resources/MaleCNS` and
+selects that bundled folder automatically on first launch. The app also includes
+the model attribution and dataset license notice. The Windows automated checks
 exercise the application and the self-contained MARL baseline backend. They are
 headless runner checks; they do not verify the interactive GUI, graphics driver,
 screen scaling, accessibility, or the MaleCNS dependency stack on physical
@@ -28,5 +29,6 @@ on Unix-like systems. Packaged mode resolves the backend next to the exported
 application. Outputs are written to the user's Godot data directory in packaged
 mode and remain ordinary CSV, JSON, PNG and JSONL files.
 
-Windows release files are named `FlySwarm-<version>-windows-x64-setup.exe`,
-`FlySwarm-<version>-windows-x64.zip` and `SHA256SUMS-windows.txt`.
+Windows Student Edition files are named
+`FlySwarm-Student-<version>-windows-x64-setup.exe`,
+`FlySwarm-Student-<version>-windows-x64.zip` and `SHA256SUMS-windows.txt`.

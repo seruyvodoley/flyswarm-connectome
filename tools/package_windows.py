@@ -33,10 +33,34 @@ def licenses(destination: Path) -> None:
     destination.write_text("\n\n".join(sections), encoding="utf-8")
 
 
+def add_malecns_dataset(source: Path, resources: Path) -> None:
+    """Bundle the licensed, checksum-verified MaleCNS runtime files."""
+    from flybrain.data import FILES
+
+    source = source.expanduser().resolve()
+    destination = resources / "MaleCNS"
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, expected in FILES.items():
+        path = source / name
+        if not path.is_file():
+            raise RuntimeError(f"MaleCNS dataset file is missing: {path}")
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(block)
+        if digest.hexdigest() != expected:
+            raise RuntimeError(f"MaleCNS dataset checksum does not match FlyBrain: {path}")
+        shutil.copy2(path, destination / name)
+    notice = ROOT / "docs" / "MALECNS_DATA_NOTICE.txt"
+    shutil.copy2(notice, resources / notice.name)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
     parser.add_argument("--godot", required=True, type=Path)
+    parser.add_argument("--dataset", required=True, type=Path,
+                        help="Folder containing the checksum-verified brain.npz and weights.npz")
     parser.add_argument("--output", type=Path, default=ROOT / "build/windows")
     args = parser.parse_args()
     if sys.platform != "win32":
@@ -70,6 +94,12 @@ def main() -> None:
     shutil.copy2(ROOT / "tools/app_job.py", packaged / "Resources/support/tools/app_job.py")
     shutil.copy2(ROOT / "docs/windows_packaging.md", packaged / "Resources/INSTALLATION.txt")
     licenses(packaged / "Resources/THIRD_PARTY_LICENSES.txt")
+    add_malecns_dataset(args.dataset, packaged / "Resources")
+    shutil.copy2(ROOT / "frontend/godot/assets/environment/ASSET_SOURCES.md",
+                 packaged / "Resources/3D_ASSET_ATTRIBUTION.md")
+    shutil.copytree(ROOT / "frontend/godot/assets/environment/licenses",
+                    packaged / "Resources/asset-licenses",
+                    ignore=shutil.ignore_patterns("._*"))
     (packaged / "VERSION.txt").write_text(args.version + "\n", encoding="utf-8")
     # The Godot executable and its embedded PCK sit side by side with Resources.
     shutil.move(str(out / "FlySwarm.exe"), packaged / "FlySwarm.exe")
@@ -86,10 +116,10 @@ def main() -> None:
     run([str(backend_exe), "--marl", "--output-root", str(smoke), "compare", str(checkpoint), "--episodes", "1", "--seed", "31", "--max-steps", "16"], cwd=packaged)
 
     (out / "FlySwarm.iss").write_text(
-        f'''[Setup]\nAppId=FlySwarm-Research-Platform\nAppName=FlySwarm\nAppVersion={args.version}\nDefaultDirName={{autopf}}\\FlySwarm\nDefaultGroupName=FlySwarm\nOutputDir={out.as_posix()}\nOutputBaseFilename=FlySwarm-{args.version}-windows-x64-setup\nArchitecturesInstallIn64BitMode=x64\nCompression=lzma2\nSolidCompression=yes\nPrivilegesRequired=lowest\n\n[Files]\nSource: "{(packaged / '*').as_posix()}"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs\n\n[Icons]\nName: "{{group}}\\FlySwarm"; Filename: "{{app}}\\FlySwarm.exe"\nName: "{{autodesktop}}\\FlySwarm"; Filename: "{{app}}\\FlySwarm.exe"; Tasks: desktopicon\n\n[Tasks]\nName: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked\n''', encoding="utf-8")
+        f'''[Setup]\nAppId=FlySwarm-Student\nAppName=FlySwarm Student\nAppVersion={args.version}\nDefaultDirName={{autopf}}\\FlySwarm Student\nDefaultGroupName=FlySwarm Student\nOutputDir={out.as_posix()}\nOutputBaseFilename=FlySwarm-Student-{args.version}-windows-x64-setup\nArchitecturesInstallIn64BitMode=x64\nCompression=lzma2\nSolidCompression=yes\nPrivilegesRequired=lowest\n\n[Files]\nSource: "{(packaged / '*').as_posix()}"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs\n\n[Icons]\nName: "{{group}}\\FlySwarm Student"; Filename: "{{app}}\\FlySwarm.exe"\nName: "{{autodesktop}}\\FlySwarm Student"; Filename: "{{app}}\\FlySwarm.exe"; Tasks: desktopicon\n\n[Tasks]\nName: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked\n''', encoding="utf-8")
     run(["iscc", str(out / "FlySwarm.iss")])
-    installer = out / f"FlySwarm-{args.version}-windows-x64-setup.exe"
-    portable_zip = out / f"FlySwarm-{args.version}-windows-x64.zip"
+    installer = out / f"FlySwarm-Student-{args.version}-windows-x64-setup.exe"
+    portable_zip = out / f"FlySwarm-Student-{args.version}-windows-x64.zip"
     with zipfile.ZipFile(portable_zip, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in packaged.rglob("*"):
             if path.is_file():

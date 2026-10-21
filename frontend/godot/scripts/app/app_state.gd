@@ -1,4 +1,5 @@
 extends Node
+const STUDENT_EDITION := true
 const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
@@ -306,6 +307,8 @@ func set_battle_overlay_visible(value: bool):
 	for layer in battle.find_children("*","CanvasLayer",true,false):
 		layer.visible=value
 func show_page(page: String):
+	if STUDENT_EDITION and page in ["OpenDayMain", "HowItWorks", "DemoResult"]:
+		page = "MainMenu"
 	menu_axes.clear()
 	menu_stick_latches.clear()
 	current_page=page
@@ -378,6 +381,11 @@ func configure(mode: String):
 	if mode=="research":session.seconds=5;session.blue_controller="brain";session.red_controller="brain"
 	show_page({"battle":"HistoricalBattleSetup","range":"TestRangeSetup","training":"TrainingMenu","research":"ResearchLab"}[mode])
 func open_day_menu():
+	if STUDENT_EDITION:
+		open_day_mode=false
+		stop_session()
+		show_page("MainMenu")
+		return
 	open_day_mode=true
 	stop_session()
 	show_page("OpenDayMain")
@@ -386,6 +394,9 @@ func research_menu():
 	stop_session()
 	show_page("MainMenu")
 func configure_demo(vehicle: String="t34_85"):
+	if STUDENT_EDITION:
+		show_page("MainMenu")
+		return
 	open_day_mode=true
 	session=Config.new()
 	session.mode="demo"
@@ -446,7 +457,7 @@ func stop_session():
 	backend_dialog_open=false
 func menu():
 	stop_session()
-	show_page("OpenDayMain" if open_day_mode else "MainMenu")
+	show_page("OpenDayMain" if open_day_mode and not STUDENT_EDITION else "MainMenu")
 func launch():
 	var problem=session.validate()
 	if problem!="":view.notice(problem);return
@@ -564,6 +575,9 @@ func rerun():
 	stop_session()
 	launch()
 func start_job(evaluate=false):
+	if STUDENT_EDITION and session.mode=="combat_training" and session.combat_action=="deploy":
+		view.notice("Open Day deployment is unavailable in the Student Edition.")
+		return
 	if job_pid>0 and OS.is_process_running(job_pid):view.notice("The previous job is still stopping. Please retry shortly.");return
 	var error=session.validate()
 	if error!="":view.notice(error);return

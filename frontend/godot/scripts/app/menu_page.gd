@@ -49,7 +49,7 @@ func _ready():
 		"ResultsScreen":results()
 		"PauseMenu":pause_screen()
 		"JobProgress":job_progress()
-	label(col,"LOCAL RESEARCH BUILD     /     Historical geometry and armour data remain under validation",13).modulate=Color("7f9389")
+	label(col,"STUDENT EDITION     /     Learn neural control and multi-agent systems",13).modulate=Color("7f9389")
 	if page=="MainMenu":main_menu_watermark()
 	var buttons=find_children("*","Button",true,false)
 	if not buttons.is_empty():buttons[0].grab_focus()
@@ -110,7 +110,6 @@ func main_menu():
 	label(left,"FLYSWARM",58).add_theme_color_override("font_color",DesignSystem.text_for(str(AppState.settings.get("appearance","dark"))))
 	label(left,"A world to observe. A network to study.",16)
 	var spacer=Control.new();spacer.custom_minimum_size.y=20;left.add_child(spacer)
-	menu_entry(left,"OPEN DAY DEMO","A fast 1v1: a visitor against a tank controlled by the reconstructed MaleCNS model.",AppState.open_day_menu)
 	menu_entry(left,"AUTONOMOUS BATTLE","Run or observe an 8×8 battle using Rule AI, MaleCNS or a trained adapter.",AppState.configure.bind("battle"))
 	menu_entry(left,"RESEARCH LABORATORY","Run reproducible experiment series across seeds and compare conditions.",AppState.configure.bind("research"))
 	if str(AppState.settings.get("language","en"))=="ru":
@@ -220,9 +219,6 @@ func training():
 	button(combat_actions,"EVALUATE MODEL",func():
 		if s.combat_checkpoint=="" or not FileAccess.file_exists(s.combat_checkpoint):notice("Select a combat checkpoint first.");return
 		s.mode="combat_training";s.combat_action="evaluate";AppState.start_job())
-	button(combat_actions,"PREPARE FOR OPEN DAY",func():
-		if s.combat_checkpoint=="" or not FileAccess.file_exists(s.combat_checkpoint):notice("Select a combat checkpoint first.");return
-		s.mode="combat_training";s.combat_action="deploy";AppState.start_job())
 	back()
 
 func _find_combat_checkpoint() -> String:
@@ -403,7 +399,7 @@ func backend_unavailable(reason: String):
 	headline.text=AppState.tr_text("MaleCNS backend is unavailable.")
 	text_block(reason)
 	button(body,"Retry",AppState.launch)
-	if AppState.session.mode=="demo":
+	if AppState.session.mode=="demo" and not AppState.STUDENT_EDITION:
 		text_block("The interactive Fly battle requires the real MaleCNS backend. Rule AI is never presented as the fly.")
 		button(body,"MALECNS DATASET SETTINGS",func():AppState.show_page("Settings"))
 		button(body,"RETURN TO OPEN DAY",AppState.open_day_menu)

@@ -111,28 +111,8 @@ def add_malecns_dataset(source: Path, resources: Path) -> None:
         if digest.hexdigest() != expected:
             raise RuntimeError(f"MaleCNS dataset checksum does not match FlyBrain: {path}")
         shutil.copy2(path, dataset / name)
-    notice = """MaleCNS v1.0 connectome data notice
-
-The bundled brain.npz and weights.npz are prebuilt derived runtime files for
-the MaleCNS v1.0 connectome. The dataset is from FlyEM at HHMI Janelia, in
-collaboration with the University of Cambridge, the MRC Laboratory of Molecular
-Biology, and Google Research.
-
-Source and dataset information: https://male-cns.janelia.org/download/
-License: Creative Commons Attribution 4.0 International (CC BY 4.0)
-License text: https://creativecommons.org/licenses/by/4.0/
-Scientific reference: Berg et al., Sexual dimorphism in the complete connectome
-of the Drosophila male central nervous system, Cell (2026).
-
-The two prebuilt files are distributed by the FlyBrain package and are derived
-from the CC BY 4.0 connectome. FlyBrain documents these derived files as covered
-by the source dataset's CC BY 4.0 terms:
-https://github.com/alextitonis/fly.ai
-
-The bundled data files are unchanged. Their SHA-256 checksums are validated by
-FlyBrain and by FlySwarm before the neural backend starts.
-"""
-    (resources / "MALECNS_DATA_NOTICE.txt").write_text(notice, encoding="utf-8")
+    shutil.copy2(ROOT / "docs" / "MALECNS_DATA_NOTICE.txt",
+                 resources / "MALECNS_DATA_NOTICE.txt")
 
 
 def build_backend(python: Path, build_root: Path, output: Path) -> Path:
@@ -169,13 +149,14 @@ def build_backend(python: Path, build_root: Path, output: Path) -> Path:
     return dist
 
 
-def update_plist(app: Path, version: str) -> None:
+def update_plist(app: Path, version: str, *, student_edition: bool = False) -> None:
     plist_path = app / "Contents/Info.plist"
     with plist_path.open("rb") as source:
         info = plistlib.load(source)
-    info["CFBundleDisplayName"] = "FlySwarm"
-    info["CFBundleName"] = "FlySwarm"
-    info["CFBundleIdentifier"] = "org.flyswarm.connectome"
+    display_name = "FlySwarm Student" if student_edition else "FlySwarm"
+    info["CFBundleDisplayName"] = display_name
+    info["CFBundleName"] = display_name
+    info["CFBundleIdentifier"] = "org.flyswarm.research.student" if student_edition else "org.flyswarm.connectome"
     info["CFBundleShortVersionString"] = version
     info["CFBundleVersion"] = version.split("-")[0]
     info["LSArchitecturePriority"] = ["arm64"]
@@ -193,6 +174,8 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", args.version):
         raise RuntimeError(f"Invalid SemVer version: {args.version}")
     godot = Path(args.godot).expanduser().resolve()
+    project_settings = (ROOT / "frontend/godot/project.godot").read_text(encoding="utf-8")
+    student_edition = 'config/name="FlySwarm Student"' in project_settings
     # Keep the venv launcher symlink intact: resolving it points at the base
     # Homebrew interpreter and drops the virtualenv's site-packages.
     python = Path(os.path.abspath(Path(args.python).expanduser()))
@@ -234,7 +217,7 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
         apps = [path for path in exported.glob("*.app") if not path.name.startswith("._")]
         if len(apps) != 1:
             raise RuntimeError(f"Expected one exported app bundle, found {apps}")
-        app = output / "FlySwarm.app"
+        app = output / ("FlySwarm Student.app" if student_edition else "FlySwarm.app")
         shutil.rmtree(app, ignore_errors=True)
         shutil.move(str(apps[0]), app)
     finally:
@@ -252,7 +235,7 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     if args.dataset:
         add_malecns_dataset(Path(args.dataset), resources)
     shutil.copy2(ROOT / "docs/macos_packaging.md", resources / "INSTALLATION.txt")
-    update_plist(app, args.version)
+    update_plist(app, args.version, student_edition=student_edition)
     remove_macos_metadata(app)
     make_arm64(app)
     remove_macos_metadata(app)
@@ -261,15 +244,16 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     remove_macos_metadata(app)
     run(["codesign", "--verify", "--deep", "--strict", app])
 
-    dmg_path = output / f"FlySwarm-{args.version}-macos-arm64.dmg"
-    zip_path = output / f"FlySwarm-{args.version}-macos-arm64.zip"
+    artifact_name = "FlySwarm-Student" if student_edition else "FlySwarm"
+    dmg_path = output / f"{artifact_name}-{args.version}-macos-arm64.dmg"
+    zip_path = output / f"{artifact_name}-{args.version}-macos-arm64.zip"
     checksum_path = output / "SHA256SUMS.txt"
     disk_contents = build_root / "dmg"
     disk_contents.mkdir()
-    shutil.copytree(app, disk_contents / "FlySwarm.app", symlinks=True)
+    shutil.copytree(app, disk_contents / app.name, symlinks=True)
     (disk_contents / "Applications").symlink_to("/Applications")
     remove_macos_metadata(disk_contents)
-    run(["hdiutil", "create", "-ov", "-format", "UDZO", "-imagekey", "zlib-level=9", "-volname", "FlySwarm", "-srcfolder", disk_contents, dmg_path])
+    run(["hdiutil", "create", "-ov", "-format", "UDZO", "-imagekey", "zlib-level=9", "-volname", artifact_name, "-srcfolder", disk_contents, dmg_path])
     run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, zip_path])
     with zipfile.ZipFile(zip_path) as archive:
         bad = archive.testzip()

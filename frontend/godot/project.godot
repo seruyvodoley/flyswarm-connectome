@@ -1,6 +1,6 @@
 config_version=5
 [application]
-config/name="FlySwarm"
+config/name="FlySwarm Student"
 run/main_scene="res://scenes/Bootstrap.tscn"
 [autoload]
 AppState="*res://scripts/app/app_state.gd"

@@ -3,7 +3,7 @@ const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
 var session=Config.new()
-var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","appearance":"dark","dataset_path":"","environment_profile":"enhanced_visual"}
+var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","appearance":"dark","dataset_path":"","environment_profile":"enhanced_visual","open_day_policy_mode":"baseline","open_day_policy_path":""}
 var root_path=""
 var python=""
 var packaged_app=false
@@ -29,6 +29,8 @@ var menu_stick_latches: Dictionary={}
 var loading_message="Preparing simulation…"
 var backend_dialog_open=false
 var open_day_mode=false
+var open_day_policy_mode := "baseline"
+var open_day_policy_path := ""
 var marl_pid=-1
 var marl_output=""
 var marl_replay_path=""
@@ -56,6 +58,8 @@ func _ready():
 	var file=ConfigFile.new()
 	if file.load("user://settings.cfg")==OK:
 		for key in settings:settings[key]=file.get_value("settings",key,settings[key])
+	open_day_policy_mode=str(settings.get("open_day_policy_mode","baseline"))
+	open_day_policy_path=str(settings.get("open_day_policy_path",""))
 	if str(settings.dataset_path)=="":
 		var bundled_dataset=bundle_resources.path_join("MaleCNS") if packaged_app else ""
 		if not bundled_dataset.is_empty() and FileAccess.file_exists(bundled_dataset.path_join("brain.npz")) and FileAccess.file_exists(bundled_dataset.path_join("weights.npz")):
@@ -400,6 +404,12 @@ func configure_demo(vehicle: String="t34_85"):
 	session.port=int(settings.port)
 func start_demo(vehicle: String="t34_85"):
 	configure_demo(vehicle)
+	if open_day_policy_mode=="trained":
+		if open_day_policy_path=="" or not FileAccess.file_exists(open_day_policy_path):
+			view.notice(tr_text("Select a compatible trained PPO deployment policy first."))
+			return
+		session.red_controller="adapter"
+		session.red_policy=open_day_policy_path
 	launch()
 func stop_backend():
 	if backend_pid>0 and OS.is_process_running(backend_pid):OS.kill(backend_pid)

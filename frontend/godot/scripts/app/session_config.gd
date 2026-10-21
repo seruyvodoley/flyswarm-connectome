@@ -29,6 +29,7 @@ var range_distance=500
 var target_angle=0
 var range_mode="gunnery"
 var training_stage="malecns"
+var allow_pretraining_to_malecns=false
 var training_program="automatic"
 var training_steps=512
 var training_seconds=180

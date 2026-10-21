@@ -17,10 +17,25 @@ class CombatPPOPolicy:
         if metadata.get('schema')!=SCHEMA:raise ValueError('Unsupported combat policy feature schema')
         expected=list(NEURAL_CHANNELS)+list(GAME_FEATURES)
         if metadata.get('features')!=expected:raise ValueError('Combat policy feature layout mismatch')
+        if metadata.get('actions')!=['throttle','brake','steering','turret','elevation','fire']:
+            raise ValueError('Combat policy action layout mismatch')
+        if metadata.get('architecture')!='MlpPolicy: pi=[128,128], vf=[128,128]':
+            raise ValueError('Combat policy PPO architecture is missing or incompatible')
+        if not metadata.get('male_cns_required') or metadata.get('independent_evaluation') != 'passed_independent_analytic_evaluation':
+            raise ValueError('Open Day requires a MaleCNS-trained policy that beat the fixed Rule AI baseline in independent evaluation')
+        evaluation=metadata.get('evaluation_metrics',{})
+        baseline=evaluation.get('baseline_rule',{})
+        candidate=evaluation.get('policy',{})
+        score=lambda metrics:(float(metrics.get('win_rate',0.0)),float(metrics.get('mean_damage',0.0)),
+                              float(metrics.get('accuracy',0.0)),-float(metrics.get('mean_stuck_recoveries',0.0)))
+        if score(candidate)<=score(baseline):
+            raise ValueError('Open Day combat policy has not demonstrated a strict improvement over the fixed Rule AI baseline')
         digest=hashlib.sha256(Path(path).read_bytes()).hexdigest()
         expected_digest=metadata.get('checkpoint_sha256',metadata.get('sha256'))
         if expected_digest!=digest:raise ValueError('Combat policy checksum mismatch')
         self.model=PPO.load(str(path),device='cpu')
+        if tuple(self.model.observation_space.shape)!=(22,) or tuple(self.model.action_space.shape)!=(6,):
+            raise ValueError('Combat PPO model observation/action dimensions do not match the runtime')
         self.metadata={'schema':SCHEMA,'algorithm':'Stable-Baselines3 PPO','male_cns_required':bool(metadata.get('male_cns_required',metadata.get('training_stage')=='malecns'))}
     def act(self,observation):
         action,_=self.model.predict(np.asarray(observation,dtype=np.float32),deterministic=True)
@@ -50,22 +65,25 @@ class NonNeuralAdapter:
         return np.clip(np.append(x,1.)@self.weights,-1.,1.)
 
 def combat_features(trace,observation):
-    from flyswarm.training.combat import NEURAL_CHANNELS
-    neural=np.log1p(np.maximum(0,np.asarray(trace,dtype=float)))/5
+    from flyswarm.training.combat import combat_feature_vector
     proprio=np.asarray(observation.get('proprio',[0.]*6),dtype=float)
-    rl=np.asarray(observation.get('rl_task',[0.]*14),dtype=float)
     turret=float(observation.get('turret_angle_rad',float(proprio[3])*np.pi))
-    target_bearing=float(observation.get('bearing',0.0))+turret
     turret_error=float(observation.get('bearing',0.0))
-    game=np.asarray([
-        float(proprio[0]),min(float(observation.get('target_distance_m',0.0))/500.0,2.0),
-        np.sin(target_bearing),np.cos(target_bearing),np.sin(target_bearing),np.cos(target_bearing),
-        np.sin(turret_error),np.cos(turret_error),float(observation.get('gun_angle_rad',proprio[4]))/.5,
-        float(proprio[2]),float(rl[2]) if rl.size>2 else 1.0,
-        float(observation.get('target_health_observed',1.0)),float(bool(observation.get('visible',False))),
-        0.0,0.0,0.0,
-    ],dtype=float)
-    return np.concatenate([neural,game])
+    hull_error=turret_error+turret
+    return combat_feature_vector(trace,{
+        'speed_fraction':float(proprio[0]),
+        'distance_m':float(observation.get('target_distance_m',0.0)),
+        'target_bearing_rad':hull_error,'hull_error_rad':hull_error,
+        'turret_error_rad':turret_error,
+        'gun_elevation_rad':float(observation.get('gun_angle_rad',proprio[4])),
+        'reload_fraction':float(proprio[2]),
+        'own_health':float(observation.get('own_health_fraction',1.0)),
+        'target_health':float(observation.get('target_health_observed',1.0)),
+        'visible':bool(observation.get('visible',False)),
+        # The simulator currently does not expose these sensor values to the
+        # policy. Keep the documented neutral values in both train and runtime.
+        'obstacle_left':0.0,'obstacle_right':0.0,'last_damage':0.0,
+    })
 
 def load_policy(path):
     """Load either the ridge readout or any supported shared PPO adapter."""

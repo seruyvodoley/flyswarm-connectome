@@ -36,7 +36,8 @@ class FlySwarmParallelEnv(ParallelEnv):
                  curriculum_tier="C", active_units_per_team=None, combat_enabled=None,fire_rate_multiplier=None):
         self.max_steps=int(max_steps);self.dt=float(dt)
         self.coefficients=DEFAULT_REWARDS|{"battle_draw":0.}|dict(reward_coefficients or {})
-        if reward_function is not None and not callable(reward_function):raise TypeError("reward_function must be callable")
+        if reward_function is not None and not callable(reward_function) and not callable(getattr(reward_function,"calculate_batch",None)):
+            raise TypeError("reward_function must be callable or provide calculate_batch(samples)")
         self.reward_function=reward_function
         self.vehicle_ids=tuple(vehicle_ids or DEFAULT_COMPOSITION)
         if len(self.vehicle_ids)!=16:raise ValueError("vehicle_ids must contain 16 vehicle ids")
@@ -60,6 +61,10 @@ class FlySwarmParallelEnv(ParallelEnv):
     def observation_space(self,agent):return spaces.Box(-10.,10.,(self.obs_dim,),np.float32)
     def reset(self,seed=None,options=None):
         self._rng=np.random.default_rng(seed);self.agents=list(self.possible_agents);self.steps=0
+        self.seed_value=0 if seed is None else int(seed)
+        self.start_side="right" if bool((options or {}).get("swap_sides",False)) else "left"
+        reward_reset=getattr(self.reward_function,"reset",None)
+        if callable(reward_reset):reward_reset(self.seed_value)
         self.pos=np.zeros((16,2),float);self.pos[:8]=[-450,-180];self.pos[8:]=[450,180]
         self.pos[:,1]+=np.linspace(-210,210,8).tolist()*2
         self.pos+=self._rng.uniform(-8.,8.,size=(16,2))
@@ -74,13 +79,16 @@ class FlySwarmParallelEnv(ParallelEnv):
             self.pos[8]=np.array([315.,0.])+self._rng.uniform(-8.,8.,2)
             self.heading[0]=self._rng.uniform(-.025,.025)
             self.heading[8]=np.pi+self._rng.uniform(-.025,.025)
+        if self.start_side=="right":
+            self.pos*=-1.0
+            self.heading=(self.heading+np.pi+np.pi)%(2*np.pi)-np.pi
         self.neural=np.zeros((16,6),np.float32);self.last_components=[{} for _ in range(16)]
         self.last_events=[];self.last_actions=np.zeros((16,6),np.float32)
         self.last_rewards={}
         self.winner=None;self.terminal_reason="ongoing"
         self.last_outcome={"winner":None,"reason":"ongoing","tickets":self.tickets.tolist(),
                            "active_units_per_team":self.active_units_per_team,"curriculum_tier":self.curriculum_tier,
-                           "fire_rate_multiplier":self.fire_rate_multiplier}
+                           "fire_rate_multiplier":self.fire_rate_multiplier,"start_side":self.start_side}
         return self._observations(),{a:self._info(i) for i,a in enumerate(self.agents)}
     def set_connectome_features(self,features):
         value=np.asarray(features,np.float32)
@@ -88,6 +96,7 @@ class FlySwarmParallelEnv(ParallelEnv):
         self.neural=np.log1p(np.maximum(0,value))/5
     def step(self,actions):
         if not self.agents:raise RuntimeError("step() after episode end")
+        previous_observations=self._observations()
         previous_tickets=self.tickets.copy();previous_owner=self.zones_owner.copy();previous_progress=self.zones_progress.copy();previous_health=self.health.copy();previous_pos=self.pos.copy()
         self.last_events=[]
         applied=np.zeros((16,6),float)
@@ -159,7 +168,10 @@ class FlySwarmParallelEnv(ParallelEnv):
         done=bool(timed_out or tickets_exhausted or eliminated)
         self.winner,self.terminal_reason=self._resolve_outcome(blue_alive,red_alive,tickets_exhausted,timed_out)
         health_loss=np.maximum(0,previous_health-self.health)
-        for i,a in enumerate(self.possible_agents):
+        custom_reward_values=None
+        custom_reward_batch=getattr(self.reward_function,"calculate_batch",None)
+        reward_components=[]
+        for i in range(len(self.possible_agents)):
             team=0 if i<8 else 1;enemy=1-team
             damage=float(health_loss[8:].sum() if team==0 else health_loss[:8].sum())
             deaths=float(previous_health[i]>0 and self.health[i]<=0)
@@ -180,13 +192,41 @@ class FlySwarmParallelEnv(ParallelEnv):
             }
             if i%8>=self.active_units_per_team:c={key:0. for key in c}
             else:
-                # Shared team events are apportioned over living participants so
-                # summing a team's per-agent rewards counts each event once.
                 for key in TEAM_REWARD_COMPONENTS:c[key]/=self.active_units_per_team
+            reward_components.append(c)
+        observations=self._observations()
+        if callable(custom_reward_batch):
+            samples=[]
+            for i,agent_id in enumerate(self.possible_agents):
+                team="blue" if i<8 else "red"
+                events=[event for event in self.last_events
+                        if event.get("agent_id")==agent_id or event.get("target_id")==agent_id]
+                samples.append({
+                    "components":reward_components[i],
+                    "observation":previous_observations[agent_id],
+                    "action":applied[i].astype(np.float32,copy=True),
+                    "next_observation":observations[agent_id],
+                    "context":{"agent_id":agent_id,"team":team,"episode_seed":self.seed_value,
+                        "episode_step":self.steps,"terminated":bool(done and self.steps<self.max_steps),
+                        "truncated":bool(done and self.steps>=self.max_steps),
+                        "winner":None if self.winner is None else ("blue" if self.winner==0 else "red"),
+                        "terminal_reason":self.terminal_reason,"events":events},
+                })
+            custom_reward_values=custom_reward_batch(samples)
+            if len(custom_reward_values)!=len(self.possible_agents):
+                raise ValueError("reward.py returned the wrong number of values for the world-step batch")
+        for i,a in enumerate(self.possible_agents):
+            team=0 if i<8 else 1;enemy=1-team
+            c=reward_components[i]
             self.last_components[i]=c
             standard_coefficients=DEFAULT_REWARDS|{"battle_draw":0.}
             standard_reward=float(sum(standard_coefficients[k]*v for k,v in c.items()))
-            training_reward=float(self.reward_function(dict(c)) if self.reward_function else sum(self.coefficients[k]*v for k,v in c.items()))
+            if custom_reward_values is not None:
+                training_reward=float(custom_reward_values[i])
+            elif self.reward_function:
+                training_reward=float(self.reward_function(dict(c)))
+            else:
+                training_reward=float(sum(self.coefficients[k]*v for k,v in c.items()))
             if not np.isfinite(training_reward):raise ValueError("reward function returned NaN or infinity")
             rewards[a]=training_reward
             infos[a]=self._info(i)
@@ -196,13 +236,12 @@ class FlySwarmParallelEnv(ParallelEnv):
             infos[a]["terminal_reason"]=self.terminal_reason
         terminations={a:done and self.steps<self.max_steps for a in self.possible_agents}
         truncations={a:done and self.steps>=self.max_steps for a in self.possible_agents}
-        observations=self._observations()
         self.last_actions=applied.astype(np.float32)
         self.last_rewards=dict(rewards)
         self.last_outcome={"winner":None if self.winner is None else ("blue" if self.winner==0 else "red"),
                            "reason":self.terminal_reason,"tickets":self.tickets.tolist(),
                            "active_units_per_team":self.active_units_per_team,"curriculum_tier":self.curriculum_tier,
-                           "fire_rate_multiplier":self.fire_rate_multiplier}
+                           "fire_rate_multiplier":self.fire_rate_multiplier,"start_side":self.start_side}
         if done:self.agents=[]
         return observations,rewards,terminations,truncations,infos
 
@@ -328,5 +367,9 @@ class FlySwarmParallelEnv(ParallelEnv):
             "nation":p["nation"],"role_conditioning":self.role_conditioning,
             "curriculum_tier":self.curriculum_tier,"combat_enabled":self.combat_enabled,
             "active_units_per_team":self.active_units_per_team,"fire_rate_multiplier":self.fire_rate_multiplier,
-            "reward_semantics_version":REWARD_SEMANTICS_VERSION,
+            "reward_semantics_version":REWARD_SEMANTICS_VERSION,"start_side":self.start_side,
         }
+
+    def close(self):
+        reward_close=getattr(self.reward_function,"close",None)
+        if callable(reward_close):reward_close()

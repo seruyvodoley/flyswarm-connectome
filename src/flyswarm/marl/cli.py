@@ -18,10 +18,24 @@ from .experiments import (
     run_student_agent,
     train_sb3_ppo,
 )
-from .student_code import ManagedStudentAgent, load_reward
+from .student_code import ManagedStudentAgent, ManagedStudentReward
 from .exporter import export_practical
 
 _ACTIVE_OUTPUT: Path | None = None
+
+
+def _experiment_label(command: str, seed: int) -> str:
+    labels = {
+        "baseline": f"random-seed-{seed}",
+        "rule": f"rule-ai-seed-{seed}",
+        "train": f"ppo-training-seed-{seed}",
+        "student": f"student-agent-seed-{seed}",
+        "evaluate": "ppo-evaluation",
+        "check": "student-code-check",
+        "compare-all": "four-policy-comparison",
+        "export": "practical-export",
+    }
+    return labels.get(command, "random-vs-ppo-paired")
 
 
 def _rewards(path):
@@ -58,7 +72,7 @@ def build_parser():
     train.add_argument("--max-steps", type=int, default=600)
     train.add_argument("--learning-rate", type=float, default=3e-4)
     train.add_argument("--reward-file", type=Path, help="Student calculate_reward(components) Python file")
-    train.add_argument("--tier", choices=("A","B","C"), default="C", help="Educational scenario: A capture basics, B 4v4 tactics, C full 8v8")
+    train.add_argument("--tier", choices=("A","B","C"), default="C", help="Internal diagnostic environment; the student application always uses full 8x8")
     train.add_argument("--continue-from", type=Path, help="Continue a compatible PPO checkpoint")
     train.add_argument("--checkpoint-interval", type=int, default=1024)
     train.add_argument("--architecture", choices=("centralized","parameter_sharing"), default="centralized")
@@ -109,22 +123,7 @@ def main(argv=None):
     rewards = _rewards(args.reward_coefficients)
     root = args.output_root
     make_output = lambda label: args.experiment_dir or new_experiment_dir(root, label)
-    if args.command == "baseline":
-        out = make_output(f"random-seed-{args.seed}")
-    elif args.command == "rule":
-        out = make_output(f"rule-ai-seed-{args.seed}")
-    elif args.command == "train":
-        out = make_output(f"ppo-training-seed-{args.seed}")
-    elif args.command == "evaluate":
-        out = make_output("ppo-evaluation")
-    elif args.command == "check":
-        out = make_output("student-code-check")
-    elif args.command == "compare-all":
-        out = make_output("four-policy-comparison")
-    elif args.command == "export":
-        out = make_output("practical-export")
-    else:
-        out = make_output("random-vs-ppo-paired")
+    out = make_output(_experiment_label(args.command, getattr(args, "seed", 0)))
     if out.exists():
         raise FileExistsError(f"Experiment output already exists; refusing to overwrite: {out}")
     _ACTIVE_OUTPUT = out
@@ -133,19 +132,31 @@ def main(argv=None):
             import numpy as np
             out.mkdir(parents=True,exist_ok=True)
             with (out/"execution.log").open("a",encoding="utf-8",buffering=1) as console, redirect_stdout(console), redirect_stderr(console):
-                observation=np.zeros(30,dtype=np.float32)
-                context={"agent_id":"blue_0","team":"blue","episode_seed":1,"episode_step":0,"team_index":0}
+                observations=[np.zeros(30,dtype=np.float32) for _ in range(8)]
+                contexts=[{"agent_id":f"blue_{index}","team":"blue","episode_seed":1,
+                           "episode_step":0,"team_index":index} for index in range(8)]
                 with ManagedStudentAgent(args.agent_file) as agent:
-                    action=agent.act_team([observation],[context])[0]
-                reward=load_reward(args.reward_file) if args.reward_file else None
-                reward_value=reward({"objective_capture":1.0,"damage_dealt":0.0,"own_death":0.0,
-                                     "objective_progress":0.0,"objective_neutralization":0.0,"enemy_kill":0.0,
-                                     "ticket_delta":0.0,"battle_win":0.0,"battle_loss":0.0,"role_shaping":0.0}) if reward else None
+                    actions=agent.act_team(observations,contexts)
+                reward_sample={"components":{"objective_progress":0.0,"objective_approach":0.0,
+                                     "objective_capture":1.0,"objective_neutralization":0.0,
+                                     "damage_dealt":0.0,"enemy_kill":0.0,"own_death":0.0,
+                                     "ticket_delta":0.0,"battle_win":0.0,"battle_loss":0.0,
+                                     "battle_draw":0.0,"role_shaping":0.0},
+                               "observation":np.zeros(30,dtype=np.float32),"action":np.zeros(6,dtype=np.float32),
+                               "next_observation":np.zeros(30,dtype=np.float32),
+                               "context":{"agent_id":"blue_0","team":"blue","episode_seed":1,
+                                           "episode_step":1,"team_index":0,"terminated":False,
+                                           "truncated":False,"events":[]}}
+                if args.reward_file:
+                    with ManagedStudentReward(args.reward_file) as reward:
+                        reward.reset(1)
+                        reward_value=reward.calculate_batch([reward_sample])[0]
+                else:reward_value=None
                 (out/"manifest.json").write_text(json.dumps({"kind":"student_code_check","agent_file":str(args.agent_file),
                     "reward_file":str(args.reward_file) if args.reward_file else None},indent=2)+"\n",encoding="utf-8")
                 (out/"progress.json").write_text(json.dumps({"state":"complete","message":"Python files are valid.",
-                    "action_shape":list(action.shape),"reward_probe":reward_value},indent=2)+"\n",encoding="utf-8")
-                print(json.dumps({"valid":True,"action_shape":list(action.shape),"reward_probe":reward_value}))
+                    "action_shape":[list(action.shape) for action in actions],"reward_probe":reward_value},indent=2)+"\n",encoding="utf-8")
+                print(json.dumps({"valid":True,"action_shape":[list(action.shape) for action in actions],"reward_probe":reward_value}))
             return 0
         if args.command == "export":
             out.mkdir(parents=True,exist_ok=True)
@@ -169,10 +180,9 @@ def main(argv=None):
         elif args.command == "train":
             out.mkdir(parents=True)
             with (out/"execution.log").open("a",encoding="utf-8",buffering=1) as console, redirect_stdout(console), redirect_stderr(console):
-                reward_function=load_reward(args.reward_file) if args.reward_file else None
                 result = train_sb3_ppo(out, args.steps, args.seed, args.max_steps,
                                        args.learning_rate, out / "progress.json", rewards,
-                                       reward_function=reward_function,reward_file=args.reward_file,
+                                       reward_file=args.reward_file,
                                        curriculum_tier=args.tier,continue_from=args.continue_from,
                                        checkpoint_interval=args.checkpoint_interval,ppo_architecture=args.architecture)
         elif args.command == "evaluate":

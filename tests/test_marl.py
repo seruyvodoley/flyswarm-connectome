@@ -12,7 +12,7 @@ from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features,vehicle_profile
 from flyswarm.bridge.server import load_policy,ppo_features
 from flyswarm.marl.experiments import TeamGymnasiumEnv, SharedAgentVecEnv, run_random_baseline, train_sb3_ppo
 from flyswarm.marl.experiments import run_student_agent
-from flyswarm.marl.student_code import AGENT_TEMPLATE, REWARD_TEMPLATE, ManagedStudentAgent, load_agent, load_reward
+from flyswarm.marl.student_code import AGENT_TEMPLATE, REWARD_TEMPLATE, ManagedStudentAgent, ManagedStudentReward, load_agent, load_reward
 from flyswarm.marl.exporter import export_practical
 import zipfile
 import json
@@ -158,7 +158,7 @@ class MarlTests(unittest.TestCase):
             agent_file.write_text(AGENT_TEMPLATE,encoding="utf-8")
             reward_file.write_text(REWARD_TEMPLATE,encoding="utf-8")
             action=load_agent(agent_file)(np.zeros(30,np.float32),{"agent_id":"blue_0"})
-            self.assertEqual(action.shape,(6,));self.assertEqual(action[0],.5)
+            self.assertEqual(action.shape,(6,));self.assertAlmostEqual(float(action[0]),.5)
             self.assertTrue(np.isfinite(load_reward(reward_file)({"objective_capture":1.0,"damage_dealt":0.0,"own_death":0.0})))
             output=root/"student-run"
             result=run_student_agent(output,agent_file,episodes=1,seed=71,max_steps=2,reward_file=reward_file)
@@ -181,6 +181,56 @@ class MarlTests(unittest.TestCase):
                 load_agent(bad)(np.zeros(30,np.float32),{})
             bad.write_text("def act(obs):\n !!!",encoding="utf-8")
             with self.assertRaises(SyntaxError):load_agent(bad)
+            bad.write_text("def act(obs): return [True, 0, 0, 0, 0, 0]\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"numeric"):
+                load_agent(bad)(np.zeros(30,np.float32),{})
+    def test_student_team_api_runs_once_and_resets_persistent_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"agent.py"
+            source.write_text(
+                "STATE = {'seed': 0, 'calls': 0}\n"
+                "def reset(seed=0):\n    STATE.update(seed=seed, calls=0)\n"
+                "def act_team(observations, contexts):\n"
+                "    STATE['calls'] += 1\n"
+                "    return [[min(STATE['seed']/100, 1), STATE['calls']/10, "
+                "context['team_index']/8, 0, 0, 0] for context in contexts]\n",
+                encoding="utf-8")
+            observations=[np.zeros(30,np.float32) for _ in range(8)]
+            contexts=[{"team_index":index} for index in range(8)]
+            with ManagedStudentAgent(source,timeout_seconds=4) as worker:
+                worker.reset(17)
+                actions=worker.act_team(observations,contexts)
+                self.assertEqual(len(actions),8)
+                self.assertTrue(all(action[0]==.17 and action[1]==.1 for action in actions))
+                self.assertEqual([float(action[2]) for action in actions],[index/8 for index in range(8)])
+                actions=worker.act_team(observations,contexts)
+                self.assertTrue(all(action[1]==.2 for action in actions))
+                worker.reset(9)
+                actions=worker.act_team(observations,contexts)
+                self.assertTrue(all(action[0]==.09 and action[1]==.1 for action in actions))
+    def test_student_team_api_rejects_wrong_action_count_and_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"agent.py"
+            source.write_text("def act_team(observations, contexts):\n    return [[0]*6]\n",encoding="utf-8")
+            with ManagedStudentAgent(source,timeout_seconds=4) as worker:
+                with self.assertRaisesRegex(RuntimeError,"act_team must return shape"):
+                    worker.act_team([np.zeros(30,np.float32) for _ in range(2)],[{},{}])
+            source.write_text("def act_team(observations, contexts):\n    return [[0]*6 for _ in observations]\n",encoding="utf-8")
+            with ManagedStudentAgent(source,timeout_seconds=4) as worker:
+                action=worker.act_team([np.zeros(30,np.float32)],[{}])[0]
+                np.testing.assert_array_equal(action,np.zeros(6,np.float32))
+    def test_student_agent_can_import_a_sibling_helper_module(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"student_helpers.py").write_text("def throttle(): return .25\n",encoding="utf-8")
+            source=root/"agent.py"
+            source.write_text(
+                "from student_helpers import throttle\n"
+                "def act(observation, context=None): return [throttle(), 0, 0, 0, 0, 0]\n",
+                encoding="utf-8")
+            with ManagedStudentAgent(source,timeout_seconds=4) as worker:
+                action=worker.act_team([np.zeros(30,np.float32)],[{}])[0]
+            self.assertEqual(action[0],.25)
     def test_managed_student_worker_runs_and_reports_exceptions(self):
         with tempfile.TemporaryDirectory() as directory:
             source=Path(directory)/"agent.py"
@@ -211,6 +261,63 @@ class MarlTests(unittest.TestCase):
             source.write_text("def calculate_reward(c): return float('inf')\n",encoding="utf-8")
             with self.assertRaisesRegex(ValueError,"NaN or infinity"):
                 load_reward(source)({})
+    def test_managed_reward_worker_batches_world_step_and_keeps_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"reward.py"
+            source.write_text(
+                "CALLS = 0\n"
+                "def calculate_reward(components):\n"
+                "    global CALLS\n"
+                "    CALLS += 1\n"
+                "    return components['value'] + CALLS\n",
+                encoding="utf-8")
+            with ManagedStudentReward(source,timeout_seconds=4) as worker:
+                rewards=worker.calculate_batch([{"value":10.},{"value":20.},{"value":30.}])
+                self.assertEqual(rewards,[11.,22.,33.])
+                self.assertTrue(worker.process.is_alive())
+                self.assertEqual(worker.calculate_batch([{"value":0.}]),[4.])
+            self.assertFalse(worker.process.is_alive())
+    def test_reward_supports_legacy_and_optional_public_step_arguments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"reward.py"
+            source.write_text(
+                "def calculate_reward(components, observation=None, action=None, "
+                "next_observation=None, context=None):\n"
+                "    if observation is None: return components['base']\n"
+                "    return (components['base'] + float(observation[0]) + float(action[0]) "
+                "+ float(next_observation[0]) + context['bonus'])\n",
+                encoding="utf-8")
+            calculate=load_reward(source)
+            self.assertEqual(calculate({"base":2.}),2.)
+            sample={"components":{"base":2.},"observation":[1.],"action":[.25],
+                    "next_observation":[2.],"context":{"bonus":.5}}
+            self.assertEqual(calculate(sample),5.75)
+    def test_managed_reward_worker_reset_and_extended_step_batch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"reward.py"
+            source.write_text(
+                "BONUS = 0\n"
+                "def reset(seed=0):\n    global BONUS\n    BONUS = seed / 100\n"
+                "def calculate_reward(components, observation=None, action=None, "
+                "next_observation=None, context=None):\n"
+                "    return (components['base'] + BONUS + float(observation[0]) "
+                "+ float(action[0]) + float(next_observation[0]) + context['team_index'])\n",
+                encoding="utf-8")
+            sample={"components":{"base":1.},"observation":[1.],"action":[.5],
+                    "next_observation":[2.],"context":{"team_index":3}}
+            with ManagedStudentReward(source,timeout_seconds=4) as worker:
+                worker.reset(20)
+                self.assertEqual(worker.calculate_batch([sample,sample]),[7.7,7.7])
+                worker.reset(5)
+                self.assertEqual(worker.calculate_batch([sample]),[7.55])
+    def test_managed_reward_worker_times_out_and_terminates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"reward.py"
+            source.write_text("def calculate_reward(components):\n    while True: pass\n",encoding="utf-8")
+            with ManagedStudentReward(source,timeout_seconds=.2,startup_timeout_seconds=4) as worker:
+                with self.assertRaisesRegex(TimeoutError,"timed out"):
+                    worker.calculate_batch([{} for _ in range(8)])
+                self.assertFalse(worker.process.is_alive())
     def test_practical_export_only_contains_real_session_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);workspace=root/"workspace";sessions=root/"sessions";session=sessions/"run-1"

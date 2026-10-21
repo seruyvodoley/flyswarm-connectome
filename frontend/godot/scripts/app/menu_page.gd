@@ -180,6 +180,7 @@ func training():
 	label(body,"MALECNS COMBAT TRAINING",25).modulate=Color("c1a573")
 	text_block("Train an external combat policy with PPO. The connectome stays frozen. MaleCNS mode uses the real FlyBrain(batch=1) and requires the configured dataset; Gameplay Pretraining is labelled separately and does not use neural signals.")
 	dropdown("Neural input",["MaleCNS Training / Fine-tuning","Gameplay Pretraining · no MaleCNS"],["malecns","pretraining"],s.training_stage,func(v):s.training_stage=v)
+	toggle("Allow Gameplay Pretraining → MaleCNS Fine-tuning transfer",s.allow_pretraining_to_malecns,func(v):s.allow_pretraining_to_malecns=v)
 	dropdown("Training program",["Automatic curriculum","Full battle"],["automatic","full_battle"],s.training_program,func(v):s.training_program=v)
 	number("PPO steps",s.training_steps,16,200000,func(v):s.training_steps=int(v))
 	number("Maximum training time (minutes)",s.training_time_minutes,1,4320,func(v):s.training_time_minutes=int(v))

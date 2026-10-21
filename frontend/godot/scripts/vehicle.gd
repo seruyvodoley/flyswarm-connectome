@@ -591,6 +591,13 @@ func reset_destroyed_state():
 
 func observation() -> Dictionary:
 	var target_health=1.0
+	var own_health=1.0
+	if world.is_demo and agent_id in [0,8]:
+		own_health=float(demo_health)/maxf(1.0,float(demo_health_max))
+	else:
+		var own_intact=0
+		for working in modules.values():own_intact+=1 if working else 0
+		own_health=float(own_intact)/maxf(1.0,float(modules.size()))
 	if seen and target>=0 and target<world.vehicles.size():
 		var enemy=world.vehicles[target]
 		if enemy!=null:
@@ -600,4 +607,4 @@ func observation() -> Dictionary:
 				var intact=0
 				for working in enemy.modules.values():intact+=1 if working else 0
 				target_health=float(intact)/maxf(1.0,float(enemy.modules.size()))
-	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"rl_task":world.rl_task_features(self),"teacher":teacher(),"target":target,"target_distance_m":target_range,"turret_angle_rad":turret_angle,"gun_angle_rad":gun_angle,"target_health_observed":target_health}
+	return {"id":agent_id,"vehicle":cfg.id,"alive":alive,"position":[position.x,position.y,position.z],"bearing":aim_error,"elevation":elevation_error,"visible":seen,"angular_size":previous_size if seen else 0.0,"looming":looming,"proprio":[speed/(cfg.max_speed_kph/3.6),yaw_rate,reload_left/maxf(1,cfg.reload_s),turret_angle/PI,gun_angle,1.0 if modules.engine else 0.0],"rl_task":world.rl_task_features(self),"teacher":teacher(),"target":target,"target_distance_m":target_range,"turret_angle_rad":turret_angle,"gun_angle_rad":gun_angle,"own_health_fraction":own_health,"target_health_observed":target_health}

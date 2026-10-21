@@ -54,6 +54,9 @@ func run():
 		for page in ["OpenDayMain","HowItWorks","Settings"]:
 			app.show_page(page);await process_frame
 			check(is_instance_valid(app.view),"Open Day page loads: "+page+" "+language)
+			if page=="OpenDayMain":
+				var opponent=app.view.find_child("OpenDayOpponentPolicy",true,false) as OptionButton
+				check(opponent!=null and opponent.item_count==2,"Open Day exposes MaleCNS baseline and evaluated PPO opponent choices")
 			if page!="Settings":check(not app.view.find_children("*","SubViewportContainer",true,false).is_empty(),"Fly viewport visible: "+page)
 			else:check(app.view.find_child("MaleCNSDatasetPath",true,false)!=null,"Dataset folder setting is available: "+language)
 			if language=="ru":await capture("main-ru" if page=="OpenDayMain" else "how-it-works-ru")
@@ -172,7 +175,7 @@ func run():
 	battle.paused=true
 	var connected_controllers=Input.get_connected_joypads()
 	check(battle.demo_gamepad_active==not connected_controllers.is_empty(),"Open Day automatically selects a connected joypad when present")
-	check(battle.demo_intro.autowrap_mode==TextServer.AUTOWRAP_WORD_SMART and is_equal_approx(battle.demo_intro.anchor_left,.5) and is_equal_approx(battle.demo_intro.anchor_right,.5) and is_equal_approx(battle.demo_intro.offset_left,-battle.demo_intro.offset_right) and is_equal_approx(battle.demo_intro.offset_top,-battle.demo_intro.offset_bottom),"Open Day intro instructions wrap in a symmetric area centered on the viewport")
+	check(battle.demo_intro.autowrap_mode==TextServer.AUTOWRAP_WORD_SMART and is_equal_approx(battle.demo_intro.anchor_left,0.0) and is_equal_approx(battle.demo_intro.anchor_right,1.0) and is_equal_approx(battle.demo_intro.anchor_top,0.0) and is_equal_approx(battle.demo_intro.anchor_bottom,1.0) and is_zero_approx(battle.demo_intro.offset_left) and is_zero_approx(battle.demo_intro.offset_right) and is_zero_approx(battle.demo_intro.offset_top) and is_zero_approx(battle.demo_intro.offset_bottom) and battle.demo_intro.horizontal_alignment==HORIZONTAL_ALIGNMENT_CENTER and battle.demo_intro.vertical_alignment==VERTICAL_ALIGNMENT_CENTER,"Open Day intro instructions wrap in a symmetric area centered on the viewport")
 	if capture_enabled:
 		battle.demo_intro_left=0.0
 		battle.demo_intro.text="ТВОЙ ТАНК: ИС-2 (обр. 1944)\nЛЕВЫЙ СТИК — ДВИЖЕНИЕ · ПРАВЫЙ — ВЗГЛЯД И ПРИЦЕЛ · L2 — ПРИБЛИЖЕНИЕ · R2 — ВЫСТРЕЛ"

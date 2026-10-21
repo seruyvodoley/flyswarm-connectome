@@ -158,7 +158,7 @@ class Job:
    result=evaluate_checkpoint(checkpoint,self.c,self.out)
   elif action=='deploy':
    checkpoint=Path(self.c.get('combat_checkpoint',''))
-   best=checkpoint.parent/'best.zip'
+   best=checkpoint.parent/'best_evaluated.zip'
    if best.is_file():checkpoint=best
    result=prepare_deployment(checkpoint,self.out/'deployment')
   else:raise ValueError(f'Unknown combat training action: {action}')

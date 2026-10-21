@@ -11,6 +11,8 @@ var attract_label: Label
 var vehicle_preview: SubViewportContainer
 var vehicle_buttons: Dictionary={}
 var selected_vehicle_label: Label
+var opponent_picker: OptionButton
+var policy_status_label: Label
 var attract_phase=0
 var attract_clock=0.0
 
@@ -37,7 +39,11 @@ const RU_COPY={
 	"movement\nturning\naiming\nfiring":"движение\nповорот\nнаведение\nвыстрел","The existing FlySwarm physics, armour and ballistics remain active.":"Физика FlySwarm, броня и баллистика остаются активны.","BACK":"НАЗАД",
 	"YOU DEFEATED THE FLY":"ТЫ ПОБЕДИЛ МУХУ","THE FLY WON":"МУХА ПОБЕДИЛА","DRAW":"НИЧЬЯ","Neither vehicle was destroyed; no winner was awarded.":"Ни одна машина не уничтожена; победитель не определён.","Yes. A reconstructed model of the Drosophila nervous system just won this round.":"Да. Реконструированная модель нервной системы дрозофилы выиграла этот раунд.",
 	"Time: %.1f s   ·   shots: %d   ·   penetrating hits: %d":"Время: %.1f с   ·   выстрелы: %d   ·   пробития: %d","MaleCNS + external engineered motor/tactical layer":"MaleCNS + внешний инженерный адаптер управления",
-	"PLAY AGAIN":"ЕЩЁ РАЗ","OPEN DAY MENU":"В МЕНЮ ДЕМО","A FLY CONTROLS A TANK":"МУХА УПРАВЛЯЕТ ТАНКОМ","REAL MALECNS ACTIVITY":"АКТИВНОСТЬ МОДЕЛИ MALECNS","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT":"СМОЖЕШЬ ПОБЕДИТЬ МУХУ?\nНАЖМИ, ЧТОБЫ СРАЗИТЬСЯ"
+	"PLAY AGAIN":"ЕЩЁ РАЗ","OPEN DAY MENU":"В МЕНЮ ДЕМО","A FLY CONTROLS A TANK":"МУХА УПРАВЛЯЕТ ТАНКОМ","REAL MALECNS ACTIVITY":"АКТИВНОСТЬ МОДЕЛИ MALECNS","CAN YOU DEFEAT THE FLY?\nCLICK TO FIGHT":"СМОЖЕШЬ ПОБЕДИТЬ МУХУ?\nНАЖМИ, ЧТОБЫ СРАЗИТЬСЯ",
+	"OPPONENT POLICY":"ПОЛИТИКА ПРОТИВНИКА","MaleCNS Baseline":"MALECNS · БАЗОВАЯ","MaleCNS + Trained PPO":"MALECNS + ОБУЧЕННАЯ PPO",
+	"Choose deployment policy…":"ВЫБРАТЬ ПОЛИТИКУ…","Baseline: real MaleCNS with the existing Open Day controller.":"Базовый режим: MaleCNS и текущий контроллер Open Day.",
+	"Choose an evaluated MaleCNS deployment ZIP.":"Выберите оценённую политику MaleCNS для Open Day.","Policy metadata is missing.":"Не найдены метаданные политики.",
+	"Policy schema, MaleCNS mode, evaluation or checksum is invalid.":"Схема, режим MaleCNS, оценка или контрольная сумма не прошли проверку."
 }
 
 func _ready():
@@ -67,6 +73,40 @@ func button(parent: Node,text: String,callback: Callable) -> Button:
 func copy_text(text: String) -> String:
 	if str(AppState.settings.language)=="ru":return str(RU_COPY.get(text,AppState.tr_text(text)))
 	return AppState.tr_text(text)
+func _choose_open_day_policy() -> void:
+	var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM
+	dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
+	dialog.filters=PackedStringArray(["*.zip ; Evaluated FlySwarm PPO deployment"])
+	add_child(dialog)
+	dialog.file_selected.connect(func(path):
+		AppState.open_day_policy_path=path
+		_update_policy_status()
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered_ratio(.75)
+
+func _update_policy_status() -> void:
+	if not is_instance_valid(policy_status_label):return
+	if AppState.open_day_policy_mode!="trained":
+		policy_status_label.text=copy_text("Baseline: real MaleCNS with the existing Open Day controller.")
+		return
+	var path=AppState.open_day_policy_path
+	if path=="" or not FileAccess.file_exists(path):
+		policy_status_label.text=copy_text("Choose an evaluated MaleCNS deployment ZIP.")
+		return
+	var sidecar=path.get_base_dir().path_join("metadata.json")
+	if not FileAccess.file_exists(sidecar):
+		policy_status_label.text=copy_text("Policy metadata is missing.")
+		return
+	var file=FileAccess.open(sidecar,FileAccess.READ)
+	var metadata=JSON.parse_string(file.get_as_text()) if file else null
+	var valid=metadata is Dictionary and metadata.get("schema")=="flyswarm_malecns_combat_v2" and metadata.get("male_cns_required",false) and metadata.get("independent_evaluation")=="passed_independent_analytic_evaluation" and metadata.get("sha256",metadata.get("checkpoint_sha256",""))==FileAccess.get_sha256(path)
+	policy_status_label.text=(copy_text("Ready · ")+path.get_file()) if valid else copy_text("Policy schema, MaleCNS mode, evaluation or checksum is invalid.")
+	policy_status_label.add_theme_color_override("font_color",Color("aebe9a") if valid else Color("e18f82"))
+	if valid:
+		AppState.settings.open_day_policy_mode="trained"
+		AppState.settings.open_day_policy_path=path
+		AppState.save_settings()
 func panel(parent: Node) -> VBoxContainer:
 	var frame=PanelContainer.new();frame.size_flags_vertical=Control.SIZE_EXPAND_FILL;frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	frame.add_theme_stylebox_override("panel",DesignSystem.panel_style(str(AppState.settings.get("appearance","dark"))));parent.add_child(frame)
@@ -133,6 +173,17 @@ func build_main(root: VBoxContainer):
 	label(right,"WHY A FLY?",22);label(right,"EYES",14).modulate=Color("c1a573");label(right,"Visual signals enter the reconstructed sensory pathways.",15)
 	label(right,"NERVOUS SYSTEM",14).modulate=Color("c1a573");label(right,"The fixed MaleCNS model processes those signals.",15)
 	label(right,"MOVEMENT",14).modulate=Color("c1a573");label(right,"Descending-neuron signals pass through an external engineered motor adapter.",15)
+	label(right,copy_text("OPPONENT POLICY"),14).modulate=Color("c1a573")
+	opponent_picker=OptionButton.new();opponent_picker.name="OpenDayOpponentPolicy";opponent_picker.add_item(copy_text("MaleCNS Baseline"),0);opponent_picker.add_item(copy_text("MaleCNS + Trained PPO"),1);opponent_picker.select(1 if AppState.open_day_policy_mode=="trained" else 0);right.add_child(opponent_picker)
+	opponent_picker.item_selected.connect(func(index):
+		AppState.open_day_policy_mode="trained" if index==1 else "baseline"
+		if index==0:
+			AppState.settings.open_day_policy_mode="baseline";AppState.save_settings()
+		_update_policy_status())
+	var choose_policy=button(right,copy_text("Choose deployment policy…"),_choose_open_day_policy)
+	choose_policy.custom_minimum_size.y=42
+	policy_status_label=label(right,"",12);policy_status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;policy_status_label.modulate=Color("aebcb4")
+	_update_policy_status()
 	var grow=Control.new();grow.size_flags_vertical=Control.SIZE_EXPAND_FILL;right.add_child(grow)
 	button(right,"START DEMO",func():AppState.start_demo(selected_vehicle))
 	button(right,AppState.language_switch_label(),AppState.toggle_language)

@@ -50,7 +50,7 @@ var code_dirty := false
 var loading_code := false
 
 const STUDENT_AGENT_STARTER = "import numpy as np\n\ndef act(observation, context=None):\n    action = np.zeros(6, dtype=np.float32)\n\n    # Turn toward the assigned objective and move forward.\n    objective_angle = np.arctan2(observation[12], observation[13])\n    action[0] = 0.5\n    action[2] = np.clip(objective_angle, -1.0, 1.0)\n\n    return action\n"
-const STUDENT_REWARD_STARTER = "\"\"\"A readable example reward based on public battle events.\"\"\"\n\ndef calculate_reward(components):\n    captures = components[\"objective_capture\"]\n    damage = components[\"damage_dealt\"]\n    losses = components[\"own_death\"]\n    return float(3.0 * captures + 0.01 * damage - 4.0 * losses)\n"
+const STUDENT_REWARD_STARTER = "\"\"\"Example: reward progress, useful damage, and keeping vehicles alive.\n\nThe components dictionary contains public events from the latest battle step.\nThis function returns one finite number for PPO to learn from.\n\"\"\"\n\ndef calculate_reward(components):\n    # Reward capturing an objective, then add a small bonus for damage.\n    objective_reward = 3.0 * components[\"objective_capture\"]\n    damage_reward = 0.01 * components[\"damage_dealt\"]\n\n    # own_death is a positive count, so subtract it to discourage losses.\n    loss_penalty = 4.0 * components[\"own_death\"]\n\n    return float(\n        objective_reward\n        + damage_reward\n        - loss_penalty\n    )\n"
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -298,17 +298,51 @@ func _update_code_breadcrumb():
 	code_breadcrumb.text=active_code+".py"+("  ›  "+symbol if symbol!="" else "")
 
 func _show_code_help():
-	var dialog=AcceptDialog.new()
+	var dialog=Window.new()
+	dialog.name="PythonApiHelp"
 	dialog.title=_t("Справка по Python API","Python API help")
-	dialog.dialog_text=_t(
+	dialog.transient=true
+	dialog.exclusive=true
+	dialog.unresizable=true
+	var help_text=_t(
 		"agent.py\nact(observation, context=None) возвращает шесть чисел от −1 до 1: движение, тормоз, поворот корпуса, поворот башни, угол орудия и выстрел. observation содержит публичные сигналы и состояние машины.\n\nreward.py\ncalculate_reward(components) возвращает одно число — награду за переход. Пользовательская награда влияет на обучение PPO; независимая оценка использует стандартные метрики.",
 		"agent.py\nact(observation, context=None) returns six numbers from −1 to 1: throttle, brake, hull steering, turret rotation, gun elevation, and fire. observation contains public signals and vehicle state.\n\nreward.py\ncalculate_reward(components) returns one number: the reward for a transition. A custom reward changes PPO training; independent evaluation uses standard metrics."
 	)
-	dialog.add_theme_font_size_override("font_size",16)
+	var window_size=get_window().size
+	var dialog_size=Vector2i(int(minf(760.0,window_size.x*.82)),int(minf(440.0,window_size.y*.72)))
+	dialog.min_size=Vector2i(mini(360,dialog_size.x),mini(220,dialog_size.y))
+	dialog.size=dialog_size
+	var margin=MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,18)
+	dialog.add_child(margin)
+	var layout=VBoxContainer.new()
+	layout.add_theme_constant_override("separation",12)
+	margin.add_child(layout)
+	var scroll=ScrollContainer.new()
+	scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	layout.add_child(scroll)
+	var help_label=Label.new()
+	help_label.name="HelpText"
+	help_label.text=help_text
+	help_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	help_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	help_label.custom_minimum_size.x=0
+	help_label.add_theme_font_size_override("font_size",16)
+	scroll.add_child(help_label)
+	var footer=HBoxContainer.new()
+	footer.alignment=BoxContainer.ALIGNMENT_END
+	layout.add_child(footer)
+	var close=Button.new()
+	close.text=_t("Готово","Done")
+	close.pressed.connect(dialog.queue_free)
+	footer.add_child(close)
+	dialog.close_requested.connect(dialog.queue_free)
 	add_child(dialog)
-	dialog.confirmed.connect(dialog.queue_free)
-	dialog.canceled.connect(dialog.queue_free)
-	dialog.popup_centered(Vector2i(680,300))
+	dialog.popup_centered(dialog_size)
+	dialog.size=dialog_size
 
 func _on_editor_menu_action(id:int):
 	match id:

@@ -32,6 +32,7 @@ case "$TASK_ACTION" in
   "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/field_environment_validation.gd
   "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
   "$TASK_GODOT" --headless --path frontend/godot res://scenes/ResearchCombatValidation.tscn
+  "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/help_layout_validation.gd
   exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd ;;
  run-ballistics-test) exec "$TASK_GODOT" --headless --path frontend/godot --script res://scripts/validation.gd ;;
  run-profile) exec "$TASK_GODOT" --path frontend/godot --script res://scripts/app/performance_profile.gd -- "$@" ;;

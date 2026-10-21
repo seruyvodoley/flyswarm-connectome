@@ -37,14 +37,24 @@ def act(observation, context=None):
 
     return action
 '''
-REWARD_TEMPLATE = '''"""Calculate one agent's training reward from public event components."""
+REWARD_TEMPLATE = '''"""Example: reward progress, useful damage, and keeping vehicles alive.
+
+The components dictionary contains public events from the latest battle step.
+This function returns one finite number for PPO to learn from.
+"""
 
 def calculate_reward(components):
-    # Components are documented in docs/marl_python_api.md.
+    # Reward capturing an objective, then add a small bonus for damage.
+    objective_reward = 3.0 * components["objective_capture"]
+    damage_reward = 0.01 * components["damage_dealt"]
+
+    # own_death is a positive count, so subtract it to discourage losses.
+    loss_penalty = 4.0 * components["own_death"]
+
     return float(
-        3.0 * components["objective_capture"]
-        + 0.01 * components["damage_dealt"]
-        - 4.0 * components["own_death"]
+        objective_reward
+        + damage_reward
+        - loss_penalty
     )
 '''
 

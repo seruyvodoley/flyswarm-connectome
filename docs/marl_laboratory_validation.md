@@ -61,3 +61,33 @@ Updated: 2026-10-21
   build's appearance.
 - No before/after performance measurements were collected in this pass.
 - No GitHub Release was created, in accordance with the user's instruction.
+
+## Responsive Help and reward starter — beta55
+
+- Updated the Python API Help window to wrap long explanations and stay within
+  the application window. A Godot layout validation script checked 1280×720,
+  1920×1080, 2880×860, and 800×480 viewports; all four sizes passed.
+- Replaced the one-line reward placeholder with a commented, runnable example
+  covering objective capture, damage, and own-vehicle losses. The Python
+  backend template and Godot editor starter use the same example. The existing
+  default reward weights and calculation remain unchanged.
+- Updated the user's saved `reward.py` starter in the MARL workspace so an
+  already-created workspace receives the same example. A backup of the prior
+  starter was retained in the user's Trash.
+- Python contract checks: 36 passed (`tests/test_marl.py` and
+  `tests/test_marl_student_contracts.py`); two PettingZoo deprecation warnings.
+- Godot headless Help layout validation passed with zero failures. Godot editor
+  import also passed. The Help dialog was not manually click-tested in the
+  packaged GUI because UI automation could not attach to its separate native
+  window.
+
+### beta55 package
+
+- Built `0.2.0-beta.55` from commit `05adbe0` for macOS arm64. The installed
+  copy at `/Applications/FlySwarm.app` opens; signature verification succeeds
+  (ad-hoc), and the bundled MaleCNS data check reports both files ready.
+- DMG verification and ZIP integrity checks passed. The mounted-DMG app copy
+  was launched outside the checkout. Notarization was not performed.
+- DMG SHA-256: `cfd0522a5c2cdfee1c552da8dd16e275b3644b7a954866e9b724cf964cfa0b9b`
+- ZIP SHA-256: `80fc9943e09124c99265d471b2abf8fc670cb672d64979e17c0baf3b92ae17cc`
+- No GitHub Release was published, per the user's instruction.

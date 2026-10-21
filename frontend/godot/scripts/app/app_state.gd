@@ -330,7 +330,7 @@ func run_marl_job(command: String,args: Array=[]):
 	marl_progress={"state":"starting","phase":"process","command":command,"message":"Starting the Python experiment worker…"}
 	marl_pid=OS.create_process(python,cli_args)
 	if marl_pid<=0:marl_progress={"state":"error","phase":"process","command":command,"message":"Could not start the Python experiment process."}
-	show_page("MarlLaboratory")
+	if current_page!="MarlLaboratory":show_page("MarlLaboratory")
 func stop_marl_job():
 	if marl_pid>0 and OS.is_process_running(marl_pid):
 		FileAccess.open(marl_output.path_join("cancel"),FileAccess.WRITE).store_string("cancel")

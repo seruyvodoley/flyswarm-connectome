@@ -1,5 +1,5 @@
 """Supervised application jobs. Own children, report actual progress, cancel cleanly."""
-import hashlib,json,os,signal,socket,subprocess,sys,time
+import hashlib,json,os,signal,socket,subprocess,sys,time,traceback
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
@@ -170,7 +170,9 @@ class Job:
    elif self.c['mode']=='combat_training':self.combat_training()
    else:self.research()
   except Cancelled:self.status(state='cancelled',message='Cancelled; owned child processes stopped.')
-  except Exception as exc:self.status(state='error',message=str(exc))
+  except Exception as exc:
+   (self.out/'error.log').write_text(traceback.format_exc(),encoding='utf-8')
+   self.status(state='error',message=str(exc))
   finally:self.cleanup()
 if __name__=='__main__':
  config=json.loads(Path(sys.argv[1]).read_text());Job(config).execute()

@@ -18,6 +18,7 @@ var student_reward_path=""
 var code_status_label: Label
 var code_cursor_label: Label
 var code_file_tabs: Dictionary = {}
+var code_stop_button: Button
 var code_dirty := false
 var loading_code := false
 
@@ -109,22 +110,21 @@ func _build_programming_tab(tabs:TabContainer):
 	DirAccess.make_dir_recursive_absolute(_workspace_dir())
 	if not FileAccess.file_exists(student_agent_path):FileAccess.open(student_agent_path,FileAccess.WRITE).store_string('import numpy as np\n\ndef act(observation, context=None):\n    action = np.zeros(6, dtype=np.float32)\n    action[0] = 0.5\n    return action\n')
 	if not FileAccess.file_exists(student_reward_path):FileAccess.open(student_reward_path,FileAccess.WRITE).store_string('def calculate_reward(components):\n    return float(3.0 * components["objective_capture"] + 0.01 * components["damage_dealt"] - 4.0 * components["own_death"])\n')
-	var warning=Label.new();warning.text=_t("Python запускается в отдельном backend-процессе с правами вашей учётной записи. Это не песочница: запускайте только знакомый код.","Python runs in a separate backend process with your account permissions. This is not a sandbox: run code only if you trust it.");warning.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;warning.modulate=Color("e5c27b");panel.add_child(warning)
-	var row=HBoxContainer.new();panel.add_child(row)
-	var agent_tab=Button.new();agent_tab.text="agent.py";agent_tab.pressed.connect(func():_switch_code("agent"));row.add_child(agent_tab)
-	var reward_tab=Button.new();reward_tab.text="reward.py";reward_tab.pressed.connect(func():_switch_code("reward"));row.add_child(reward_tab)
+	var toolbar=HBoxContainer.new();toolbar.add_theme_constant_override("separation",6);panel.add_child(toolbar)
+	var agent_tab=Button.new();agent_tab.text="agent.py";agent_tab.pressed.connect(func():_switch_code("agent"));toolbar.add_child(agent_tab)
+	var reward_tab=Button.new();reward_tab.text="reward.py";reward_tab.pressed.connect(func():_switch_code("reward"));toolbar.add_child(reward_tab)
 	code_file_tabs={"agent":agent_tab,"reward":reward_tab}
 	for key in code_file_tabs:
 		var file_tab:Button=code_file_tabs[key];file_tab.toggle_mode=true;file_tab.button_pressed=key==active_code
 		file_tab.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("pressed",DesignSystem.tab_style(appearance,true));file_tab.add_theme_color_override("font_color",DesignSystem.text_for(appearance))
-	var import_button=Button.new();import_button.text=_t("Импортировать .py…","Import .py…");import_button.pressed.connect(_import_python);row.add_child(import_button)
-	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.pressed.connect(_save_current_code);row.add_child(save_button)
-	var restore_button=Button.new();restore_button.text=_t("Шаблон","Template");restore_button.pressed.connect(_restore_template);row.add_child(restore_button)
-	var actions=HBoxContainer.new();actions.add_theme_constant_override("separation",8);panel.add_child(actions)
-	var check=Button.new();check.text=_t("Проверить код","Check code");check.pressed.connect(func():_confirm_student_run("check"));actions.add_child(check)
-	var run=Button.new();run.text=_t("Запустить свою стратегию","Run strategy");run.pressed.connect(func():_confirm_student_run("student"));actions.add_child(run)
-	var export=Button.new();export.text=_t("Экспортировать работу","Export practical");export.pressed.connect(func():_save_current_code();AppState.run_marl_job("export",["--workspace",_workspace_dir(),"--sessions-root",AppState.results_root().path_join("marl")]));actions.add_child(export)
-	var stop=Button.new();stop.text=_t("Остановить","Stop");stop.pressed.connect(AppState.stop_marl_job);actions.add_child(stop)
+	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;toolbar.add_child(spacer)
+	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.tooltip_text="⌘S / Ctrl+S";save_button.pressed.connect(_save_current_code);toolbar.add_child(save_button)
+	var check=Button.new();check.text=_t("Проверить","Check");check.pressed.connect(func():_confirm_student_run("check"));toolbar.add_child(check)
+	var run=Button.new();run.text=_t("▶ Запустить","▶ Run");run.pressed.connect(func():_confirm_student_run("student"));toolbar.add_child(run)
+	code_stop_button=Button.new();code_stop_button.text=_t("Остановить","Stop");code_stop_button.visible=false;code_stop_button.pressed.connect(AppState.stop_marl_job);toolbar.add_child(code_stop_button)
+	var more=MenuButton.new();more.text="⋯";more.tooltip_text=_t("Другие действия","More actions");toolbar.add_child(more)
+	var more_menu=more.get_popup();more_menu.add_item(_t("Импортировать файл Python…","Import Python file…"),1);more_menu.add_item(_t("Восстановить шаблон","Restore template"),2);more_menu.add_separator();more_menu.add_item(_t("Экспортировать практическую…","Export practical…"),3);more_menu.add_separator();more_menu.add_item(_t("О безопасности Python…","About Python security…"),4)
+	more_menu.id_pressed.connect(_on_editor_menu_action)
 	var editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;panel.add_child(editor_split)
 	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=300;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
 	var mono=SystemFont.new();mono.font_names=PackedStringArray(["SF Mono","Menlo","Monaco","monospace"]);code_editor.add_theme_font_override("font",mono);code_editor.add_theme_font_size_override("font_size",17);editor_split.add_child(code_editor)
@@ -139,7 +139,18 @@ func _build_programming_tab(tabs:TabContainer):
 	code_status_label=Label.new();code_status_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_status_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_status_label)
 	code_cursor_label=Label.new();code_cursor_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_cursor_label)
 	var language_label=Label.new();language_label.text="Python · UTF-8 · Spaces: 4";language_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(language_label)
+	var security_label=Label.new();security_label.text=_t("НЕ ПЕСОЧНИЦА","NOT SANDBOXED");security_label.tooltip_text=_t("Python-код запускается с правами вашей учётной записи и доступом к её файлам. Запускайте только знакомый код.","Python runs with your account permissions and can access your files. Run code only if you trust it.");security_label.add_theme_color_override("font_color",Color("a9823d") if DesignSystem.is_light(appearance) else Color("c1a573"));status_bar.add_child(security_label)
 	loading_code=true;code_editor.text=FileAccess.get_file_as_string(student_agent_path);loading_code=false;_set_code_dirty(false);_update_code_cursor()
+
+func _on_editor_menu_action(id:int):
+	match id:
+		1:_import_python()
+		2:_restore_template()
+		3:
+			_save_current_code()
+			AppState.run_marl_job("export",["--workspace",_workspace_dir(),"--sessions-root",AppState.results_root().path_join("marl")])
+		4:
+			var dialog=AcceptDialog.new();dialog.title=_t("Безопасность Python","Python security");dialog.dialog_text=_t("Python работает в отдельном процессе с правами вашей учётной записи и доступом к её файлам. Это не песочница: запускайте только код, которому доверяете.","Python runs in a separate process with your account permissions and access to your files. This is not a sandbox: only run code you trust.");add_child(dialog);dialog.confirmed.connect(dialog.queue_free);dialog.popup_centered()
 
 func _make_python_highlighter(appearance:String)->CodeHighlighter:
 	var light=DesignSystem.is_light(appearance)
@@ -300,6 +311,7 @@ func _show_history():
 func update_marl_status(progress:Dictionary,output_path:String):
 	if not is_instance_valid(status_label):return
 	var state=str(progress.get("state","ready"))
+	if is_instance_valid(code_stop_button):code_stop_button.visible=state in ["starting","initializing","training","finalizing"]
 	var labels={
 		"ready":_t("Готово к запуску","Ready to start"),
 		"starting":_t("Запуск Python…","Starting Python…"),

@@ -148,7 +148,7 @@ def build_backend(python: Path, build_root: Path, output: Path) -> Path:
         "--name", "FlySwarmBackend", "--distpath", str(output), "--workpath", str(work),
         "--specpath", str(specs), "--paths", str(ROOT / "src"),
         "--collect-all", "flybrain", "--collect-all", "pettingzoo", "--collect-all", "gymnasium",
-        "--collect-all", "stable_baselines3", "--collect-all", "torch", "--collect-all", "matplotlib",
+        "--collect-all", "stable_baselines3", "--collect-binaries", "torch", "--collect-all", "matplotlib",
         "--collect-binaries", "llvmlite",
         "--exclude-module", "pygame",
         "--collect-binaries", "scipy", "--hidden-import", "flybrain.brain",
@@ -162,13 +162,10 @@ def build_backend(python: Path, build_root: Path, output: Path) -> Path:
     executable = dist / "FlySwarmBackend"
     if not executable.is_file():
         raise RuntimeError(f"PyInstaller executable missing: {executable}")
-    # Torch ships over a gigabyte of C/C++ headers for compiling custom
-    # extensions. FlySwarm uses the precompiled CPU runtime and never builds
-    # extensions inside the app; omit headers but retain runtime libraries
-    # and their licenses to keep the installer practical.
-    torch_headers = dist / "_internal/torch/include"
-    if torch_headers.is_dir():
-        shutil.rmtree(torch_headers)
+    # Collect Torch's native runtime libraries without its package data. The
+    # full package collector stages multi-gigabyte C/C++ headers and test
+    # fixtures that this precompiled CPU application never uses. PyInstaller's
+    # normal module analysis still follows the imported Python runtime modules.
     return dist
 
 
@@ -205,9 +202,13 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
         raise RuntimeError(f"Python environment not found: {python}")
     output = Path(args.output).expanduser().resolve() / args.version
     output.mkdir(parents=True, exist_ok=True)
-    build_root = ROOT / "build/package-work"
-    shutil.rmtree(build_root, ignore_errors=True)
-    build_root.mkdir(parents=True)
+    # Keep large PyInstaller, Godot staging, DMG and ZIP intermediates on the
+    # local APFS temp volume. The project may live on a slower removable
+    # filesystem (for example ExFAT); staging multi-gigabyte app copies there
+    # repeatedly triggers indexing and security scans and makes the machine
+    # sluggish. The caller can copy the finished release artifacts to the
+    # project volume once packaging and validation succeed.
+    build_root = Path(tempfile.mkdtemp(prefix=f"flyswarm-package-work-{args.version}-"))
 
     backend_dist = output / "FlySwarmBackend"
     if not args.reuse_backend or not (backend_dist / "FlySwarmBackend").is_file():

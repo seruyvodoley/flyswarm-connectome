@@ -10,7 +10,7 @@ from flyswarm.marl import FlySwarmParallelEnv
 from flyswarm.marl.policy import SharedPPOPolicy
 from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features,vehicle_profile
 from flyswarm.bridge.server import load_policy,ppo_features
-from flyswarm.marl.experiments import TeamGymnasiumEnv, run_random_baseline, train_sb3_ppo
+from flyswarm.marl.experiments import TeamGymnasiumEnv, SharedAgentVecEnv, run_random_baseline, train_sb3_ppo
 from flyswarm.marl.experiments import run_student_agent
 from flyswarm.marl.student_code import AGENT_TEMPLATE, REWARD_TEMPLATE, ManagedStudentAgent, load_agent, load_reward
 from flyswarm.marl.exporter import export_practical
@@ -63,6 +63,94 @@ class MarlTests(unittest.TestCase):
         self.assertEqual(info["backend"],"analytical_training")
         self.assertEqual(len(info["snapshot"]["agents"]),16)
         self.assertFalse(terminated);self.assertFalse(truncated)
+        env.close()
+    def test_team_reward_components_are_not_multiplied_by_agent_count(self):
+        env=FlySwarmParallelEnv(max_steps=4);env.reset(seed=28)
+        env.zones_owner[0]=0;env.tickets[1]=250.
+        actions={agent:np.zeros(6,np.float32) for agent in env.agents}
+        _,rewards,_,_,infos=env.step(actions)
+        ticket_delta=sum(infos[f"blue_{i}"]["reward_components"]["ticket_delta"] for i in range(8))
+        self.assertAlmostEqual(ticket_delta,.02)
+        self.assertAlmostEqual(sum(rewards[f"blue_{i}"] for i in range(8)),
+            sum(infos[f"blue_{i}"]["standard_evaluation_reward"] for i in range(8)))
+        env.close()
+    def test_role_shaping_is_small_signed_distance_delta_and_cannot_reward_idling(self):
+        env=FlySwarmParallelEnv(max_steps=2,curriculum_tier="C");env.reset(seed=81)
+        env.zones[0]=np.array([0.,0.]);previous=env.pos.copy();previous[0]=[100.,0.]
+        env.pos[0]=[90.,0.]
+        toward=env._role_shaping(0,previous,np.zeros(6,np.float32))
+        self.assertAlmostEqual(toward,float(env.profiles[0]["objective_bias"])*.01)
+        previous[0]=env.pos[0].copy()
+        self.assertEqual(env._role_shaping(0,previous,np.zeros(6,np.float32)),0.)
+        env.pos[0]=[100.,0.]
+        self.assertLess(env._role_shaping(0,previous,np.zeros(6,np.float32)),0.)
+        self.assertLessEqual(abs(toward),.05)
+        env.close()
+    def test_objective_approach_gives_dense_bounded_signed_learning_signal(self):
+        env=FlySwarmParallelEnv(max_steps=2,curriculum_tier="A");env.reset(seed=82)
+        env.zones[0]=np.array([0.,0.]);previous=env.pos.copy();previous[0]=[-100.,0.]
+        env.pos[0]=[-99.,0.]
+        self.assertAlmostEqual(env._objective_approach(0,previous),.01)
+        previous[0]=env.pos[0].copy()
+        self.assertEqual(env._objective_approach(0,previous),0.)
+        env.pos[0]=[-100.,0.]
+        self.assertAlmostEqual(env._objective_approach(0,previous),-.01)
+        env.pos[0]=[0.,0.]
+        self.assertAlmostEqual(env._objective_approach(0,previous),.05)
+        env.close()
+    def test_terminal_rewards_follow_resolved_outcome(self):
+        env=FlySwarmParallelEnv(max_steps=3);env.reset(seed=30)
+        env.health[8:]=0.
+        actions={agent:np.zeros(6,np.float32) for agent in env.agents}
+        _,rewards,terms,truncs,infos=env.step(actions)
+        self.assertEqual(env.last_outcome["winner"],"blue")
+        self.assertAlmostEqual(sum(infos[f"blue_{i}"]["reward_components"]["battle_win"] for i in range(8)),1.)
+        self.assertAlmostEqual(sum(infos[f"red_{i}"]["reward_components"]["battle_loss"] for i in range(8)),1.)
+        self.assertTrue(all(terms.values()));self.assertFalse(any(truncs.values()))
+        env.reset(seed=31);env.health[:]=0.
+        actions={agent:np.zeros(6,np.float32) for agent in env.agents}
+        _,_,_,_,infos=env.step(actions)
+        self.assertIsNone(env.last_outcome["winner"])
+        self.assertAlmostEqual(sum(infos[f"blue_{i}"]["reward_components"]["battle_draw"] for i in range(8)),1.)
+        env.close()
+    def test_battle_outcome_elimination_tickets_timeout_and_draw(self):
+        env=FlySwarmParallelEnv(max_steps=2);env.reset(seed=29)
+        self.assertEqual(env._resolve_outcome(True,False,False,False),(0,"opponent_eliminated"))
+        self.assertEqual(env._resolve_outcome(False,False,False,False),(None,"simultaneous_elimination"))
+        env.tickets=np.array([300.,0.])
+        self.assertEqual(env._resolve_outcome(True,True,True,False),(0,"enemy_tickets_exhausted"))
+        env.tickets=np.array([0.,0.])
+        self.assertEqual(env._resolve_outcome(True,True,True,False),(None,"simultaneous_ticket_exhaustion"))
+        env.tickets=np.array([100.,100.]);env.zones_owner=np.array([0,0,1])
+        self.assertEqual(env._resolve_outcome(True,True,False,True),(0,"timeout_objectives"))
+        env.zones_owner=np.array([0,1,-1])
+        self.assertEqual(env._resolve_outcome(True,True,False,True),(None,"timeout_draw"))
+        env.close()
+    def test_curriculum_a_keeps_same_spaces_and_disables_combat(self):
+        env=FlySwarmParallelEnv(max_steps=3,curriculum_tier="A")
+        obs,_=env.reset(seed=5)
+        self.assertEqual(len(obs),16);self.assertEqual(obs["blue_0"].shape,obs["blue_7"].shape)
+        self.assertEqual(np.count_nonzero(env.health[:8]),1);self.assertEqual(np.count_nonzero(env.health[8:]),1)
+        actions={agent:np.zeros(6,np.float32) for agent in env.agents};actions["blue_0"][5]=1.
+        env.pos[0]=[0.,0.];env.pos[8]=[50.,0.]
+        env.step(actions)
+        self.assertEqual(env.health[8],1.)
+        env.close()
+    def test_curriculum_a_seed_changes_small_start_jitter_reproducibly(self):
+        first=FlySwarmParallelEnv(curriculum_tier="A");second=FlySwarmParallelEnv(curriculum_tier="A");other=FlySwarmParallelEnv(curriculum_tier="A")
+        first.reset(seed=81);second.reset(seed=81);other.reset(seed=82)
+        np.testing.assert_array_equal(first.pos[[0,8]],second.pos[[0,8]])
+        self.assertFalse(np.array_equal(first.pos[[0,8]],other.pos[[0,8]]))
+        first.close();second.close();other.close()
+    def test_parameter_sharing_vecenv_synchronizes_multiple_agents(self):
+        env=SharedAgentVecEnv(seed=19,max_steps=2,curriculum_tier="B")
+        observations=env.reset()
+        self.assertEqual(observations.shape,(4,env.observation_space.shape[0]))
+        obs,rewards,dones,infos=env.step(np.zeros((4,6),np.float32))
+        self.assertEqual(rewards.shape,(4,));self.assertFalse(dones.any())
+        obs,rewards,dones,infos=env.step(np.zeros((4,6),np.float32))
+        self.assertTrue(dones.all());self.assertEqual(sum("episode" in item for item in infos),1)
+        self.assertEqual(obs.shape,(4,env.observation_space.shape[0]))
         env.close()
     def test_student_python_api_runs_strategy_and_snapshots_source(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -210,4 +298,23 @@ class MarlTests(unittest.TestCase):
             self.assertEqual(state["state"],"complete")
             self.assertEqual(state["timesteps"],16)
             self.assertTrue(Path(result["checkpoint"]).is_file())
+            metadata=output/"checkpoint"/"ppo_team.metadata.json"
+            self.assertTrue(metadata.is_file())
+            saved=json.loads(metadata.read_text())
+            self.assertEqual(saved["checkpoint_schema"],"flyswarm.sb3_ppo.v2")
+            self.assertEqual(saved["num_timesteps"],16)
+            continued=Path(directory)/"continued"
+            with patch.object(experiments,"_plot_learning_curve",return_value=None):
+                result2=train_sb3_ppo(continued,timesteps=16,seed=41,max_steps=2,
+                    continue_from=Path(result["checkpoint"]))
+            self.assertEqual(result2["initial_timesteps"],16)
+            self.assertEqual(result2["timesteps"],32)
+            self.assertEqual(json.loads((continued/"manifest.json").read_text())["continued_from"],str(Path(result["checkpoint"]).resolve()))
+            shared=Path(directory)/"shared"
+            with patch.object(experiments,"_plot_learning_curve",return_value=None):
+                shared_result=train_sb3_ppo(shared,timesteps=16,seed=42,max_steps=2,
+                    curriculum_tier="B",ppo_architecture="parameter_sharing")
+            shared_manifest=json.loads((shared/"manifest.json").read_text())
+            self.assertEqual(shared_manifest["architecture"],"parameter-sharing PPO with local critic; not MAPPO")
+            self.assertEqual(shared_result["timesteps"],16)
 if __name__=="__main__":unittest.main()

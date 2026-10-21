@@ -8,6 +8,8 @@ var checkpoint_path=""
 var seed_value=101
 var episode_steps=600
 var training_steps=2048
+var training_tier="C"
+var training_architecture="parameter_sharing"
 var current_replay=""
 var result_path=""
 var code_editor: CodeEdit
@@ -77,17 +79,32 @@ func _ready():
 	_number(left,"Seed",seed_value,1,2147480000,func(v):seed_value=int(v))
 	_number(left,"Episode steps / Шаги эпизода",episode_steps,16,1500,func(v):episode_steps=int(v))
 	_action(left,_t("Запустить случайную политику","Run random baseline"),func():
-		AppState.run_marl_job("baseline",["--episodes","3","--seed",str(seed_value),"--max-steps",str(episode_steps)]))
+		AppState.run_marl_job("baseline",["--episodes","3","--seed",str(seed_value),"--max-steps",str(episode_steps),"--tier",training_tier]))
 	var b=Button.new();b.text=_t("Смотреть последний случайный бой","Watch last Random battle");b.pressed.connect(func():_open_replay("random-seed-"+str(seed_value)+".jsonl"));left.add_child(b)
 	_section(left,"B · ОБУЧЕНИЕ PPO","B · PPO TRAINING")
+	var tier_row=HBoxContainer.new();left.add_child(tier_row)
+	var tier_label=Label.new();tier_label.text=_t("Учебная задача","Learning task");tier_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tier_row.add_child(tier_label)
+	var tier_picker=OptionButton.new();tier_picker.add_item(_t("A · захват точки · 1 на 1 без стрельбы","A · capture basics · 1v1 without weapons"));tier_picker.add_item(_t("B · тактика · 4 на 4","B · tactics · 4v4"));tier_picker.add_item(_t("C · полный бой · 8 на 8","C · full battle · 8v8"));tier_picker.selected=0;tier_picker.item_selected.connect(func(index):training_tier=chr(65+index));tier_row.add_child(tier_picker)
+	var architecture_row=HBoxContainer.new();left.add_child(architecture_row)
+	var architecture_label=Label.new();architecture_label.text=_t("Архитектура PPO","PPO architecture");architecture_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;architecture_row.add_child(architecture_label)
+	var architecture_picker=OptionButton.new();architecture_picker.add_item(_t("Общая политика на каждый танк","Shared policy per vehicle"));architecture_picker.add_item(_t("Централизованная политика на команду","Centralized team policy"));architecture_picker.selected=0
+	architecture_picker.item_selected.connect(func(index):training_architecture="parameter_sharing" if index==0 else "centralized");architecture_row.add_child(architecture_picker)
+	var architecture_note=Label.new();architecture_note.text=_t("Общая политика получает наблюдение одного танка и выдаёт 6 действий. Это parameter-sharing PPO с локальной value-сетью, не MAPPO.","Shared PPO reads one vehicle observation and outputs six actions. It uses a local value function; it is not MAPPO.");architecture_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;architecture_note.modulate=DesignSystem.muted_for(appearance);left.add_child(architecture_note)
 	_number(left,"Training steps / Шаги обучения",training_steps,64,500000,func(v):training_steps=int(v))
 	_action(left,_t("Обучить PPO и сохранить checkpoint","Train PPO and save checkpoint"),func():
-		AppState.run_marl_job("train",["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps)]))
+		AppState.run_marl_job("train",["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps),"--tier",training_tier,"--architecture",training_architecture]))
 	_action(left,_t("Обучить PPO с reward.py","Train PPO with reward.py"),func():
 		_save_current_code()
-		_confirm_python_job("train",["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps),"--reward-file",student_reward_path]))
+		_confirm_python_job("train",["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps),"--tier",training_tier,"--architecture",training_architecture,"--reward-file",student_reward_path]))
 	checkpoint_path=_find_checkpoint()
 	var select=Button.new();select.text=_t("Выбрать checkpoint…","Choose checkpoint…");select.pressed.connect(_choose_checkpoint);left.add_child(select)
+	_action(left,_t("Продолжить выбранный checkpoint","Continue selected checkpoint"),func():
+		if checkpoint_path=="" or not FileAccess.file_exists(checkpoint_path):status_label.text=_t("Сначала выберите checkpoint PPO","Choose a PPO checkpoint first");return
+		var args=["--steps",str(training_steps),"--seed",str(seed_value),"--max-steps",str(episode_steps),"--tier",training_tier,"--continue-from",checkpoint_path]
+		var metadata=AppState.read_json(checkpoint_path.get_base_dir().path_join("ppo_team.metadata.json"))
+		args.append_array(["--architecture","parameter_sharing" if str(metadata.get("architecture",""))=="parameter_sharing_mlp_128x2" else "centralized"])
+		if str(metadata.get("custom_reward_sha256",""))!="":args.append_array(["--reward-file",student_reward_path])
+		AppState.run_marl_job("train",args))
 	_section(left,"C · ОЦЕНКА","C · EVALUATION")
 	_action(left,_t("Оценить модель на тестовых seed","Evaluate checkpoint on test seeds"),func():_run_checkpoint("evaluate"))
 	_action(left,_t("Сравнить Random и PPO на одинаковых seed","Compare Random and PPO on paired seeds"),func():_run_checkpoint("compare"))
@@ -95,11 +112,12 @@ func _ready():
 		_save_current_code()
 		var standard=_find_checkpoint_kind(false);var custom=_find_checkpoint_kind(true)
 		if standard=="" or custom=="":status_label.text=_t("Сначала обучите PPO со стандартной и пользовательской наградой","Train PPO with standard and custom rewards first");return
-		_confirm_python_job("compare-all",["--agent-file",student_agent_path,"--standard-checkpoint",standard,"--custom-reward-checkpoint",custom,"--episodes","3","--seed",str(seed_value+2000),"--max-steps",str(episode_steps)]))
+		_confirm_python_job("compare-all",["--agent-file",student_agent_path,"--standard-checkpoint",standard,"--custom-reward-checkpoint",custom,"--episodes","3","--seed",str(seed_value+2000),"--max-steps",str(episode_steps),"--tier",training_tier]))
 	var trained=Button.new();trained.text=_t("Смотреть бой PPO","Watch trained PPO battle");trained.pressed.connect(func():_open_matching_replay("trained-seed-"));left.add_child(trained)
 	var choose_replay=Button.new();choose_replay.text=_t("Открыть любой повтор…","Open any replay…");choose_replay.pressed.connect(_choose_replay);left.add_child(choose_replay)
 	var compare_csv=Button.new();compare_csv.text=_t("Открыть CSV сравнения","Open comparison CSV");compare_csv.pressed.connect(func():_open_result_file("comparison.csv"));left.add_child(compare_csv)
 	var graph=Button.new();graph.text=_t("Открыть график обучения","Open training graph");graph.pressed.connect(func():_open_result_file("plots/learning_curve.png"));left.add_child(graph)
+	var diagnostics_graph=Button.new();diagnostics_graph.text=_t("Открыть диагностику PPO","Open PPO diagnostics");diagnostics_graph.pressed.connect(func():_open_result_file("plots/ppo_diagnostics.png"));left.add_child(diagnostics_graph)
 	var results=Button.new();results.text=_t("Открыть папку результатов","Open results folder");results.pressed.connect(func():OS.shell_open(AppState.results_root().path_join("marl")));left.add_child(results)
 	var history=Button.new();history.text=_t("История экспериментов…","Experiment history…");history.pressed.connect(_show_history);left.add_child(history)
 	var right=VBoxContainer.new();right.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_theme_constant_override("separation",14);split.add_child(right)
@@ -109,6 +127,9 @@ func _ready():
 	status_label=Label.new();status_label.text=_t("Готово к запуску","Ready");status_label.add_theme_font_size_override("font_size",24);status_content.add_child(status_label)
 	status_progress=ProgressBar.new();status_progress.min_value=0;status_progress.max_value=1;status_progress.indeterminate=true;status_progress.custom_minimum_size.y=12;status_content.add_child(status_progress)
 	detail_label=Label.new();detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;detail_label.modulate=DesignSystem.muted_for(appearance);status_content.add_child(detail_label)
+	var control_row=HBoxContainer.new();status_content.add_child(control_row)
+	var pause_training=Button.new();pause_training.text=_t("Пауза / продолжить","Pause / resume");pause_training.pressed.connect(AppState.toggle_marl_pause);control_row.add_child(pause_training)
+	var stop_training=Button.new();stop_training.text=_t("Остановить и сохранить","Stop and save");stop_training.pressed.connect(AppState.stop_marl_job);control_row.add_child(stop_training)
 	var workflow_card=PanelContainer.new();workflow_card.add_theme_stylebox_override("panel",DesignSystem.panel_style(appearance));right.add_child(workflow_card)
 	var workflow=VBoxContainer.new();workflow.add_theme_constant_override("separation",8);workflow_card.add_child(workflow)
 	_section(workflow,"ПОРЯДОК РАБОТЫ","A CLEAR WORKFLOW")
@@ -528,7 +549,7 @@ func _import_python():
 func _confirm_student_run(command:String):
 	_save_current_code()
 	var args=["--agent-file",student_agent_path,"--reward-file",student_reward_path]
-	if command=="student":args.append_array(["--episodes","3","--seed",str(seed_value),"--max-steps",str(episode_steps)])
+	if command=="student":args.append_array(["--episodes","3","--seed",str(seed_value),"--max-steps",str(episode_steps),"--tier",training_tier])
 	AppState.run_marl_job(command,args)
 func _confirm_python_job(command:String,args:Array):
 	var title=_t("Запустить обучение с reward.py?","Start training with reward.py?")
@@ -577,7 +598,7 @@ func _choose_checkpoint():
 func _run_checkpoint(command:String):
 	if checkpoint_path=="" or not FileAccess.file_exists(checkpoint_path):checkpoint_path=_find_checkpoint()
 	if checkpoint_path=="":status_label.text=_t("Сначала обучите PPO или выберите checkpoint","Train PPO or choose a checkpoint first");return
-	AppState.run_marl_job(command,[checkpoint_path,"--episodes","3","--seed",str(seed_value+1000),"--max-steps",str(episode_steps)])
+	AppState.run_marl_job(command,[checkpoint_path,"--episodes","3","--seed",str(seed_value+1000),"--max-steps",str(episode_steps),"--tier",training_tier])
 func _open_replay(filename:String):
 	var path=AppState.marl_output.path_join("replays").path_join(filename)
 	if not FileAccess.file_exists(path):
@@ -629,6 +650,7 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		"starting":_t("Запуск Python…","Starting Python…"),
 		"initializing":_t("Подготовка модели…","Preparing model…"),
 		"training":_t("Обучение PPO…","Training PPO…"),
+		"paused":_t("Пауза · checkpoint сохранён","Paused · checkpoint saved"),
 		"finalizing":_t("Сохранение результатов…","Saving results…"),
 		"complete":_t("Готово","Complete"),
 		"error":_t("Ошибка","Error"),
@@ -637,6 +659,7 @@ func update_marl_status(progress:Dictionary,output_path:String):
 	status_label.text=str(labels.get(state,state.capitalize()))
 	var current=float(progress.get("timesteps",progress.get("completed",0)))
 	var target=float(progress.get("target_timesteps",progress.get("total",0)))
+	if target>0.0 and current>target:target=current
 	var terminal=state in ["complete","error","cancelled"]
 	status_progress.visible=state!="ready"
 	status_progress.indeterminate=not terminal and (target<=0.0 or state in ["starting","initializing","finalizing"])
@@ -657,8 +680,14 @@ func update_marl_status(progress:Dictionary,output_path:String):
 	if progress_message!="":lines.append(progress_message)
 	var phase=str(progress.get("phase",""))
 	if phase!="":lines.append("%s: %s" % [_t("Этап","Phase"),phase])
-	for key in ["timesteps","target_timesteps","episodes","elapsed_seconds","latest_episode_reward"]:
+	for key in ["timesteps","target_timesteps","episodes","steps_per_second","elapsed_seconds","eta_seconds","latest_episode_reward"]:
 		if progress.has(key):lines.append("%s: %s" % [key,str(progress[key])])
+	var metrics=progress.get("ppo_metrics",{})
+	if metrics is Dictionary and not metrics.is_empty():
+		lines.append("PPO: "+", ".join(PackedStringArray(["%s=%s" % [key,str(metrics[key])] for key in metrics])))
+	var reward_totals=progress.get("reward_component_totals",{})
+	if reward_totals is Dictionary and not reward_totals.is_empty():
+		lines.append(_t("Компоненты награды","Reward components")+": "+", ".join(PackedStringArray(["%s=%s" % [key,str(reward_totals[key])] for key in reward_totals])))
 	if output_path!="":lines.append("\n"+output_path)
 	detail_label.text="\n".join(lines)
 	if is_instance_valid(code_console) and console_mode=="jobs":

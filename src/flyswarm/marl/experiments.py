@@ -17,7 +17,14 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from .env import ACTION_NAMES, AGENTS, DEFAULT_REWARDS, FlySwarmParallelEnv
+try:
+    from stable_baselines3.common.vec_env import VecEnv
+except ImportError:
+    class VecEnv:  # Allows non-PPO baseline utilities to import without SB3 installed.
+        pass
+
+from .env import (ACTION_NAMES, AGENTS, DEFAULT_REWARDS, ENVIRONMENT_SEMANTICS_VERSION, REWARD_SEMANTICS_VERSION,
+                  TEAM_REWARD_COMPONENTS, FlySwarmParallelEnv)
 from .roles import DEFAULT_COMPOSITION
 from .student_code import ManagedStudentAgent, load_reward
 
@@ -41,7 +48,9 @@ class FixedRulePolicy:
             if self.env.health[i] <= 0:
                 result[AGENTS[i]] = np.zeros(6, dtype=np.float32)
                 continue
-            target = self.env.zones[local % len(self.env.zones)]
+            zone_index=local % len(self.env.zones)
+            if self.env.curriculum_tier=="A" and self.team==1:zone_index=(zone_index+2)%len(self.env.zones)
+            target = self.env.zones[zone_index]
             delta = target - self.env.pos[i]
             desired = float(np.arctan2(delta[1], delta[0]))
             error = float((desired - self.env.heading[i] + np.pi) % (2 * np.pi) - np.pi)
@@ -84,7 +93,8 @@ class TeamGymnasiumEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, seed: int = 0, max_steps: int = 600, team: int = 0,
-                 reward_coefficients: dict[str, float] | None = None, reward_function=None):
+                 reward_coefficients: dict[str, float] | None = None, reward_function=None,
+                 curriculum_tier: str = "C"):
         super().__init__()
         if team not in (0, 1):
             raise ValueError("team must be 0 (blue) or 1 (red)")
@@ -97,6 +107,7 @@ class TeamGymnasiumEnv(gym.Env):
             reward_coefficients=reward_coefficients,
             role_conditioning=True,
             reward_function=reward_function,
+            curriculum_tier=curriculum_tier,
         )
         self.observation_space = spaces.Box(
             low=-10, high=10, shape=(8 * self.env.obs_dim,), dtype=np.float32
@@ -143,6 +154,12 @@ class TeamGymnasiumEnv(gym.Env):
             "snapshot": snapshot,
             "terminated": terminated,
             "truncated": truncated,
+            "winner": self.env.last_outcome.get("winner"),
+            "terminal_reason": self.env.last_outcome.get("reason"),
+            "reward_component_totals": {
+                key: float(sum(infos[a]["reward_components"].get(key, 0.0) for a in members))
+                for key in self.env.last_components[0]
+            },
         }
         if done:
             info["episode"] = {
@@ -156,6 +173,76 @@ class TeamGymnasiumEnv(gym.Env):
 
     def close(self):
         self.env.close() if hasattr(self.env, "close") else None
+
+
+class SharedAgentVecEnv(VecEnv):
+    """One shared PPO policy controls each blue agent in the same battle.
+
+    The eight VecEnv slots are agent views into one synchronized PettingZoo
+    world. Each step gathers eight actions before advancing that world once.
+    This is parameter-sharing PPO with a local critic, not MAPPO.
+    """
+    def __init__(self, seed=0, max_steps=600, reward_coefficients=None,
+                 reward_function=None, curriculum_tier="C"):
+        self.tier=str(curriculum_tier).upper()
+        self.world=FlySwarmParallelEnv(max_steps=max_steps,reward_coefficients=reward_coefficients,
+            role_conditioning=True,reward_function=reward_function,curriculum_tier=self.tier)
+        self.world.render_mode=None
+        self.agent_count=self.world.active_units_per_team
+        self.base_seed=int(seed);self.episode_index=0;self.episode_steps=0
+        self.episode_rewards=np.zeros(self.agent_count,dtype=np.float64)
+        self._pending_actions=None;self._observations=None
+        self._closed=False
+        super().__init__(self.agent_count,self.world.observation_space("blue_0"),self.world.action_space("blue_0"))
+
+    def _seed_for_episode(self):
+        value=self.base_seed+self.episode_index;self.episode_index+=1;return value
+
+    def reset(self):
+        seed=self._seed_for_episode()
+        observations,infos=self.world.reset(seed=seed)
+        self._observations=np.stack([observations[f"blue_{i}"] for i in range(self.agent_count)])
+        self.reset_infos=[{"seed":seed,"backend":"analytical_training","curriculum_tier":self.tier}
+                          for _ in range(self.agent_count)]
+        self.episode_steps=0;self.episode_rewards.fill(0.)
+        self._reset_seeds();self._reset_options()
+        return self._observations.copy()
+
+    def step_async(self,actions):self._pending_actions=np.asarray(actions,dtype=np.float32).reshape(self.agent_count,6)
+
+    def step_wait(self):
+        if self._pending_actions is None:raise RuntimeError("step_async must be called before step_wait")
+        actions=FixedRulePolicy(self.world,1).actions()
+        actions.update({f"blue_{i}":np.clip(self._pending_actions[i],-1,1) for i in range(self.agent_count)})
+        observations,rewards,terms,truncs,infos=self.world.step(actions);self.episode_steps+=1
+        reward_array=np.asarray([rewards[f"blue_{i}"] for i in range(self.agent_count)],dtype=np.float32)
+        self.episode_rewards+=reward_array
+        done=bool(any(terms.values()) or any(truncs.values()))
+        info_rows=[]
+        for i in range(self.agent_count):
+            info=dict(infos[f"blue_{i}"]);info["TimeLimit.truncated"]=bool(truncs[f"blue_{i}"] and not terms[f"blue_{i}"])
+            info["reward_component_totals"]=dict(info.get("reward_components",{}))
+            if done:
+                info["terminal_observation"]=observations[f"blue_{i}"].copy()
+                if i==0:info["episode"]={"r":float(np.mean(self.episode_rewards)),"l":int(self.episode_steps)}
+            info_rows.append(info)
+        dones=np.full(self.agent_count,done,dtype=bool)
+        if done:
+            self._observations=self.reset()
+        else:self._observations=np.stack([observations[f"blue_{i}"] for i in range(self.agent_count)])
+        self._pending_actions=None
+        return self._observations.copy(),reward_array,dones,info_rows
+
+    def close(self):
+        if not self._closed:self.world.close();self._closed=True
+
+    def get_attr(self,attr_name,indices=None):
+        if not hasattr(self.world,attr_name):raise AttributeError(attr_name)
+        return [getattr(self.world,attr_name) for _ in self._get_indices(indices)]
+    def set_attr(self,attr_name,value,indices=None):setattr(self.world,attr_name,value)
+    def env_method(self,method_name,*method_args,indices=None,**method_kwargs):
+        method=getattr(self.world,method_name);return [method(*method_args,**method_kwargs) for _ in self._get_indices(indices)]
+    def env_is_wrapped(self,wrapper_class,indices=None):return [False for _ in self._get_indices(indices)]
 
 
 def new_experiment_dir(root: Path, label: str) -> Path:
@@ -205,7 +292,7 @@ def _source_metadata() -> dict[str, str | None]:
 
 
 def _effective_rewards(reward_coefficients):
-    return DEFAULT_REWARDS | dict(reward_coefficients or {})
+    return DEFAULT_REWARDS | {"battle_draw": 0.} | dict(reward_coefficients or {})
 
 
 def append_replay(path: Path, seed: int, frame: dict[str, Any]) -> None:
@@ -225,6 +312,10 @@ def start_replay(path: Path, env: FlySwarmParallelEnv, seed: int, policy_id: str
         "action_order": list(ACTION_NAMES),
         "state_authority": "FlySwarmParallelEnv",
         "visual_effects_authority": "none; playback may render recorded events only",
+        "curriculum_tier":env.curriculum_tier,"active_units_per_team":env.active_units_per_team,
+        "combat_enabled":env.combat_enabled,"fire_rate_multiplier":env.fire_rate_multiplier,
+        "environment_semantics_version":ENVIRONMENT_SEMANTICS_VERSION,
+        "reward_semantics_version":REWARD_SEMANTICS_VERSION,
     })
     append_replay(path, seed, env.snapshot({}, {}, kind="frame"))
 
@@ -232,19 +323,27 @@ def start_replay(path: Path, env: FlySwarmParallelEnv, seed: int, policy_id: str
 def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
                   seed: int, policy_id: str, run_id: str, replay_path: Path | None = None,
                   ppo_model=None, rng: np.random.Generator | None = None,
-                  deterministic: bool = False, student_agent=None) -> dict[str, Any]:
+                  deterministic: bool = False, student_agent=None,
+                  ppo_architecture: str="centralized",rule_agent:bool=False) -> dict[str, Any]:
     members = BLUE
     rule_red = FixedRulePolicy(env, 1).actions
     total_reward = 0.0
     captures = kills = deaths = 0
     standard_evaluation_reward = 0.0
     episode_steps = 0
+    reward_component_totals: dict[str, float] = {}
+    standard_component_totals: dict[str, float] = {}
     while env.agents:
         actions = rule_red()
         if ppo_model is not None:
-            team_obs = np.concatenate([observations[a] for a in members]).astype(np.float32)
-            action, _ = ppo_model.predict(team_obs, deterministic=deterministic)
-            actions.update({a: np.asarray(action).reshape(8, 6)[i] for i, a in enumerate(BLUE)})
+            if ppo_architecture=="parameter_sharing":
+                for agent_id in members[:env.active_units_per_team]:
+                    action,_=ppo_model.predict(observations[agent_id],deterministic=deterministic)
+                    actions[agent_id]=np.asarray(action,dtype=np.float32).reshape(6)
+            else:
+                team_obs=np.concatenate([observations[a] for a in members]).astype(np.float32)
+                action,_=ppo_model.predict(team_obs,deterministic=deterministic)
+                actions.update({a:np.asarray(action).reshape(8,6)[i] for i,a in enumerate(BLUE)})
         elif student_agent is not None:
             if episode_steps == 0 and getattr(student_agent, "reset", None):
                 student_agent.reset(seed=int(seed))
@@ -257,6 +356,8 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
             else:
                 actions.update({a: student_agent(observations[a], context)
                                 for a, context in zip(members, contexts)})
+        elif rule_agent:
+            actions.update(FixedRulePolicy(env,0).actions())
         else:
             for a in members:
                 actions[a] = rng.uniform(-1, 1, size=6).astype(np.float32)
@@ -266,6 +367,10 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
         team_step_reward = float(sum(rewards[a] for a in members))
         total_reward += team_step_reward
         standard_evaluation_reward += float(sum(infos[a]["standard_evaluation_reward"] for a in members))
+        for key in infos[members[0]]["reward_components"]:
+            value=float(sum(infos[a]["reward_components"].get(key,0.0) for a in members))
+            reward_component_totals[key]=reward_component_totals.get(key,0.0)+value
+            standard_component_totals[key]=standard_component_totals.get(key,0.0)+value*DEFAULT_REWARDS.get(key,0.0)
         episode_steps += 1
         captures += int(np.count_nonzero((old_owners != 0) & (env.zones_owner == 0)))
         kills += int(np.count_nonzero((old_health[8:] > 0) & (env.health[8:] <= 0)))
@@ -278,7 +383,7 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
     if replay_path is not None:
         write_json(replay_path.with_suffix(".final_state.json"),
                    {"schema":REPLAY_SCHEMA,"seed":int(seed),**env.snapshot(actions,rewards,run_id=run_id)})
-    winner = "blue" if tickets[0] > tickets[1] else ("red" if tickets[1] > tickets[0] else "draw")
+    winner = env.last_outcome.get("winner") or "draw"
     return {
         "seed": seed, "policy_id": policy_id, "run_id": run_id,
         "team_reward": total_reward, "training_reward": total_reward,
@@ -289,12 +394,15 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
         "blue_tickets": tickets[0], "red_tickets": tickets[1],
         "blue_alive": int(np.count_nonzero(env.health[:8])),
         "red_alive": int(np.count_nonzero(env.health[8:])),
+        "terminal_reason": env.last_outcome.get("reason"),
+        "reward_component_totals":reward_component_totals,
+        "standard_component_contributions":standard_component_totals,
     }
 
 
 def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
                       seed: int = 101, max_steps: int = 300,
-                      reward_file: Path | None = None) -> dict[str, Any]:
+                      reward_file: Path | None = None,curriculum_tier: str="C") -> dict[str, Any]:
     """Run a student's real Python strategy in the analytical PettingZoo env."""
     agent_file = Path(agent_file).expanduser().resolve()
     reward_file = Path(reward_file).expanduser().resolve() if reward_file else None
@@ -309,7 +417,7 @@ def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
     try:
         for episode in range(int(episodes)):
             episode_seed=int(seed+episode)
-            env=FlySwarmParallelEnv(max_steps=max_steps,reward_function=reward_function)
+            env=FlySwarmParallelEnv(max_steps=max_steps,reward_function=reward_function,curriculum_tier=curriculum_tier)
             try:
                 observations,_=env.reset(seed=episode_seed)
                 replay=output/"replays"/f"student-seed-{episode_seed}.jsonl"
@@ -340,21 +448,50 @@ def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
 
 
 def run_random_baseline(output: Path, episodes: int = 3, seed: int = 101,
-                        max_steps: int = 300, reward_coefficients=None) -> dict[str, Any]:
+                        max_steps: int = 300, reward_coefficients=None,
+                        curriculum_tier: str = "C") -> dict[str, Any]:
     """Run uniform random blue actions against the fixed rule opponent."""
     _prepare_output(output)
     rows = []
     for episode in range(int(episodes)):
         episode_seed = int(seed + episode)
         rng = np.random.default_rng(episode_seed)
-        env = FlySwarmParallelEnv(max_steps=max_steps, reward_coefficients=reward_coefficients)
+        env = FlySwarmParallelEnv(max_steps=max_steps, reward_coefficients=reward_coefficients,curriculum_tier=curriculum_tier)
         observations, _ = env.reset(seed=episode_seed)
         replay = output / "replays" / f"random-seed-{episode_seed}.jsonl"
         start_replay(replay, env, episode_seed, "uniform_random")
         rows.append(_step_episode(env, observations, episode_seed, "uniform_random",
                                   f"random-{episode_seed}", replay, rng=rng))
     _write_run_outputs(output, rows, "random_baseline", seed, max_steps, reward_coefficients)
+    manifest=json.loads((output/"manifest.json").read_text());manifest.update({"curriculum_tier":curriculum_tier,"reward_semantics_version":REWARD_SEMANTICS_VERSION});write_json(output/"manifest.json",manifest)
     return {"experiment_dir": str(output), "runs": rows, "mean_team_reward": _mean(rows, "team_reward")}
+
+
+def evaluate_rule_ai(output:Path,episodes:int=5,seed:int=1001,max_steps:int=300,
+                     curriculum_tier:str="C"):
+    """Independent fixed Rule AI control, scored by the standard metric."""
+    _prepare_output(output);rows=[]
+    for offset in range(int(episodes)):
+        episode_seed=int(seed+offset);env=FlySwarmParallelEnv(max_steps=max_steps,curriculum_tier=curriculum_tier)
+        try:
+            observations,_=env.reset(seed=episode_seed)
+            replay=output/"replays"/f"rule-ai-seed-{episode_seed}.jsonl"
+            start_replay(replay,env,episode_seed,"fixed_rule_ai")
+            rows.append(_step_episode(env,observations,episode_seed,"fixed_rule_ai",f"rule-ai-{episode_seed}",
+                replay,rule_agent=True))
+        finally:env.close()
+    _write_run_outputs(output,rows,"rule_ai_evaluation",seed,max_steps)
+    manifest=json.loads((output/"manifest.json").read_text());manifest.update({"curriculum_tier":curriculum_tier,
+        "reward_semantics_version":REWARD_SEMANTICS_VERSION,
+        "environment_semantics_version":ENVIRONMENT_SEMANTICS_VERSION,
+        "control":"fixed objective and aim aware policy"})
+    write_json(output/"manifest.json",manifest)
+    write_json(output/"summary.json",{"protocol":"independent fixed Rule AI control","curriculum_tier":curriculum_tier,
+        "episodes":len(rows),"mean_standard_evaluation_reward":_mean(rows,"standard_evaluation_reward"),
+        "std_standard_evaluation_reward":float(np.std([r["standard_evaluation_reward"] for r in rows],ddof=1)) if len(rows)>1 else 0.,
+        "win_rate":_win_rate(rows),"mean_captures":_mean(rows,"captures"),"mean_kills":_mean(rows,"kills"),
+        "mean_losses":_mean(rows,"deaths"),"runs":rows})
+    return {"experiment_dir":str(output),"runs":rows,"mean_standard_evaluation_reward":_mean(rows,"standard_evaluation_reward")}
 
 
 def _mean(rows, field):
@@ -366,7 +503,11 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        fields=[]
+        for row in rows:
+            for key in row:
+                if key not in fields:fields.append(key)
+        writer = csv.DictWriter(stream, fieldnames=fields,extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -389,6 +530,8 @@ def _write_run_outputs(output: Path, rows: list[dict[str, Any]], backend: str,
     manifest = {
         "backend": "analytical_training", "runtime": "PettingZoo ParallelEnv",
         **_source_metadata(),
+        "reward_semantics_version": REWARD_SEMANTICS_VERSION,
+        "environment_semantics_version": ENVIRONMENT_SEMANTICS_VERSION,
         "python": platform.python_version(), "platform": platform.platform(),
         "seed": int(seed), "episode_length_limit": int(max_steps),
         "reward_coefficients": _effective_rewards(reward_coefficients),
@@ -406,51 +549,114 @@ def _write_run_outputs(output: Path, rows: list[dict[str, Any]], backend: str,
 def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
                   max_steps: int = 300, learning_rate: float = 3e-4,
                   progress_path: Path | None = None, reward_coefficients=None,
-                  reward_function=None, reward_file: Path | None = None) -> dict[str, Any]:
-    """Train the real Stable-Baselines3 PPO implementation on the team wrapper."""
+                  reward_function=None, reward_file: Path | None = None,
+                  curriculum_tier: str = "C", continue_from: Path | None = None,
+                  checkpoint_interval: int = 1024,ppo_architecture: str="centralized") -> dict[str, Any]:
+    """Train centralized joint-action PPO with safe pause, stop, and resume."""
     started = time.monotonic()
     _prepare_output(output)
     progress_path = progress_path or output / "progress.json"
     curve_path = output / "training.csv"
-    write_json(progress_path, {
-        "state": "initializing", "phase": "dependencies",
-        "timesteps": 0, "target_timesteps": int(timesteps), "episodes": 0,
-        "elapsed_seconds": 0.0, "latest_episode_reward": None,
-        "message": "Loading Stable-Baselines3 and preparing the PPO model.",
-    })
+    if int(timesteps) < 1: raise ValueError("steps must be positive")
+    tier=str(curriculum_tier).upper()
+    if tier not in {"A","B","C"}:raise ValueError("curriculum tier must be A, B, or C")
+    ppo_architecture=str(ppo_architecture)
+    if ppo_architecture not in {"centralized","parameter_sharing"}:raise ValueError("unknown PPO architecture")
+    reward_values=_effective_rewards(reward_coefficients)
+    reward_file_hash=hashlib.sha256(Path(reward_file).read_bytes()).hexdigest() if reward_file else None
+    from .roles import ROLE_FEATURE_DIM
+    contract={"checkpoint_schema":"flyswarm.sb3_ppo.v2",
+        "observation_shape":[(22+ROLE_FEATURE_DIM) if ppo_architecture=="parameter_sharing" else 8*(22+ROLE_FEATURE_DIM)],
+        "action_shape":[6] if ppo_architecture=="parameter_sharing" else [8,6],
+        "architecture":"parameter_sharing_mlp_128x2" if ppo_architecture=="parameter_sharing" else "centralized_joint_mlp_128x2",
+        "curriculum_tier":tier,
+        "active_units_per_team":{"A":1,"B":4,"C":8}[tier],"combat_enabled":tier!="A",
+        "fire_rate_multiplier":{"A":1.,"B":2.,"C":1.}[tier],
+        "max_steps":int(max_steps),"environment_semantics_version":ENVIRONMENT_SEMANTICS_VERSION,
+        "reward_semantics_version":REWARD_SEMANTICS_VERSION,
+        "reward_coefficients":reward_values,"custom_reward_sha256":reward_file_hash}
+    checkpoint=output/"checkpoint"/"ppo_team";checkpoint.parent.mkdir(parents=True,exist_ok=True)
+    zipped=checkpoint.with_suffix(".zip");metadata_path=checkpoint.parent/"ppo_team.metadata.json"
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.callbacks import BaseCallback
     except ImportError as exc:
         raise RuntimeError("PPO training requires stable-baselines3; install requirements-marl.txt") from exc
 
-    write_json(progress_path, {
-        "state": "initializing", "phase": "environment",
-        "timesteps": 0, "target_timesteps": int(timesteps), "episodes": 0,
-        "elapsed_seconds": round(time.monotonic() - started, 2),
-        "latest_episode_reward": None,
-        "message": "Preparing the training environment.",
-    })
+    env=(SharedAgentVecEnv(seed=seed,max_steps=max_steps,reward_coefficients=reward_coefficients,
+                           reward_function=reward_function,curriculum_tier=tier)
+         if ppo_architecture=="parameter_sharing" else
+         TeamGymnasiumEnv(seed=seed,max_steps=max_steps,reward_coefficients=reward_coefficients,
+                          reward_function=reward_function,curriculum_tier=tier))
+    def save_checkpoint(model,kind):
+        model.save(str(checkpoint))
+        write_json(metadata_path,{**contract,"seed":int(seed),"num_timesteps":int(model.num_timesteps),
+            "ppo_hyperparameters":{"learning_rate":float(model.learning_rate),"n_steps":int(model.n_steps),
+                "batch_size":int(model.batch_size),"n_epochs":int(model.n_epochs),"gamma":float(model.gamma),
+                "gae_lambda":float(model.gae_lambda),"clip_range":float(model.clip_range(1.) if callable(model.clip_range) else model.clip_range),
+                "policy_network":{"pi":[128,128],"vf":[128,128]}},
+            "saved_as":kind,"created_utc":datetime.now(timezone.utc).isoformat(),
+            "checkpoint_sha256":hashlib.sha256(zipped.read_bytes()).hexdigest()})
+
+    initial_timesteps=0
+    if continue_from is not None:
+        continue_from=Path(continue_from).expanduser().resolve()
+        sidecar=continue_from.parent/(continue_from.stem+".metadata.json")
+        if not continue_from.is_file() or not sidecar.is_file():
+            env.close();raise ValueError("Checkpoint is missing compatibility metadata; start a new training run.")
+        saved=json.loads(sidecar.read_text(encoding="utf-8"))
+        if saved.get("checkpoint_sha256")!=hashlib.sha256(continue_from.read_bytes()).hexdigest():
+            env.close();raise ValueError("Checkpoint checksum does not match its metadata.")
+        mismatches=[key for key,value in contract.items() if saved.get(key)!=value]
+        if mismatches:
+            env.close();raise ValueError("Checkpoint is incompatible with this training setup: "+", ".join(mismatches))
+        model=PPO.load(str(continue_from),env=env,device="cpu")
+        initial_timesteps=int(model.num_timesteps)
+    else:
+        vector_count=env.num_envs if hasattr(env,"num_envs") else 1
+        n_steps=(min(64,max(2,(int(timesteps)+vector_count-1)//vector_count))
+                 if ppo_architecture=="parameter_sharing" else min(256,max(16,int(timesteps))))
+        rollout_size=n_steps*vector_count
+        batch_size=min(128 if ppo_architecture=="parameter_sharing" else 64,rollout_size)
+        model=PPO("MlpPolicy",env,learning_rate=float(learning_rate),n_steps=n_steps,
+            batch_size=max(2,batch_size),n_epochs=5,gamma=.99,gae_lambda=.95,
+            clip_range=.2,seed=int(seed),device="cpu",verbose=0,
+            policy_kwargs={"net_arch":{"pi":[128,128],"vf":[128,128]}})
+
+    write_json(progress_path,{"state":"initializing","phase":"model","timesteps":initial_timesteps,
+        "target_timesteps":int(timesteps),"episodes":0,"elapsed_seconds":0.0,"latest_episode_reward":None,
+        "message":"Continuing the compatible checkpoint." if continue_from else "Constructing the PPO policy network."})
 
     class Progress(BaseCallback):
         def __init__(self):
             super().__init__()
-            self.started = time.monotonic()
-            self.rows = []
-            self.episode_count = 0
-            self.last_logged_steps = 0
+            self.rows=[];self.episode_count=0;self.last_logged_steps=0;self.last_checkpoint_steps=initial_timesteps
+            self.last_metrics_steps=-1;self.latest_metrics={};self.stopped_by_user=False
+            self.component_totals={};self.component_steps=0
+
+        def _status(self,state="training",message="PPO rollouts are running."):
+            elapsed=max(.001,time.monotonic()-started);current=int(self.num_timesteps)
+            speed=current/elapsed;remaining=max(0,int(timesteps)-(current-initial_timesteps))
+            write_json(progress_path,{"state":state,"phase":"rollouts","timesteps":current,
+                "target_timesteps":initial_timesteps+int(timesteps),"episodes":self.episode_count,
+                "elapsed_seconds":round(elapsed,2),"steps_per_second":round(speed,2),
+                "eta_seconds":round(remaining/speed,2) if speed else None,
+                "latest_episode_reward":self.rows[-1]["mean_team_reward"] if self.rows else None,
+                "ppo_metrics":self.latest_metrics,"reward_component_totals":self.component_totals,
+                "checkpoint":str(zipped) if zipped.exists() else None,
+                "message":message})
 
         def _on_training_start(self):
-            write_json(progress_path, {
-                "state": "training", "phase": "rollouts",
-                "timesteps": int(self.num_timesteps), "target_timesteps": int(timesteps),
-                "episodes": self.episode_count, "elapsed_seconds": round(time.monotonic() - started, 2),
-                "latest_episode_reward": None,
-                "message": "PPO rollouts are running.",
-            })
+            self._status()
 
         def _on_step(self):
-            for info in self.locals.get("infos", []):
+            step_infos=self.locals.get("infos", [])
+            component_rows=[info.get("reward_component_totals",{}) for info in step_infos if isinstance(info,dict)]
+            if any(component_rows):self.component_steps+=1
+            for components in component_rows:
+                if components:
+                    for key,value in components.items():self.component_totals[key]=self.component_totals.get(key,0.)+float(value)
+            for info in step_infos:
                 ep = info.get("episode") if isinstance(info, dict) else None
                 if ep:
                     self.episode_count += 1
@@ -459,37 +665,39 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
                         "episodes": self.episode_count,
                         "mean_team_reward": float(ep["r"]),
                         "episode_steps": int(ep["l"]),
-                        "elapsed_seconds": round(time.monotonic() - self.started, 3),
+                        "elapsed_seconds": round(time.monotonic() - started, 3),
                     })
                     _write_csv(curve_path, self.rows)
             if self.num_timesteps - self.last_logged_steps >= 16 or self.num_timesteps >= timesteps:
                 self.last_logged_steps = self.num_timesteps
-                write_json(progress_path, {
-                    "state": "training", "timesteps": int(self.num_timesteps),
-                    "target_timesteps": int(timesteps), "episodes": self.episode_count,
-                    "elapsed_seconds": round(time.monotonic() - self.started, 2),
-                    "latest_episode_reward": self.rows[-1]["mean_team_reward"] if self.rows else None,
-                })
-            return not (output / "cancel").exists()
+                self._status()
+            values=getattr(self.model.logger,"name_to_value",{})
+            aliases={"policy_loss":"train/policy_gradient_loss","value_loss":"train/value_loss",
+                "entropy":"train/entropy_loss","approx_kl":"train/approx_kl",
+                "clip_fraction":"train/clip_fraction","explained_variance":"train/explained_variance"}
+            if self.num_timesteps-self.last_metrics_steps>=max(1,int(self.model.n_steps)):
+                self.latest_metrics={k:float(values[v]) for k,v in aliases.items()
+                    if v in values and np.isfinite(float(values[v]))}
+                if self.latest_metrics:
+                    metric_path=output/"ppo_metrics.csv";metric_rows=_read_csv(metric_path)
+                    metric_rows.append({"timesteps":int(self.num_timesteps),"elapsed_seconds":round(time.monotonic()-started,3),**self.latest_metrics})
+                    _write_csv(metric_path,metric_rows)
+                self.last_metrics_steps=self.num_timesteps
+            if (output/"pause").exists() and not (output/"cancel").exists():
+                save_checkpoint(self.model,"paused_checkpoint");self._status("paused","Training paused; checkpoint saved.")
+                while (output/"pause").exists() and not (output/"cancel").exists():time.sleep(.2)
+                if not (output/"cancel").exists():self._status("training","Training resumed.")
+            if self.num_timesteps-self.last_checkpoint_steps>=max(1,int(checkpoint_interval)):
+                save_checkpoint(self.model,"periodic_checkpoint");self.last_checkpoint_steps=self.num_timesteps
+            if (output/"cancel").exists():self.stopped_by_user=True;return False
+            return True
 
-    env = TeamGymnasiumEnv(seed=seed, max_steps=max_steps, reward_coefficients=reward_coefficients,
-                           reward_function=reward_function)
-    n_steps = min(256, max(16, int(timesteps)))
-    write_json(progress_path, {
-        "state": "initializing", "phase": "model",
-        "timesteps": 0, "target_timesteps": int(timesteps), "episodes": 0,
-        "elapsed_seconds": round(time.monotonic() - started, 2),
-        "latest_episode_reward": None,
-        "message": "Constructing the PPO policy network.",
-    })
-    model = PPO(
-        "MlpPolicy", env, learning_rate=float(learning_rate), n_steps=n_steps,
-        batch_size=min(64, max(8, n_steps)), n_epochs=5, gamma=.99, gae_lambda=.95,
-        clip_range=.2, seed=int(seed), device="cpu", verbose=0,
-        policy_kwargs={"net_arch": {"pi": [128, 128], "vf": [128, 128]}},
-    )
+        def _on_training_end(self):save_checkpoint(self.model,"final_checkpoint")
+
     try:
-        model.learn(total_timesteps=int(timesteps), callback=Progress(), progress_bar=False)
+        callback=Progress()
+        model.learn(total_timesteps=int(timesteps),callback=callback,progress_bar=False,
+                    reset_num_timesteps=continue_from is None)
         training_rows = _read_csv(curve_path)
         write_json(progress_path, {
             "state": "finalizing", "phase": "artifacts",
@@ -499,25 +707,31 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
             "latest_episode_reward": float(training_rows[-1]["mean_team_reward"]) if training_rows else None,
             "message": "Training finished; saving checkpoint and learning curve.",
         })
-        checkpoint = output / "checkpoint" / "ppo_team"
-        checkpoint.parent.mkdir(parents=True, exist_ok=True)
-        model.save(str(checkpoint))
     finally:
         env.close()
-    zipped = checkpoint.with_suffix(".zip")
     digest = hashlib.sha256(zipped.read_bytes()).hexdigest()
     write_json(output / "manifest.json", {
         **_source_metadata(),
         "backend": "analytical_training", "algorithm": "Stable-Baselines3 PPO",
         "algorithm_version": _sb3_version(), "framework": "PettingZoo ParallelEnv + Gymnasium team adapter",
-        "control_mode": "centralized joint action, 8 agents x 6 continuous controls",
+        "control_mode": "shared per-agent policy, 6 continuous controls" if ppo_architecture=="parameter_sharing" else "centralized joint action, 8 agents x 6 continuous controls",
+        "architecture":"parameter-sharing PPO with local critic; not MAPPO" if ppo_architecture=="parameter_sharing" else "centralized PPO; not MAPPO or parameter-sharing PPO",
+        "curriculum_tier":tier,"active_units_per_team":contract["active_units_per_team"],
+        "combat_enabled":contract["combat_enabled"],"environment_semantics_version":ENVIRONMENT_SEMANTICS_VERSION,
+        "reward_semantics_version":REWARD_SEMANTICS_VERSION,
+        "fire_rate_multiplier":contract["fire_rate_multiplier"],
+        "continued_from":str(continue_from) if continue_from else None,"initial_timesteps":initial_timesteps,
+        "ppo_metrics_file":"ppo_metrics.csv",
         "seed": int(seed), "target_timesteps": int(timesteps),
         "actual_timesteps": int(model.num_timesteps), "episode_length_limit": int(max_steps),
-        "learning_rate": float(learning_rate), "checkpoint": str(zipped),
+        "learning_rate": float(model.learning_rate),"n_steps":int(model.n_steps),"batch_size":int(model.batch_size),
+        "n_epochs":int(model.n_epochs),"gamma":float(model.gamma),"gae_lambda":float(model.gae_lambda),
+        "clip_range":float(model.clip_range(1.) if callable(model.clip_range) else model.clip_range),
+        "policy_network":{"pi":[128,128],"vf":[128,128]},"checkpoint": str(zipped),
         "checkpoint_sha256": digest, "elapsed_seconds": round(time.monotonic() - started, 3),
         "reward_coefficients": _effective_rewards(reward_coefficients),
         "custom_reward": bool(reward_function),
-        "reward_file_sha256": hashlib.sha256(Path(reward_file).read_bytes()).hexdigest() if reward_file else None,
+        "reward_file_sha256": reward_file_hash,
         "created_utc": datetime.now(timezone.utc).isoformat(),
     })
     training_rows=_read_csv(curve_path)
@@ -528,13 +742,27 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
         "mean_training_team_reward":float(np.mean([float(row["mean_team_reward"]) for row in training_rows])) if training_rows else None,
         "checkpoint":str(zipped),"checkpoint_sha256":digest,
         "training_curve_is_not_independent_evaluation":True,
+        "initial_timesteps":initial_timesteps,"curriculum_tier":tier,
+        "ppo_architecture":ppo_architecture,
     })
+    write_json(output/"reward_components.json",{
+        "schema":"flyswarm.reward_diagnostics.v1","semantics_version":REWARD_SEMANTICS_VERSION,
+        "training_world_steps":callback.component_steps,"custom_reward":bool(reward_function),
+        "raw_component_totals":callback.component_totals,
+        "raw_component_means_per_world_step":{key:value/max(1,callback.component_steps) for key,value in callback.component_totals.items()},
+        "standard_coefficient_contributions":None if reward_function else {
+            key:value*reward_values.get(key,0.) for key,value in callback.component_totals.items()},
+        "note":"For custom reward.py, raw components are reported; arbitrary student code cannot be decomposed additively without changing its semantics."})
     write_json(output / "config.json", {
         "algorithm":"Stable-Baselines3 PPO","seed":int(seed),"timesteps":int(timesteps),
         "max_steps":int(max_steps),"learning_rate":float(learning_rate),
         "reward_coefficients":_effective_rewards(reward_coefficients),
         "vehicle_ids":list(DEFAULT_COMPOSITION),"opponent":"fixed objective-seeking and aim-aware rule policy",
         "custom_reward":bool(reward_function),
+        "curriculum_tier":tier,"active_units_per_team":contract["active_units_per_team"],
+        "fire_rate_multiplier":contract["fire_rate_multiplier"],
+        "reward_semantics_version":REWARD_SEMANTICS_VERSION,
+        "ppo_architecture":ppo_architecture,
     })
     if reward_file:
         (output/"student_code").mkdir(exist_ok=True)
@@ -542,20 +770,23 @@ def train_sb3_ppo(output: Path, timesteps: int = 10000, seed: int = 7,
     plot_error = None
     try:
         _plot_learning_curve(curve_path, output / "plots" / "learning_curve.png")
+        _plot_ppo_diagnostics(output/"ppo_metrics.csv",output/"plots"/"ppo_diagnostics.png")
     except Exception as exc:  # A chart is supplemental; preserve a valid checkpoint and results.
         plot_error = str(exc)
     current = json.loads(progress_path.read_text()) if progress_path.exists() else {}
     current.update({
-        "state": "complete", "phase": "complete", "timesteps": int(model.num_timesteps),
+        "state": "cancelled" if callback.stopped_by_user else "complete",
+        "phase": "saved" if callback.stopped_by_user else "complete", "timesteps": int(model.num_timesteps),
         "checkpoint": str(zipped), "checkpoint_sha256": digest,
         "elapsed_seconds": round(time.monotonic() - started, 2),
-        "message": "Training and checkpoint are ready." if plot_error is None else
+        "message": "Stopped by user; the last consistent checkpoint was saved." if callback.stopped_by_user else
+                   "Training and checkpoint are ready." if plot_error is None else
                    f"Training and checkpoint are ready; learning curve could not be rendered: {plot_error}",
     })
     write_json(progress_path, current)
     return {"checkpoint": str(zipped), "checkpoint_sha256": digest,
             "timesteps": int(model.num_timesteps), "episodes": len(_read_csv(curve_path)),
-            "experiment_dir": str(output)}
+            "initial_timesteps":initial_timesteps,"curriculum_tier":tier,"experiment_dir": str(output)}
 
 
 def _sb3_version():
@@ -564,6 +795,16 @@ def _sb3_version():
         return version("stable-baselines3")
     except Exception:
         return "unknown"
+
+
+def _checkpoint_metadata(path: Path) -> dict[str, Any]:
+    path=Path(path).expanduser().resolve()
+    sidecar=path.parent/(path.stem+".metadata.json")
+    if not sidecar.is_file():return {"architecture":"centralized_joint_mlp_128x2","curriculum_tier":"C"}
+    metadata=json.loads(sidecar.read_text(encoding="utf-8"))
+    if metadata.get("checkpoint_sha256")!=hashlib.sha256(path.read_bytes()).hexdigest():
+        raise ValueError(f"Checkpoint checksum mismatch: {path}")
+    return metadata
 
 
 def _read_csv(path: Path):
@@ -583,10 +824,14 @@ def _plot_learning_curve(csv_path: Path, png_path: Path) -> None:
         import matplotlib.pyplot as plt
         steps = [int(row["timesteps"]) for row in rows]
         rewards = [float(row["mean_team_reward"]) for row in rows]
+        window=max(1,min(10,len(rewards)))
+        rolling=[float(np.mean(rewards[max(0,index-window+1):index+1])) for index in range(len(rewards))]
         png_path.parent.mkdir(parents=True, exist_ok=True)
         figure, axis = plt.subplots(figsize=(8, 4.5), constrained_layout=True)
-        axis.plot(steps, rewards, marker=".", linewidth=1.5)
-        axis.set(xlabel="Joint environment steps", ylabel="Episode team reward", title="FlySwarm PPO learning curve")
+        axis.plot(steps, rewards, marker=".", linewidth=1, alpha=.45,label="Episode return")
+        axis.plot(steps, rolling, linewidth=2,label=f"Rolling mean ({window})")
+        axis.set(xlabel="PPO transitions", ylabel="Episode return", title="FlySwarm PPO training reward")
+        axis.legend()
         axis.grid(alpha=.25)
         figure.savefig(png_path, dpi=150)
         plt.close(figure)
@@ -594,45 +839,75 @@ def _plot_learning_curve(csv_path: Path, png_path: Path) -> None:
         return
 
 
+def _plot_ppo_diagnostics(csv_path:Path,png_path:Path)->None:
+    rows=_read_csv(csv_path)
+    if not rows:return
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fields=[("policy_loss","Policy gradient loss"),("value_loss","Value loss"),
+                ("entropy","Entropy loss"),("approx_kl","Approximate KL"),
+                ("clip_fraction","Clip fraction"),("explained_variance","Explained variance")]
+        figure,axes=plt.subplots(3,2,figsize=(10,9),constrained_layout=True)
+        for axis,(field,title) in zip(axes.flat,fields):
+            pairs=[(int(row["timesteps"]),float(row[field])) for row in rows if field in row and row[field]!=""]
+            if pairs:
+                axis.plot([x for x,_ in pairs],[y for _,y in pairs],linewidth=1.5)
+                axis.set_title(title);axis.set_xlabel("PPO transitions");axis.grid(alpha=.25)
+            else:axis.set_visible(False)
+        png_path.parent.mkdir(parents=True,exist_ok=True);figure.savefig(png_path,dpi=150);plt.close(figure)
+    except ImportError:return
+
+
 def evaluate_sb3(checkpoint: Path, output: Path, episodes: int = 5,
                  seed: int = 1001, max_steps: int = 300, deterministic=True,
-                 reward_coefficients=None) -> dict[str, Any]:
+                 reward_coefficients=None,curriculum_tier: str="C") -> dict[str, Any]:
     try:
         from stable_baselines3 import PPO
     except ImportError as exc:
         raise RuntimeError("Evaluation requires stable-baselines3; install requirements-marl.txt") from exc
     output.mkdir(parents=True, exist_ok=False)
+    metadata=_checkpoint_metadata(checkpoint)
+    if metadata.get("curriculum_tier","C")!=str(curriculum_tier).upper():
+        raise ValueError("Checkpoint curriculum tier does not match the selected evaluation tier.")
+    architecture="parameter_sharing" if metadata.get("architecture")=="parameter_sharing_mlp_128x2" else "centralized"
     model = PPO.load(str(checkpoint), device="cpu")
     rows = []
     for index in range(int(episodes)):
         episode_seed = seed + index
-        env = FlySwarmParallelEnv(max_steps=max_steps, reward_coefficients=reward_coefficients)
+        env = FlySwarmParallelEnv(max_steps=max_steps, reward_coefficients=reward_coefficients,curriculum_tier=curriculum_tier)
         observations, _ = env.reset(seed=episode_seed)
         replay = output / "replays" / f"trained-seed-{episode_seed}.jsonl"
         start_replay(replay, env, episode_seed, "stable_baselines3_ppo")
         rows.append(_step_episode(env, observations, episode_seed, "stable_baselines3_ppo",
                                   f"trained-{episode_seed}", replay, ppo_model=model,
-                                  deterministic=deterministic))
+                                  deterministic=deterministic,ppo_architecture=architecture))
     _write_run_outputs(output, rows, "ppo_evaluation", seed, max_steps, reward_coefficients)
+    manifest=json.loads((output/"manifest.json").read_text());manifest.update({"curriculum_tier":curriculum_tier,"reward_semantics_version":REWARD_SEMANTICS_VERSION});write_json(output/"manifest.json",manifest)
     _plot_evaluation(rows, output / "plots" / "evaluation.png")
     return {"experiment_dir": str(output), "runs": rows, "mean_team_reward": _mean(rows, "team_reward")}
 
 
 def compare_paired(checkpoint: Path, output: Path, episodes: int = 5,
                    seed: int = 1001, max_steps: int = 300,
-                   reward_coefficients=None) -> dict[str, Any]:
+                   reward_coefficients=None,curriculum_tier: str="C") -> dict[str, Any]:
     """Evaluate random and PPO on the same seeds and fixed rule opponents."""
     try:
         from stable_baselines3 import PPO
     except ImportError as exc:
         raise RuntimeError("Paired comparison requires stable-baselines3; install requirements-marl.txt") from exc
     output.mkdir(parents=True, exist_ok=False)
+    metadata=_checkpoint_metadata(checkpoint)
+    if metadata.get("curriculum_tier","C")!=str(curriculum_tier).upper():
+        raise ValueError("Checkpoint curriculum tier does not match the selected comparison tier.")
+    architecture="parameter_sharing" if metadata.get("architecture")=="parameter_sharing_mlp_128x2" else "centralized"
     model = PPO.load(str(checkpoint), device="cpu")
     rows = []
     for index in range(int(episodes)):
         episode_seed = seed + index
         for policy_id in ("uniform_random", "stable_baselines3_ppo"):
-            env = FlySwarmParallelEnv(max_steps=max_steps, reward_coefficients=reward_coefficients)
+            env = FlySwarmParallelEnv(max_steps=max_steps, reward_coefficients=reward_coefficients,curriculum_tier=curriculum_tier)
             observations, _ = env.reset(seed=episode_seed)
             replay_path = output / "replays" / f"{policy_id}-seed-{episode_seed}.jsonl"
             start_replay(replay_path, env, episode_seed, policy_id)
@@ -640,12 +915,13 @@ def compare_paired(checkpoint: Path, output: Path, episodes: int = 5,
             rows.append(_step_episode(
                 env, observations, episode_seed, policy_id, f"{policy_id}-{episode_seed}",
                 replay_path, ppo_model=model if policy_id == "stable_baselines3_ppo" else None,
-                rng=rng, deterministic=True,
+                rng=rng, deterministic=True,ppo_architecture=architecture,
             ))
     grouped = {policy: [row for row in rows if row["policy_id"] == policy]
                for policy in ("uniform_random", "stable_baselines3_ppo")}
     summary = {
         "backend": "analytical_training", "protocol": "paired common test seeds, same rule opponent",
+        "curriculum_tier":curriculum_tier,"reward_semantics_version":REWARD_SEMANTICS_VERSION,
         "seeds": list(range(seed, seed + episodes)), "episodes_per_policy": int(episodes),
         "team_reward_definition": "sum of the eight controlled blue agents' per-step rewards across the episode",
         "random_mean_team_reward": _mean(grouped["uniform_random"], "team_reward"),
@@ -682,12 +958,17 @@ def compare_paired(checkpoint: Path, output: Path, episodes: int = 5,
 
 def compare_all_policies(output: Path, agent_file: Path, standard_checkpoint: Path,
                          custom_reward_checkpoint: Path, episodes: int = 5,
-                         seed: int = 1001, max_steps: int = 300) -> dict[str, Any]:
+                         seed: int = 1001, max_steps: int = 300,curriculum_tier: str="C") -> dict[str, Any]:
     """Compare four policies under one unchanged, standard evaluation protocol."""
     try:
         from stable_baselines3 import PPO
     except ImportError as exc:
         raise RuntimeError("Four-way comparison requires stable-baselines3") from exc
+    standard_meta=_checkpoint_metadata(standard_checkpoint);custom_meta=_checkpoint_metadata(custom_reward_checkpoint)
+    if any(meta.get("curriculum_tier","C")!=str(curriculum_tier).upper() for meta in (standard_meta,custom_meta)):
+        raise ValueError("Both PPO checkpoints must match the selected curriculum tier.")
+    standard_arch="parameter_sharing" if standard_meta.get("architecture")=="parameter_sharing_mlp_128x2" else "centralized"
+    custom_arch="parameter_sharing" if custom_meta.get("architecture")=="parameter_sharing_mlp_128x2" else "centralized"
     standard_model=PPO.load(str(standard_checkpoint),device="cpu")
     custom_model=PPO.load(str(custom_reward_checkpoint),device="cpu")
     policies=("uniform_random","student_python_agent","ppo_standard_reward","ppo_custom_reward")
@@ -698,7 +979,7 @@ def compare_all_policies(output: Path, agent_file: Path, standard_checkpoint: Pa
         for episode in range(int(episodes)):
             episode_seed=int(seed+episode)
             for policy_id in policies:
-                env=FlySwarmParallelEnv(max_steps=max_steps)
+                env=FlySwarmParallelEnv(max_steps=max_steps,curriculum_tier=curriculum_tier)
                 try:
                     observations,_=env.reset(seed=episode_seed)
                     replay=output/"replays"/f"{policy_id}-seed-{episode_seed}.jsonl"
@@ -708,14 +989,15 @@ def compare_all_policies(output: Path, agent_file: Path, standard_checkpoint: Pa
                     if policy_id=="student_python_agent":
                         kwargs["student_agent"]=agent
                     elif policy_id=="ppo_standard_reward":
-                        kwargs["ppo_model"]=standard_model;kwargs["deterministic"]=True
+                        kwargs["ppo_model"]=standard_model;kwargs["deterministic"]=True;kwargs["ppo_architecture"]=standard_arch
                     elif policy_id=="ppo_custom_reward":
-                        kwargs["ppo_model"]=custom_model;kwargs["deterministic"]=True
+                        kwargs["ppo_model"]=custom_model;kwargs["deterministic"]=True;kwargs["ppo_architecture"]=custom_arch
                     else:
                         rng=np.random.default_rng(episode_seed)
                     row=_step_episode(env,observations,episode_seed,policy_id,
                                       f"{policy_id}-{episode_seed}",replay,rng=rng,**kwargs)
                     row["evaluation_protocol"]="standard_default_reward_same_seed_fixed_opponent"
+                    row["curriculum_tier"]=curriculum_tier
                     rows.append(row)
                 finally:
                     env.close()
@@ -725,9 +1007,12 @@ def compare_all_policies(output: Path, agent_file: Path, standard_checkpoint: Pa
     _write_csv(output/"comparison.csv",rows)
     _write_csv(output/"evaluation.csv",rows)
     summary={"backend":"analytical_training","protocol":"same independent seeds, fixed opponent, default standard reward",
+             "curriculum_tier":curriculum_tier,"reward_semantics_version":REWARD_SEMANTICS_VERSION,
              "training_reward_is_not_used_for_ranking":True,"seeds":list(range(seed,seed+episodes)),
              "episodes_per_policy":int(episodes),"policies":{
                  name:{"mean_standard_evaluation_reward":_mean(group,"standard_evaluation_reward"),
+                       "std_standard_evaluation_reward":float(np.std([r["standard_evaluation_reward"] for r in group],ddof=1)) if len(group)>1 else 0.,
+                       "median_standard_evaluation_reward":float(np.median([r["standard_evaluation_reward"] for r in group])) if group else 0.,
                        "win_rate":_win_rate(group),"mean_captures":_mean(group,"captures"),
                        "mean_kills":_mean(group,"kills"),"mean_losses":_mean(group,"deaths")}
                  for name,group in groups.items()},"runs":rows}

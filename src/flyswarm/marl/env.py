@@ -20,22 +20,37 @@ from .roles import DEFAULT_COMPOSITION, ROLE_FEATURE_DIM, role_features, vehicle
 AGENTS=tuple([f"blue_{i}" for i in range(8)]+[f"red_{i}" for i in range(8)])
 ACTION_NAMES=("throttle","brake","steering","turret","elevation","fire")
 DEFAULT_REWARDS={
-    "objective_progress":.02,"objective_capture":3.,"objective_neutralization":1.,
+    "objective_progress":1.,"objective_approach":4.,"objective_capture":3.,"objective_neutralization":1.,
     "damage_dealt":.01,"enemy_kill":4.,"own_death":-4.,"ticket_delta":.01,
     "battle_win":10.,"battle_loss":-10.,"role_shaping":.25,
 }
+TEAM_REWARD_COMPONENTS=("objective_progress","objective_capture","objective_neutralization",
+                        "damage_dealt","enemy_kill","ticket_delta","battle_win","battle_loss","battle_draw")
+REWARD_SEMANTICS_VERSION="team-events-v5"
+ENVIRONMENT_SEMANTICS_VERSION="analytical-world-v2"
 
 class FlySwarmParallelEnv(ParallelEnv):
     metadata={"name":"flyswarm_analytical_v1","render_modes":[]}
     possible_agents=list(AGENTS)
-    def __init__(self,max_steps=1500,reward_coefficients=None,dt=.1,vehicle_ids=None,role_conditioning=True,reward_function=None):
+    def __init__(self,max_steps=1500,reward_coefficients=None,dt=.1,vehicle_ids=None,role_conditioning=True,reward_function=None,
+                 curriculum_tier="C", active_units_per_team=None, combat_enabled=None,fire_rate_multiplier=None):
         self.max_steps=int(max_steps);self.dt=float(dt)
-        self.coefficients=DEFAULT_REWARDS|dict(reward_coefficients or {})
+        self.coefficients=DEFAULT_REWARDS|{"battle_draw":0.}|dict(reward_coefficients or {})
         if reward_function is not None and not callable(reward_function):raise TypeError("reward_function must be callable")
         self.reward_function=reward_function
         self.vehicle_ids=tuple(vehicle_ids or DEFAULT_COMPOSITION)
         if len(self.vehicle_ids)!=16:raise ValueError("vehicle_ids must contain 16 vehicle ids")
         self.role_conditioning=bool(role_conditioning)
+        tier=str(curriculum_tier).upper()
+        if tier not in {"A","B","C"}:raise ValueError("curriculum_tier must be A, B, or C")
+        self.curriculum_tier=tier
+        default_units={"A":1,"B":4,"C":8}[tier]
+        self.active_units_per_team=int(default_units if active_units_per_team is None else active_units_per_team)
+        if not 1<=self.active_units_per_team<=8:raise ValueError("active_units_per_team must be between 1 and 8")
+        self.combat_enabled=bool(tier!="A" if combat_enabled is None else combat_enabled)
+        default_fire_rate={"A":1.0,"B":2.0,"C":1.0}[tier]
+        self.fire_rate_multiplier=float(default_fire_rate if fire_rate_multiplier is None else fire_rate_multiplier)
+        if not np.isfinite(self.fire_rate_multiplier) or self.fire_rate_multiplier<1.:raise ValueError("fire_rate_multiplier must be finite and at least 1")
         self.obs_dim=22+(ROLE_FEATURE_DIM if self.role_conditioning else 0)
         self.profiles=[vehicle_profile(v) for v in self.vehicle_ids]
         self._rng=np.random.default_rng();self.agents=[]
@@ -49,13 +64,23 @@ class FlySwarmParallelEnv(ParallelEnv):
         self.pos[:,1]+=np.linspace(-210,210,8).tolist()*2
         self.pos+=self._rng.uniform(-8.,8.,size=(16,2))
         self.heading=np.r_[np.full(8,np.pi/2),np.full(8,-np.pi/2)]+self._rng.uniform(-.025,.025,16)
-        self.speed=np.zeros(16);self.health=np.ones(16);self.reload=np.zeros(16)
+        self.speed=np.zeros(16);self.health=np.zeros(16);self.health[:self.active_units_per_team]=1.
+        self.health[8:8+self.active_units_per_team]=1.;self.reload=np.zeros(16)
         self.turret_heading=np.zeros(16);self.gun_elevation=np.zeros(16)
         self.tickets=np.array([300.,300.]);self.zones_owner=np.full(3,-1,int);self.zones_progress=np.zeros(3)
         self.zones=np.array([[-240.,0.],[0.,0.],[240.,0.]])
+        if self.curriculum_tier=="A":
+            self.pos[0]=np.array([-315.,0.])+self._rng.uniform(-8.,8.,2)
+            self.pos[8]=np.array([315.,0.])+self._rng.uniform(-8.,8.,2)
+            self.heading[0]=self._rng.uniform(-.025,.025)
+            self.heading[8]=np.pi+self._rng.uniform(-.025,.025)
         self.neural=np.zeros((16,6),np.float32);self.last_components=[{} for _ in range(16)]
         self.last_events=[];self.last_actions=np.zeros((16,6),np.float32)
         self.last_rewards={}
+        self.winner=None;self.terminal_reason="ongoing"
+        self.last_outcome={"winner":None,"reason":"ongoing","tickets":self.tickets.tolist(),
+                           "active_units_per_team":self.active_units_per_team,"curriculum_tier":self.curriculum_tier,
+                           "fire_rate_multiplier":self.fire_rate_multiplier}
         return self._observations(),{a:self._info(i) for i,a in enumerate(self.agents)}
     def set_connectome_features(self,features):
         value=np.asarray(features,np.float32)
@@ -84,7 +109,7 @@ class FlySwarmParallelEnv(ParallelEnv):
             self.speed[i]=np.clip(self.speed[i],-float(spec["reverse_m_s"]),float(spec["max_speed_m_s"]))
             self.pos[i]+=np.array([np.cos(self.heading[i]),np.sin(self.heading[i])])*self.speed[i]*self.dt
             self.reload[i]=max(0.,self.reload[i]-self.dt)
-            if action[5]>.5 and self.reload[i]<=0:
+            if self.combat_enabled and action[5]>.5 and self.reload[i]<=0:
                 targets=np.arange(8,16) if i<8 else np.arange(0,8)
                 alive=targets[self.health[targets]>0]
                 if len(alive):
@@ -123,11 +148,16 @@ class FlySwarmParallelEnv(ParallelEnv):
                         })
                         if self.health[target]<=0:
                             self.last_events.append({"type":"destroyed","agent_id":a,"target_id":AGENTS[int(target)]})
-                    self.reload[i]=float(spec["reload_s"])
+                    self.reload[i]=float(spec["reload_s"])*self.fire_rate_multiplier
         self._objectives()
         self.steps+=1
         rewards={};infos={}
-        done=bool(self.steps>=self.max_steps or min(self.tickets)<=0 or np.all(self.health[:8]<=0) or np.all(self.health[8:]<=0))
+        blue_alive=bool(np.any(self.health[:8]>0));red_alive=bool(np.any(self.health[8:]>0))
+        tickets_exhausted=bool(np.any(self.tickets<=0))
+        eliminated=not blue_alive or not red_alive
+        timed_out=self.steps>=self.max_steps
+        done=bool(timed_out or tickets_exhausted or eliminated)
+        self.winner,self.terminal_reason=self._resolve_outcome(blue_alive,red_alive,tickets_exhausted,timed_out)
         health_loss=np.maximum(0,previous_health-self.health)
         for i,a in enumerate(self.possible_agents):
             team=0 if i<8 else 1;enemy=1-team
@@ -139,26 +169,40 @@ class FlySwarmParallelEnv(ParallelEnv):
             delta_progress=self.zones_progress-previous_progress
             progress=float(np.maximum(0,delta_progress).sum() if team==0 else np.maximum(0,-delta_progress).sum())/100.
             c={
-                "objective_progress":progress,"objective_capture":captures,"objective_neutralization":neutralized,
+                "objective_progress":progress,"objective_approach":self._objective_approach(i,previous_pos),
+                "objective_capture":captures,"objective_neutralization":neutralized,
                 "damage_dealt":damage,"enemy_kill":kills,"own_death":deaths,
                 "ticket_delta":float((previous_tickets[enemy]-self.tickets[enemy])-(previous_tickets[team]-self.tickets[team])),
-                "battle_win":float(done and self.tickets[team]>self.tickets[enemy]),
-                "battle_loss":float(done and self.tickets[team]<self.tickets[enemy]),
-                "role_shaping":self._role_shaping(i,previous_pos,applied[i]),
+                "battle_win":float(done and self.winner==team),
+                "battle_loss":float(done and self.winner==enemy),
+                "battle_draw":float(done and self.winner is None),
+                "role_shaping":self._role_shaping(i,previous_pos,applied[i]) if self.health[i]>0 else 0.,
             }
+            if i%8>=self.active_units_per_team:c={key:0. for key in c}
+            else:
+                # Shared team events are apportioned over living participants so
+                # summing a team's per-agent rewards counts each event once.
+                for key in TEAM_REWARD_COMPONENTS:c[key]/=self.active_units_per_team
             self.last_components[i]=c
-            standard_reward=float(sum(DEFAULT_REWARDS[k]*v for k,v in c.items()))
+            standard_coefficients=DEFAULT_REWARDS|{"battle_draw":0.}
+            standard_reward=float(sum(standard_coefficients[k]*v for k,v in c.items()))
             training_reward=float(self.reward_function(dict(c)) if self.reward_function else sum(self.coefficients[k]*v for k,v in c.items()))
             if not np.isfinite(training_reward):raise ValueError("reward function returned NaN or infinity")
             rewards[a]=training_reward
             infos[a]=self._info(i)
             infos[a]["training_reward"]=training_reward
             infos[a]["standard_evaluation_reward"]=standard_reward
+            infos[a]["winner"]=None if self.winner is None else ("blue" if self.winner==0 else "red")
+            infos[a]["terminal_reason"]=self.terminal_reason
         terminations={a:done and self.steps<self.max_steps for a in self.possible_agents}
         truncations={a:done and self.steps>=self.max_steps for a in self.possible_agents}
         observations=self._observations()
         self.last_actions=applied.astype(np.float32)
         self.last_rewards=dict(rewards)
+        self.last_outcome={"winner":None if self.winner is None else ("blue" if self.winner==0 else "red"),
+                           "reason":self.terminal_reason,"tickets":self.tickets.tolist(),
+                           "active_units_per_team":self.active_units_per_team,"curriculum_tier":self.curriculum_tier,
+                           "fire_rate_multiplier":self.fire_rate_multiplier}
         if done:self.agents=[]
         return observations,rewards,terminations,truncations,infos
 
@@ -191,12 +235,36 @@ class FlySwarmParallelEnv(ParallelEnv):
             "tickets":{"blue":float(self.tickets[0]),"red":float(self.tickets[1])},
             "events":list(self.last_events),
             "state_authority":"FlySwarmParallelEnv",
+            "outcome":dict(self.last_outcome),
         }
         if run_id is not None:frame["run_id"]=run_id
         return frame
 
     def close(self):
         self.agents=[]
+    def _resolve_outcome(self,blue_alive,red_alive,tickets_exhausted,timed_out):
+        """Return (winning team index or None, terminal reason).
+
+        Elimination takes precedence; a simultaneous wipe is a draw. Ticket
+        exhaustion awards the win to the team with tickets remaining, with a
+        simultaneous exhaustion drawn. On timeout compare tickets, then owned
+        objectives; exact ties are draws.
+        """
+        if not blue_alive and not red_alive:return None,"simultaneous_elimination"
+        if not red_alive:return 0,"opponent_eliminated"
+        if not blue_alive:return 1,"team_eliminated"
+        if tickets_exhausted:
+            if self.tickets[0]>self.tickets[1]:return 0,"enemy_tickets_exhausted"
+            if self.tickets[1]>self.tickets[0]:return 1,"team_tickets_exhausted"
+            return None,"simultaneous_ticket_exhaustion"
+        if timed_out:
+            if self.tickets[0]>self.tickets[1]:return 0,"timeout_tickets"
+            if self.tickets[1]>self.tickets[0]:return 1,"timeout_tickets"
+            blue_zones=int(np.count_nonzero(self.zones_owner==0));red_zones=int(np.count_nonzero(self.zones_owner==1))
+            if blue_zones>red_zones:return 0,"timeout_objectives"
+            if red_zones>blue_zones:return 1,"timeout_objectives"
+            return None,"timeout_draw"
+        return None,"ongoing"
     def _objectives(self):
         for z,center in enumerate(self.zones):
             inside=np.linalg.norm(self.pos-center,axis=1)<65
@@ -212,31 +280,21 @@ class FlySwarmParallelEnv(ParallelEnv):
         for owner in self.zones_owner:
             if owner>=0:self.tickets[1-owner]=max(0.,self.tickets[1-owner]-.2*self.dt)
     def _role_shaping(self,i,previous_pos,action):
-        """Small role prior; team success remains the dominant reward signal."""
+        """Return bounded signed change in objective-distance potential.
+
+        Normalizing by the world scale prevents per-frame movement from
+        dominating capture, combat, or terminal rewards. Moving away reverses
+        the shaping contribution, so back-and-forth motion cannot farm points.
+        """
         profile=self.profiles[i];zone=i%3;center=self.zones[zone]
         before=float(np.linalg.norm(previous_pos[i]-center));after=float(np.linalg.norm(self.pos[i]-center))
-        scale=max(1.,float(profile["max_speed_m_s"])*self.dt)
-        approach=float(np.clip((before-after)/scale,-1.,1.));inside=float(after<65.)
-        targets=np.arange(8,16) if i<8 else np.arange(0,8);alive=targets[self.health[targets]>0]
-        nearest=float(np.min(np.linalg.norm(self.pos[alive]-self.pos[i],axis=1))) if len(alive) else 9999.
-        role=str(profile["vehicle_class"]);objective=float(profile["objective_bias"]);aggression=float(profile["aggression"])
-        if role=="medium":
-            value=objective*(.70*approach+.30*inside)
-        elif role=="heavy":
-            contact=float(nearest<float(profile["effective_range_m"])*.85)
-            value=objective*(.45*approach+.40*inside)+.15*aggression*contact
-        else:
-            stand=max(1.,float(profile["standoff_m"]));band=float(np.exp(-abs(nearest-stand)/max(90.,stand*.65)))
-            too_close=max(0.,(stand*.45-nearest)/max(1.,stand*.45))
-            fire=float(action[5]>.5 and nearest<=float(profile["effective_range_m"]))
-            value=.55*band+.25*fire-.45*too_close+.10*objective*approach
-        # Engineered country prior: Germany favours stand-off use; USSR favours
-        # objective pressure. These are experiment knobs, not historical claims.
-        if profile["nation"]=="germany":
-            value+=.08*float(nearest>=float(profile["standoff_m"]) and nearest<=float(profile["effective_range_m"]))
-        else:
-            value+=.08*aggression*max(0.,approach)
-        return float(np.clip(value,-1.,1.))
+        approach=(before-after)/1000.
+        return float(np.clip(float(profile["objective_bias"])*approach,-.05,.05))
+    def _objective_approach(self,i,previous_pos):
+        """Reward bounded net movement toward an agent's assigned zone."""
+        center=self.zones[i%3]
+        before=float(np.linalg.norm(previous_pos[i]-center));after=float(np.linalg.norm(self.pos[i]-center))
+        return float(np.clip((before-after)/100.,-.05,.05))
     def _observations(self):
         out={}
         for i,a in enumerate(self.possible_agents):
@@ -268,4 +326,7 @@ class FlySwarmParallelEnv(ParallelEnv):
             "tickets":self.tickets.tolist(),"alive":bool(self.health[i]>0),"action_order":ACTION_NAMES,
             "vehicle":self.vehicle_ids[i],"vehicle_class":p["vehicle_class"],"tactical_role":p["tactical_role"],
             "nation":p["nation"],"role_conditioning":self.role_conditioning,
+            "curriculum_tier":self.curriculum_tier,"combat_enabled":self.combat_enabled,
+            "active_units_per_team":self.active_units_per_team,"fire_rate_multiplier":self.fire_rate_multiplier,
+            "reward_semantics_version":REWARD_SEMANTICS_VERSION,
         }

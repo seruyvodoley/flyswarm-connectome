@@ -11,6 +11,7 @@ from pathlib import Path
 from .experiments import (
     compare_paired,
     compare_all_policies,
+    evaluate_rule_ai,
     evaluate_sb3,
     new_experiment_dir,
     run_random_baseline,
@@ -43,6 +44,13 @@ def build_parser():
     baseline.add_argument("--episodes", type=int, default=3)
     baseline.add_argument("--seed", type=int, default=101)
     baseline.add_argument("--max-steps", type=int, default=600)
+    baseline.add_argument("--tier", choices=("A","B","C"), default="C")
+
+    rule = sub.add_parser("rule", help="Evaluate deterministic Rule AI control")
+    rule.add_argument("--episodes", type=int, default=25)
+    rule.add_argument("--seed", type=int, default=1001)
+    rule.add_argument("--max-steps", type=int, default=600)
+    rule.add_argument("--tier", choices=("A","B","C"), default="C")
 
     train = sub.add_parser("train", help="Train Stable-Baselines3 PPO")
     train.add_argument("--steps", type=int, default=10000)
@@ -50,6 +58,10 @@ def build_parser():
     train.add_argument("--max-steps", type=int, default=600)
     train.add_argument("--learning-rate", type=float, default=3e-4)
     train.add_argument("--reward-file", type=Path, help="Student calculate_reward(components) Python file")
+    train.add_argument("--tier", choices=("A","B","C"), default="C", help="Educational scenario: A capture basics, B 4v4 tactics, C full 8v8")
+    train.add_argument("--continue-from", type=Path, help="Continue a compatible PPO checkpoint")
+    train.add_argument("--checkpoint-interval", type=int, default=1024)
+    train.add_argument("--architecture", choices=("centralized","parameter_sharing"), default="centralized")
 
     student = sub.add_parser("student", help="Run a student-defined Python policy")
     student.add_argument("--agent-file", type=Path, required=True)
@@ -57,6 +69,7 @@ def build_parser():
     student.add_argument("--episodes", type=int, default=3)
     student.add_argument("--seed", type=int, default=101)
     student.add_argument("--max-steps", type=int, default=600)
+    student.add_argument("--tier", choices=("A","B","C"), default="C")
 
     check = sub.add_parser("check", help="Validate student agent/reward files")
     check.add_argument("--agent-file", type=Path, required=True)
@@ -71,12 +84,14 @@ def build_parser():
     evaluate.add_argument("--episodes", type=int, default=5)
     evaluate.add_argument("--seed", type=int, default=1001)
     evaluate.add_argument("--max-steps", type=int, default=600)
+    evaluate.add_argument("--tier", choices=("A","B","C"), default="C")
 
     compare = sub.add_parser("compare", help="Paired Random vs PPO test-seed evaluation")
     compare.add_argument("checkpoint", type=Path)
     compare.add_argument("--episodes", type=int, default=5)
     compare.add_argument("--seed", type=int, default=1001)
     compare.add_argument("--max-steps", type=int, default=600)
+    compare.add_argument("--tier", choices=("A","B","C"), default="C")
     compare_all = sub.add_parser("compare-all", help="Compare Random, student strategy, standard PPO and custom-reward PPO")
     compare_all.add_argument("--agent-file", type=Path, required=True)
     compare_all.add_argument("--standard-checkpoint", type=Path, required=True)
@@ -84,6 +99,7 @@ def build_parser():
     compare_all.add_argument("--episodes", type=int, default=5)
     compare_all.add_argument("--seed", type=int, default=1001)
     compare_all.add_argument("--max-steps", type=int, default=600)
+    compare_all.add_argument("--tier", choices=("A","B","C"), default="C")
     return parser
 
 
@@ -95,6 +111,8 @@ def main(argv=None):
     make_output = lambda label: args.experiment_dir or new_experiment_dir(root, label)
     if args.command == "baseline":
         out = make_output(f"random-seed-{args.seed}")
+    elif args.command == "rule":
+        out = make_output(f"rule-ai-seed-{args.seed}")
     elif args.command == "train":
         out = make_output(f"ppo-training-seed-{args.seed}")
     elif args.command == "evaluate":
@@ -136,29 +154,33 @@ def main(argv=None):
             (out/"progress.json").write_text(json.dumps({"state":"complete","message":f"Exported {result['included_files']} files from {result['sessions']} experiments."},indent=2)+"\n",encoding="utf-8")
             print(json.dumps(result));return 0
         if args.command == "baseline":
-            result = run_random_baseline(out, args.episodes, args.seed, args.max_steps, rewards)
+            result = run_random_baseline(out, args.episodes, args.seed, args.max_steps, rewards,args.tier)
+        elif args.command == "rule":
+            result=evaluate_rule_ai(out,args.episodes,args.seed,args.max_steps,args.tier)
         elif args.command == "student":
             out.mkdir(parents=True)
             with (out/"execution.log").open("a",encoding="utf-8",buffering=1) as console, redirect_stdout(console), redirect_stderr(console):
-                result = run_student_agent(out,args.agent_file,args.episodes,args.seed,args.max_steps,args.reward_file)
+                result = run_student_agent(out,args.agent_file,args.episodes,args.seed,args.max_steps,args.reward_file,args.tier)
         elif args.command == "compare-all":
             out.mkdir(parents=True)
             with (out/"execution.log").open("a",encoding="utf-8",buffering=1) as console, redirect_stdout(console), redirect_stderr(console):
                 result = compare_all_policies(out,args.agent_file,args.standard_checkpoint,
-                    args.custom_reward_checkpoint,args.episodes,args.seed,args.max_steps)
+                    args.custom_reward_checkpoint,args.episodes,args.seed,args.max_steps,args.tier)
         elif args.command == "train":
             out.mkdir(parents=True)
             with (out/"execution.log").open("a",encoding="utf-8",buffering=1) as console, redirect_stdout(console), redirect_stderr(console):
                 reward_function=load_reward(args.reward_file) if args.reward_file else None
                 result = train_sb3_ppo(out, args.steps, args.seed, args.max_steps,
                                        args.learning_rate, out / "progress.json", rewards,
-                                       reward_function=reward_function,reward_file=args.reward_file)
+                                       reward_function=reward_function,reward_file=args.reward_file,
+                                       curriculum_tier=args.tier,continue_from=args.continue_from,
+                                       checkpoint_interval=args.checkpoint_interval,ppo_architecture=args.architecture)
         elif args.command == "evaluate":
             result = evaluate_sb3(args.checkpoint, out, args.episodes, args.seed,
-                                  args.max_steps, reward_coefficients=rewards)
+                                  args.max_steps, reward_coefficients=rewards,curriculum_tier=args.tier)
         else:
             result = compare_paired(args.checkpoint, out, args.episodes, args.seed,
-                                    args.max_steps, rewards)
+                                    args.max_steps, rewards,args.tier)
     except Exception as exc:
         out.mkdir(parents=True, exist_ok=True)
         detail=f"{type(exc).__name__}: {exc}"

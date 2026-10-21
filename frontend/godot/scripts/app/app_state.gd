@@ -334,8 +334,12 @@ func run_marl_job(command: String,args: Array=[]):
 func stop_marl_job():
 	if marl_pid>0 and OS.is_process_running(marl_pid):
 		FileAccess.open(marl_output.path_join("cancel"),FileAccess.WRITE).store_string("cancel")
-		OS.kill(marl_pid)
-	marl_pid=-1
+		marl_progress["message"]="Останавливаю после безопасного шага и сохраняю checkpoint."
+func toggle_marl_pause():
+	if marl_pid<=0 or not OS.is_process_running(marl_pid):return
+	var pause_path=marl_output.path_join("pause")
+	if FileAccess.file_exists(pause_path):DirAccess.remove_absolute(pause_path)
+	else:FileAccess.open(pause_path,FileAccess.WRITE).store_string("pause")
 func marl_history()->Array:
 	var entries=[]
 	var root=results_root().path_join("marl")
@@ -601,7 +605,12 @@ func _process(dt):
 		if is_instance_valid(view):view.update_job(state)
 func quit_app():
 	stop_session()
+	stop_marl_job()
 	# Give the supervised job time to terminate its owned child processes.
+	if marl_pid>0:
+		for attempt in range(300):
+			if not OS.is_process_running(marl_pid):break
+			await get_tree().create_timer(.1).timeout
 	if job_pid>0:
 		for attempt in range(30):
 			if not OS.is_process_running(job_pid):break

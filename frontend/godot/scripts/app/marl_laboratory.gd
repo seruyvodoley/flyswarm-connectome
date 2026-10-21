@@ -33,13 +33,13 @@ func _ready():
 	theme=DesignSystem.make_theme(18,appearance)
 	var bg=ColorRect.new();bg.color=DesignSystem.ink_for(appearance);bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(bg)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,42)
+	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,26)
 	add_child(margin)
-	var column=VBoxContainer.new();column.add_theme_constant_override("separation",16);margin.add_child(column)
+	var column=VBoxContainer.new();column.add_theme_constant_override("separation",10);margin.add_child(column)
 	var top=HBoxContainer.new();column.add_child(top)
 	var title=Label.new();title.text=_t("ЛАБОРАТОРИЯ MARL","MARL LABORATORY");title.add_theme_font_size_override("font_size",34);title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;top.add_child(title)
 	var back=Button.new();back.text=_t("В меню","Back");back.pressed.connect(AppState.menu);top.add_child(back)
-	var intro=Label.new();intro.text=_t("PettingZoo Parallel · Stable-Baselines3 PPO · 16 машин · Python задаёт исход боя","PettingZoo Parallel · Stable-Baselines3 PPO · 16 vehicles · Python owns battle outcomes");intro.modulate=Color("bdc7bd");column.add_child(intro)
+	var intro=Label.new();intro.text=_t("16 машин · настройте политику, запустите и сравните результаты","16 vehicles · configure a policy, run it, and compare results");intro.modulate=Color("bdc7bd");column.add_child(intro)
 	var tab_row=HBoxContainer.new();tab_row.add_theme_constant_override("separation",6);column.add_child(tab_row)
 	var tabs=TabContainer.new();tabs.tabs_visible=false;tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(tabs)
 	var experiments_tab=Button.new();experiments_tab.text=_t("Эксперименты","Experiments");experiments_tab.toggle_mode=true;experiments_tab.button_pressed=true;tab_row.add_child(experiments_tab)
@@ -110,12 +110,13 @@ func _workspace_dir()->String:
 	return ProjectSettings.globalize_path("user://marl_workspace")
 func _build_programming_tab(tabs:TabContainer):
 	var appearance=str(AppState.settings.get("appearance","dark"))
-	var panel=VBoxContainer.new();panel.name=_t("Python","Python");panel.add_theme_constant_override("separation",8);tabs.add_child(panel)
+	var panel=VBoxContainer.new();panel.name=_t("Python","Python");panel.add_theme_constant_override("separation",4);tabs.add_child(panel)
 	student_agent_path=_workspace_dir().path_join("agent.py");student_reward_path=_workspace_dir().path_join("reward.py")
 	DirAccess.make_dir_recursive_absolute(_workspace_dir())
 	if not FileAccess.file_exists(student_agent_path):FileAccess.open(student_agent_path,FileAccess.WRITE).store_string('import numpy as np\n\ndef act(observation, context=None):\n    action = np.zeros(6, dtype=np.float32)\n    action[0] = 0.5\n    return action\n')
 	if not FileAccess.file_exists(student_reward_path):FileAccess.open(student_reward_path,FileAccess.WRITE).store_string('def calculate_reward(components):\n    return float(3.0 * components["objective_capture"] + 0.01 * components["damage_dealt"] - 4.0 * components["own_death"])\n')
-	var toolbar=HBoxContainer.new();toolbar.add_theme_constant_override("separation",6);panel.add_child(toolbar)
+	var toolbar_frame=PanelContainer.new();toolbar_frame.add_theme_stylebox_override("panel",_editor_toolbar_style(appearance));panel.add_child(toolbar_frame)
+	var toolbar=HBoxContainer.new();toolbar.add_theme_constant_override("separation",5);toolbar_frame.add_child(toolbar)
 	var agent_tab=Button.new();agent_tab.text="agent.py";agent_tab.pressed.connect(func():_switch_code("agent"));toolbar.add_child(agent_tab)
 	var reward_tab=Button.new();reward_tab.text="reward.py";reward_tab.pressed.connect(func():_switch_code("reward"));toolbar.add_child(reward_tab)
 	code_file_tabs={"agent":agent_tab,"reward":reward_tab}
@@ -124,11 +125,11 @@ func _build_programming_tab(tabs:TabContainer):
 		file_tab.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,key==active_code));file_tab.add_theme_stylebox_override("pressed",DesignSystem.tab_style(appearance,true));file_tab.add_theme_color_override("font_color",DesignSystem.text_for(appearance))
 	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;toolbar.add_child(spacer)
 	var save_button=Button.new();save_button.text=_t("Сохранить","Save");save_button.tooltip_text="⌘S / Ctrl+S";save_button.pressed.connect(_save_current_code);toolbar.add_child(save_button)
-	var check=Button.new();check.text=_t("Проверить","Check");check.pressed.connect(func():_confirm_student_run("check"));toolbar.add_child(check)
-	var run=Button.new();run.text=_t("▶ Запустить","▶ Run");run.pressed.connect(func():_confirm_student_run("student"));toolbar.add_child(run)
+	var check=Button.new();check.text=_t("Проверить код","Check code");check.tooltip_text=_t("Проверить agent.py и reward.py","Validate agent.py and reward.py");check.pressed.connect(func():_confirm_student_run("check"));toolbar.add_child(check)
+	var run=Button.new();run.text=_t("▶ Запустить агента","▶ Run agent");run.tooltip_text=_t("Оценить агента на трёх эпизодах","Evaluate the agent over three episodes");run.pressed.connect(func():_confirm_student_run("student"));toolbar.add_child(run)
 	code_stop_button=Button.new();code_stop_button.text=_t("Остановить","Stop");code_stop_button.visible=false;code_stop_button.pressed.connect(AppState.stop_marl_job);toolbar.add_child(code_stop_button)
 	var more=MenuButton.new();more.text="⋯";more.tooltip_text=_t("Другие действия","More actions");toolbar.add_child(more)
-	var more_menu=more.get_popup();more_menu.add_item(_t("Импортировать файл Python…","Import Python file…"),1);more_menu.add_item(_t("Восстановить шаблон","Restore template"),2);more_menu.add_separator();more_menu.add_item(_t("Экспортировать практическую…","Export practical…"),3);more_menu.add_separator();more_menu.add_item(_t("О безопасности Python…","About Python security…"),4)
+	var more_menu=more.get_popup();more_menu.add_item(_t("Импортировать файл Python…","Import Python file…"),1);more_menu.add_item(_t("Восстановить шаблон","Restore template"),2);more_menu.add_separator();more_menu.add_item(_t("Экспортировать практическую…","Export practical…"),3)
 	more_menu.id_pressed.connect(_on_editor_menu_action)
 	var workspace=HBoxContainer.new();workspace.size_flags_vertical=Control.SIZE_EXPAND_FILL;workspace.size_flags_horizontal=Control.SIZE_EXPAND_FILL;workspace.add_theme_constant_override("separation",0);panel.add_child(workspace)
 	var activity=VBoxContainer.new();activity.custom_minimum_size.x=42;activity.add_theme_constant_override("separation",8);workspace.add_child(activity)
@@ -140,32 +141,32 @@ func _build_programming_tab(tabs:TabContainer):
 	code_explorer=VBoxContainer.new();code_explorer.add_theme_constant_override("separation",6);explorer_panel.add_child(code_explorer)
 	var explorer_header=HBoxContainer.new();code_explorer.add_child(explorer_header)
 	var explorer_title=Label.new();explorer_title.text=_t("ПРОВОДНИК","EXPLORER");explorer_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;explorer_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));explorer_header.add_child(explorer_title)
-	var explorer_menu=MenuButton.new();explorer_menu.text="⋯";explorer_menu.tooltip_text=_t("Действия с файлами","File actions");explorer_header.add_child(explorer_menu)
-	var explorer_popup=explorer_menu.get_popup();explorer_popup.add_item(_t("Импортировать файл Python…","Import Python file…"),1);explorer_popup.add_item(_t("Создать шаблон","Restore template"),2);explorer_popup.id_pressed.connect(_on_editor_menu_action)
 	code_search=LineEdit.new();code_search.placeholder_text=_t("Поиск в agent.py и reward.py","Search agent.py and reward.py");code_search.visible=false;code_search.text_changed.connect(_search_code_files);code_explorer.add_child(code_search)
 	code_search_results=Label.new();code_search_results.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;code_search_results.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(code_search_results)
 	var files_header=Label.new();files_header.text=_t("ОТКРЫТЫЕ ФАЙЛЫ","OPEN FILES");files_header.add_theme_font_size_override("font_size",13);files_header.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));code_explorer.add_child(files_header)
 	for key in ["agent","reward"]:
-		var file_item=Button.new();file_item.alignment=HORIZONTAL_ALIGNMENT_LEFT;file_item.text="›  "+key+".py";file_item.pressed.connect(func():_switch_code(key));file_item.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_item.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,true));file_item.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_explorer.add_child(file_item);code_file_items[key]=file_item
+		var file_item=Button.new();file_item.alignment=HORIZONTAL_ALIGNMENT_LEFT;file_item.text="›  "+key+".py";file_item.tooltip_text=_t("Логика действий танка: act(...) возвращает шесть значений управления.","Tank policy: act(...) returns six control values.") if key=="agent" else _t("Награда за шаг: calculate_reward(...) возвращает одно число.","Per-step reward: calculate_reward(...) returns one number.");file_item.pressed.connect(func():_switch_code(key));file_item.add_theme_stylebox_override("normal",DesignSystem.tab_style(appearance,key==active_code));file_item.add_theme_stylebox_override("hover",DesignSystem.tab_style(appearance,true));file_item.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_explorer.add_child(file_item);code_file_items[key]=file_item
 	var editor_column=VBoxContainer.new();editor_column.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_column.add_theme_constant_override("separation",0);explorer_split.add_child(editor_column)
 	var breadcrumb_bar=HBoxContainer.new();breadcrumb_bar.custom_minimum_size.y=30;breadcrumb_bar.add_theme_constant_override("separation",6);editor_column.add_child(breadcrumb_bar)
 	code_breadcrumb=Label.new();code_breadcrumb.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_breadcrumb.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));breadcrumb_bar.add_child(code_breadcrumb)
-	var editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_column.add_child(editor_split)
-	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=300;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
+	var editor_split=VSplitContainer.new();editor_split.size_flags_vertical=Control.SIZE_EXPAND_FILL;editor_split.size_flags_horizontal=Control.SIZE_EXPAND_FILL;editor_split.split_offset=-90;editor_column.add_child(editor_split)
+	code_editor=CodeEdit.new();code_editor.custom_minimum_size.y=200;code_editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_editor.gutters_draw_line_numbers=true;code_editor.gutters_draw_fold_gutter=true;code_editor.indent_automatic=true;code_editor.indent_use_spaces=true;code_editor.indent_size=4;code_editor.auto_brace_completion_enabled=true;code_editor.add_theme_color_override("font_color",DesignSystem.text_for(appearance));code_editor.add_theme_color_override("font_readonly_color",DesignSystem.muted_for(appearance));code_editor.add_theme_color_override("current_line_color",Color("edf1e7") if DesignSystem.is_light(appearance) else Color("293229"));code_editor.add_theme_color_override("line_number_color",Color("788273") if DesignSystem.is_light(appearance) else Color("8c9889"));code_editor.add_theme_color_override("caret_color",DesignSystem.accent_for(appearance));code_editor.add_theme_color_override("selection_color",Color("b8c9a5",0.48) if DesignSystem.is_light(appearance) else Color("829a6b",0.42));code_editor.add_theme_color_override("brace_mismatch_color",Color("df746a"));code_editor.add_theme_color_override("word_highlighted_color",Color("d8e4ce",0.18) if DesignSystem.is_light(appearance) else Color("bbd49c",0.14));code_editor.add_theme_constant_override("line_spacing",3)
 	var mono=SystemFont.new();mono.font_names=PackedStringArray(["SF Mono","Menlo","Monaco","monospace"]);code_editor.add_theme_font_override("font",mono);code_editor.add_theme_font_size_override("font_size",17);editor_split.add_child(code_editor)
 	code_editor.syntax_highlighter=_make_python_highlighter(appearance)
 	code_editor.text_changed.connect(_on_code_changed);code_editor.caret_changed.connect(_update_code_cursor);code_editor.caret_changed.connect(_update_code_breadcrumb)
-	var output_panel=VBoxContainer.new();output_panel.custom_minimum_size.y=140;output_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL;output_panel.add_theme_constant_override("separation",4);editor_split.add_child(output_panel)
+	var output_panel=VBoxContainer.new();output_panel.custom_minimum_size.y=220;output_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL;output_panel.add_theme_constant_override("separation",4);editor_split.add_child(output_panel)
 	var output_header=HBoxContainer.new();output_panel.add_child(output_header)
 	var output_title=Label.new();output_title.text=_t("ВЫВОД И ОШИБКИ","OUTPUT & ERRORS");output_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;output_title.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));output_header.add_child(output_title)
 	var clear_output=Button.new();clear_output.text=_t("Очистить","Clear");clear_output.pressed.connect(func():code_console.clear());output_header.add_child(clear_output)
-	code_console=TextEdit.new();code_console.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_console.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_console.editable=false;code_console.wrap_mode=TextEdit.LINE_WRAPPING_BOUNDARY;code_console.placeholder_text=_t("Проверка кода, запуск и ошибки появятся здесь","Code checks, runs and errors appear here");code_console.add_theme_color_override("font_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("font_readonly_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("caret_color",DesignSystem.muted_for(appearance));code_console.add_theme_stylebox_override("read_only",_code_panel_style(appearance));code_console.add_theme_font_override("font",mono);code_console.add_theme_font_size_override("font_size",14);output_panel.add_child(code_console)
+	code_console=TextEdit.new();code_console.size_flags_vertical=Control.SIZE_EXPAND_FILL;code_console.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_console.editable=false;code_console.wrap_mode=TextEdit.LINE_WRAPPING_BOUNDARY;code_console.placeholder_text=_t("Здесь появятся результат проверки, ход запуска и сообщения об ошибках.","Validation results, run progress, and errors will appear here.");code_console.add_theme_color_override("font_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("font_readonly_color",Color("c8d1c4") if not DesignSystem.is_light(appearance) else Color("384237"));code_console.add_theme_color_override("caret_color",DesignSystem.muted_for(appearance));code_console.add_theme_stylebox_override("read_only",_code_panel_style(appearance));code_console.add_theme_font_override("font",mono);code_console.add_theme_font_size_override("font_size",14);output_panel.add_child(code_console)
 	var status_bar=HBoxContainer.new();status_bar.add_theme_constant_override("separation",18);panel.add_child(status_bar)
 	code_status_label=Label.new();code_status_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;code_status_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_status_label)
 	code_cursor_label=Label.new();code_cursor_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(code_cursor_label)
 	var language_label=Label.new();language_label.text="Python · UTF-8 · Spaces: 4";language_label.add_theme_color_override("font_color",DesignSystem.muted_for(appearance));status_bar.add_child(language_label)
-	var security_label=Label.new();security_label.text=_t("НЕ ПЕСОЧНИЦА","NOT SANDBOXED");security_label.tooltip_text=_t("Python-код запускается с правами вашей учётной записи и доступом к её файлам. Запускайте только знакомый код.","Python runs with your account permissions and can access your files. Run code only if you trust it.");security_label.add_theme_color_override("font_color",Color("a9823d") if DesignSystem.is_light(appearance) else Color("c1a573"));status_bar.add_child(security_label)
 	loading_code=true;code_editor.text=FileAccess.get_file_as_string(student_agent_path);loading_code=false;_set_code_dirty(false);_update_code_cursor();_update_code_breadcrumb()
+
+func _editor_toolbar_style(appearance:String)->StyleBoxFlat:
+	var style=StyleBoxFlat.new();style.bg_color=DesignSystem.surface_for(appearance);style.border_color=Color("c5c8bd") if DesignSystem.is_light(appearance) else Color("465044");style.set_border_width_all(1);style.set_corner_radius_all(10);style.content_margin_left=7;style.content_margin_right=7;style.content_margin_top=4;style.content_margin_bottom=4;return style
 
 func _search_code_files(query:String):
 	if not is_instance_valid(code_search_results):return
@@ -189,7 +190,8 @@ func _update_code_breadcrumb():
 		var candidate=String(lines[index]).strip_edges()
 		if candidate.begins_with("def ") or candidate.begins_with("class "):
 			symbol=candidate.trim_suffix(":");break
-	code_breadcrumb.text=active_code+".py"+("  ›  "+symbol if symbol!="" else "")
+	var guidance=_t("управление · act(...) → 6 значений","policy · act(...) → 6 values") if active_code=="agent" else _t("награда · calculate_reward(...) → одно число","reward · calculate_reward(...) → one number")
+	code_breadcrumb.text=active_code+".py"+("  ›  "+symbol if symbol!="" else "")+"   ·   "+guidance
 
 func _on_editor_menu_action(id:int):
 	match id:
@@ -198,8 +200,6 @@ func _on_editor_menu_action(id:int):
 		3:
 			_save_current_code()
 			AppState.run_marl_job("export",["--workspace",_workspace_dir(),"--sessions-root",AppState.results_root().path_join("marl")])
-		4:
-			var dialog=AcceptDialog.new();dialog.title=_t("Безопасность Python","Python security");dialog.dialog_text=_t("Python работает в отдельном процессе с правами вашей учётной записи и доступом к её файлам. Это не песочница: запускайте только код, которому доверяете.","Python runs in a separate process with your account permissions and access to your files. This is not a sandbox: only run code you trust.");add_child(dialog);dialog.confirmed.connect(dialog.queue_free);dialog.popup_centered()
 
 func _make_python_highlighter(appearance:String)->CodeHighlighter:
 	var light=DesignSystem.is_light(appearance)
@@ -276,9 +276,14 @@ func _confirm_student_run(command:String):
 	_save_current_code()
 	var args=["--agent-file",student_agent_path,"--reward-file",student_reward_path]
 	if command=="student":args.append_array(["--episodes","3","--seed",str(seed_value),"--max-steps",str(episode_steps)])
-	_confirm_python_job(command,args)
+	AppState.run_marl_job(command,args)
 func _confirm_python_job(command:String,args:Array):
-	var consent=ConfirmationDialog.new();consent.title=_t("Запуск Python-кода","Run Python code");consent.dialog_text=_t("Код будет выполнен в отдельном процессе с доступом к файлам и возможностями вашей учётной записи. Это не песочница: запускайте только код, которому доверяете.","Code will run in a separate process with your account permissions. This is not a sandbox; run code only if you trust it.");add_child(consent)
+	var title=_t("Запустить обучение с reward.py?","Start training with reward.py?")
+	var details=_t("Будет обучена PPO-политика на %s шагах с seed %s. Политика MaleCNS останется без изменений.","A PPO policy will train for %s steps with seed %s. The MaleCNS policy will remain unchanged.") % [str(training_steps),str(seed_value)]
+	if command=="compare-all":
+		title=_t("Сравнить четыре стратегии?","Compare four strategies?")
+		details=_t("Random, agent.py, стандартный PPO и PPO с reward.py будут проверены на одинаковых seed.","Random, agent.py, standard PPO, and PPO with reward.py will use the same evaluation seeds.")
+	var consent=ConfirmationDialog.new();consent.title=title;consent.dialog_text=details;add_child(consent);consent.get_ok_button().text=_t("Начать","Start")
 	consent.confirmed.connect(func():AppState.run_marl_job(command,args);consent.queue_free())
 	consent.canceled.connect(consent.queue_free);consent.popup_centered()
 

@@ -309,6 +309,8 @@ func set_battle_overlay_visible(value: bool):
 func show_page(page: String):
 	if STUDENT_EDITION and page in ["OpenDayMain", "HowItWorks", "DemoResult"]:
 		page = "MainMenu"
+	if STUDENT_EDITION and page == "JobProgress" and session.mode == "combat_training":
+		page = "TrainingMenu"
 	menu_axes.clear()
 	menu_stick_latches.clear()
 	current_page=page
@@ -575,8 +577,8 @@ func rerun():
 	stop_session()
 	launch()
 func start_job(evaluate=false):
-	if STUDENT_EDITION and session.mode=="combat_training" and session.combat_action=="deploy":
-		view.notice("Open Day deployment is unavailable in the Student Edition.")
+	if STUDENT_EDITION and session.mode=="combat_training":
+		view.notice("MaleCNS combat-opponent training is not part of the Student Edition.")
 		return
 	if job_pid>0 and OS.is_process_running(job_pid):view.notice("The previous job is still stopping. Please retry shortly.");return
 	var error=session.validate()

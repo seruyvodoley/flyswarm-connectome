@@ -7,6 +7,8 @@ import unittest
 import numpy as np
 
 SOURCE = Path(__file__).resolve().parents[1] / 'experiments/swarm/flyswarm_05_two_brains_8v8.py'
+if not SOURCE.is_file():
+    raise unittest.SkipTest('Local research experiment is not distributed in source checkouts.')
 FUNCTIONS = {'clamp', 'wrap_angle', 'bearing', 'distance', 'attenuation',
              'segment_circle_t', 'raw_heard_signal'}
 tree = ast.parse(SOURCE.read_text())

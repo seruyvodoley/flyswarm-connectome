@@ -190,35 +190,36 @@ func training():
 	button(body,"EVALUATE POLICY",func():
 		if not FileAccess.file_exists(s.blue_policy):notice("Load an existing .npz policy first.")
 		else:AppState.start_job(true))
-	label(body,"MALECNS COMBAT TRAINING",25).modulate=Color("c1a573")
-	text_block("Train an external combat policy with PPO. The connectome stays frozen. MaleCNS mode uses the real FlyBrain(batch=1) and requires the configured dataset; Gameplay Pretraining is labelled separately and does not use neural signals.")
-	dropdown("Neural input",["MaleCNS Training / Fine-tuning","Gameplay Pretraining · no MaleCNS"],["malecns","pretraining"],s.training_stage,func(v):s.training_stage=v)
-	toggle("Allow Gameplay Pretraining → MaleCNS Fine-tuning transfer",s.allow_pretraining_to_malecns,func(v):s.allow_pretraining_to_malecns=v)
-	dropdown("Training program",["Automatic curriculum","Full battle"],["automatic","full_battle"],s.training_program,func(v):s.training_program=v)
-	number("PPO steps",s.training_steps,16,200000,func(v):s.training_steps=int(v))
-	number("Maximum training time (minutes)",s.training_time_minutes,1,4320,func(v):s.training_time_minutes=int(v))
-	number("Episode limit (seconds)",s.training_seconds,30,600,func(v):s.training_seconds=int(v))
-	number("Training seed",s.training_seed,0,2147480000,func(v):s.training_seed=int(v))
-	number("Checkpoint interval (steps)",s.checkpoint_interval,64,10000,func(v):s.checkpoint_interval=int(v))
-	var checkpoint_box=row("Checkpoint (.zip)")
-	var checkpoint_edit=LineEdit.new();checkpoint_edit.name="CombatCheckpoint";checkpoint_edit.text=s.combat_checkpoint;checkpoint_edit.placeholder_text=AppState.tr_text("Select a PPO checkpoint");checkpoint_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;checkpoint_box.add_child(checkpoint_edit)
-	checkpoint_edit.text_changed.connect(func(value):s.combat_checkpoint=value)
-	button(checkpoint_box,"Browse…",func():
-		var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.zip ; PPO checkpoint or deployment policy"]);add_child(dialog)
-		dialog.file_selected.connect(func(path):checkpoint_edit.text=path;s.combat_checkpoint=path;dialog.queue_free())
-		dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.75))
-	var actions=HBoxContainer.new();actions.add_theme_constant_override("separation",10);body.add_child(actions)
-	button(actions,"START NEW COMBAT TRAINING",func():
-		s.mode="combat_training";s.combat_action="train";s.resume_checkpoint="";AppState.start_job())
-	button(actions,"RESUME / CONTINUE",func():
-		var checkpoint=s.combat_checkpoint
-		if checkpoint=="":checkpoint=_find_combat_checkpoint()
-		if checkpoint=="" or not FileAccess.file_exists(checkpoint):notice("Select an existing latest.zip checkpoint to resume training.");return
-		s.combat_checkpoint=checkpoint;s.resume_checkpoint=checkpoint;s.mode="combat_training";s.combat_action="train";AppState.start_job())
-	var combat_actions=HBoxContainer.new();combat_actions.add_theme_constant_override("separation",10);body.add_child(combat_actions)
-	button(combat_actions,"EVALUATE MODEL",func():
-		if s.combat_checkpoint=="" or not FileAccess.file_exists(s.combat_checkpoint):notice("Select a combat checkpoint first.");return
-		s.mode="combat_training";s.combat_action="evaluate";AppState.start_job())
+	if not AppState.STUDENT_EDITION:
+		label(body,"MALECNS COMBAT TRAINING",25).modulate=Color("c1a573")
+		text_block("Train an external combat policy with PPO. The connectome stays frozen. MaleCNS mode uses the real FlyBrain(batch=1) and requires the configured dataset; Gameplay Pretraining is labelled separately and does not use neural signals.")
+		dropdown("Neural input",["MaleCNS Training / Fine-tuning","Gameplay Pretraining · no MaleCNS"],["malecns","pretraining"],s.training_stage,func(v):s.training_stage=v)
+		toggle("Allow Gameplay Pretraining → MaleCNS Fine-tuning transfer",s.allow_pretraining_to_malecns,func(v):s.allow_pretraining_to_malecns=v)
+		dropdown("Training program",["Automatic curriculum","Full battle"],["automatic","full_battle"],s.training_program,func(v):s.training_program=v)
+		number("PPO steps",s.training_steps,16,200000,func(v):s.training_steps=int(v))
+		number("Maximum training time (minutes)",s.training_time_minutes,1,4320,func(v):s.training_time_minutes=int(v))
+		number("Episode limit (seconds)",s.training_seconds,30,600,func(v):s.training_seconds=int(v))
+		number("Training seed",s.training_seed,0,2147480000,func(v):s.training_seed=int(v))
+		number("Checkpoint interval (steps)",s.checkpoint_interval,64,10000,func(v):s.checkpoint_interval=int(v))
+		var checkpoint_box=row("Checkpoint (.zip)")
+		var checkpoint_edit=LineEdit.new();checkpoint_edit.name="CombatCheckpoint";checkpoint_edit.text=s.combat_checkpoint;checkpoint_edit.placeholder_text=AppState.tr_text("Select a PPO checkpoint");checkpoint_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;checkpoint_box.add_child(checkpoint_edit)
+		checkpoint_edit.text_changed.connect(func(value):s.combat_checkpoint=value)
+		button(checkpoint_box,"Browse…",func():
+			var dialog=FileDialog.new();dialog.access=FileDialog.ACCESS_FILESYSTEM;dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;dialog.filters=PackedStringArray(["*.zip ; PPO checkpoint or deployment policy"]);add_child(dialog)
+			dialog.file_selected.connect(func(path):checkpoint_edit.text=path;s.combat_checkpoint=path;dialog.queue_free())
+			dialog.canceled.connect(dialog.queue_free);dialog.popup_centered_ratio(.75))
+		var actions=HBoxContainer.new();actions.add_theme_constant_override("separation",10);body.add_child(actions)
+		button(actions,"START NEW COMBAT TRAINING",func():
+			s.mode="combat_training";s.combat_action="train";s.resume_checkpoint="";AppState.start_job())
+		button(actions,"RESUME / CONTINUE",func():
+			var checkpoint=s.combat_checkpoint
+			if checkpoint=="":checkpoint=_find_combat_checkpoint()
+			if checkpoint=="" or not FileAccess.file_exists(checkpoint):notice("Select an existing latest.zip checkpoint to resume training.");return
+			s.combat_checkpoint=checkpoint;s.resume_checkpoint=checkpoint;s.mode="combat_training";s.combat_action="train";AppState.start_job())
+		var combat_actions=HBoxContainer.new();combat_actions.add_theme_constant_override("separation",10);body.add_child(combat_actions)
+		button(combat_actions,"EVALUATE MODEL",func():
+			if s.combat_checkpoint=="" or not FileAccess.file_exists(s.combat_checkpoint):notice("Select a combat checkpoint first.");return
+			s.mode="combat_training";s.combat_action="evaluate";AppState.start_job())
 	back()
 
 func _find_combat_checkpoint() -> String:

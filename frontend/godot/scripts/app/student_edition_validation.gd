@@ -35,5 +35,12 @@ func run() -> void:
 	await process_frame
 	for node in app.view.find_children("*", "Button", true, false):
 		check(not str(node.text).to_upper().contains("OPEN DAY"), "Student training menu has no Open Day action")
+	check(app.view.find_child("CombatCheckpoint", true, false) == null, "Student training menu hides the combat-opponent checkpoint controls")
+	for node in app.view.find_children("*", "Label", true, false):
+		check(str(node.text).to_upper() != "MALECNS COMBAT TRAINING", "Student training menu hides the Open Day opponent-training panel")
+	app.session.mode = "combat_training"
+	app.show_page("JobProgress")
+	await process_frame
+	check(app.current_page == "TrainingMenu", "Student Edition blocks a direct combat-training progress route")
 	print("STUDENT EDITION VALIDATION failures=", failures)
 	quit(1 if failures else 0)

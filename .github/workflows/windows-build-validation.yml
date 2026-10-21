@@ -30,7 +30,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
+          python -m pip install -r requirements.txt -r requirements-dev.txt pyinstaller
           choco install innosetup --yes --no-progress
           "${env:ProgramFiles(x86)}\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -63,9 +63,13 @@ jobs:
         run: |
           $env:PYTHONPATH = "$PWD\src"
           python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Python test suite failed.' }
           & $env:GODOT_EXE --headless --editor --path frontend/godot --import
-          & $env:GODOT_EXE --headless --path frontend/godot --script res://scripts/validation.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Godot asset import failed.' }
+          & $env:GODOT_EXE --headless --path frontend/godot --script res://scripts/app/student_edition_validation.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Student Edition UI validation failed.' }
           & $env:GODOT_EXE --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Bridge protocol validation failed.' }
 
       - name: Build and smoke-test Windows app and backend
         shell: pwsh

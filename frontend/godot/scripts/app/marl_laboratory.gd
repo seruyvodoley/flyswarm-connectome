@@ -643,7 +643,7 @@ func update_marl_status(progress:Dictionary,output_path:String):
 	status_progress.max_value=maxf(1.0,target)
 	status_progress.value=target if state=="complete" else current
 	var lines=[]
-	var message=str(progress.get("message",""))
+	var progress_message=str(progress.get("message",""))
 	var known_messages={
 		"Starting the Python experiment worker…":_t("Запускаю процесс Python…","Starting Python worker…"),
 		"Loading Stable-Baselines3 and preparing the PPO model.":_t("Загружаю PPO и готовлю модель.","Loading PPO and preparing the model."),
@@ -653,8 +653,8 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		"Training finished; saving checkpoint and learning curve.":_t("Обучение завершено; сохраняю модель и график.","Training finished; saving model and chart."),
 		"Training and checkpoint are ready.":_t("Обучение завершено, модель сохранена.","Training and checkpoint are ready."),
 	}
-	if known_messages.has(message):message=known_messages[message]
-	if message!="":lines.append(message)
+	if known_messages.has(progress_message):progress_message=known_messages[progress_message]
+	if progress_message!="":lines.append(progress_message)
 	var phase=str(progress.get("phase",""))
 	if phase!="":lines.append("%s: %s" % [_t("Этап","Phase"),phase])
 	for key in ["timesteps","target_timesteps","episodes","elapsed_seconds","latest_episode_reward"]:

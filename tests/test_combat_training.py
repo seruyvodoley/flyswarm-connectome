@@ -47,6 +47,38 @@ def test_combat_environment_spaces_features_and_curriculum():
         env.close()
 
 
+def test_episode_info_is_only_emitted_for_completed_episode():
+    env = TankCombatEnv(4, malecns=False, max_seconds=1)
+    try:
+        env.reset(seed=9)
+        for _ in range(env.max_steps - 1):
+            _, _, terminated, truncated, info = env.step(np.zeros(6, dtype=np.float32))
+            assert not terminated and not truncated
+            assert "episode" not in info
+        _, _, terminated, truncated, info = env.step(np.zeros(6, dtype=np.float32))
+        assert truncated and not terminated
+        assert info["episode"]["l"] == env.max_steps
+        assert "r" in info["episode"]
+    finally:
+        env.close()
+
+
+def test_ppo_training_crosses_rollout_after_episode_without_reward_key_error(tmp_path):
+    config = _config(
+        tmp_path,
+        training_steps=512,
+        # Match the failing session's completed episode at timestep 285;
+        # the next PPO log boundary is timestep 384.
+        training_seconds=57,
+        checkpoint_interval=10000,
+    )
+    run_training(config, tmp_path, lambda **values: None, lambda: None)
+    progress = json.loads((tmp_path / "progress.json").read_text())
+    assert progress["state"] == "complete"
+    assert progress["timesteps"] >= 512
+    assert progress["episodes"] >= 1
+
+
 def test_short_ppo_checkpoint_resume_stop_and_deployment(tmp_path):
     checks = []
     config = _config(tmp_path)

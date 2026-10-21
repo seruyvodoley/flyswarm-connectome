@@ -228,7 +228,13 @@ class TankCombatEnv(gym.Env):
                 "stuck": self.stuck_steps > 15, "stuck_recoveries": self.stuck_recoveries,
                 "own_health": self.own_health,
                 "target_health": self.target_health, "target_type": self.target_type,
-                "visible": visible, "episode": {"r": float(reward), "l": self.steps} if terminated or truncated else {}}
+                "visible": visible}
+        # Gymnasium/SB3 reserve the "episode" info key for completed Monitor
+        # summaries. An empty dict on every ordinary step is still interpreted
+        # as a completed episode by SB3 and later causes KeyError("r") while
+        # the rollout logger reads episode rewards.
+        if terminated or truncated:
+            info["episode"] = {"r": float(reward), "l": self.steps}
         return obs, float(reward), terminated, truncated, info
 
     def close(self):

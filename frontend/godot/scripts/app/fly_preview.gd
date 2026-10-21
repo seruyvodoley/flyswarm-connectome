@@ -30,16 +30,18 @@ var render_elapsed := 0.0
 var render_pending := true
 var was_visible := false
 @export_range(0.0, 60.0, 1.0) var preview_render_hz := 30.0
+## Main-menu brand mark: render a single still frame and ignore pointer input.
+@export var static_watermark := false
 
 func _ready() -> void:
 	stretch = true
 	focus_mode = Control.FOCUS_NONE
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE if static_watermark else Control.MOUSE_FILTER_STOP
 	if custom_minimum_size.x <= 0.0 or custom_minimum_size.y <= 0.0:
 		custom_minimum_size = Vector2(300, 120)
 	viewport = SubViewport.new()
 	viewport.size = Vector2i(512, 288)
-	viewport.transparent_bg = false
+	viewport.transparent_bg = static_watermark
 	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	viewport.world_3d = World3D.new()
 	add_child(viewport)
@@ -49,7 +51,7 @@ func _ready() -> void:
 	var environment_node := WorldEnvironment.new()
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("303840")
+	environment.background_color = Color(0.0, 0.0, 0.0, 0.0) if static_watermark else Color("303840")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color("b9c3cb")
 	environment.ambient_light_energy = 0.62
@@ -63,6 +65,7 @@ func _ready() -> void:
 	var floor_mesh := PlaneMesh.new()
 	floor_mesh.size = Vector2(3.6, 3.6)
 	floor_stage.mesh = floor_mesh
+	floor_stage.visible = not static_watermark
 	var floor_material := StandardMaterial3D.new()
 	floor_material.albedo_color = Color("3b444a")
 	floor_material.roughness = 0.92
@@ -117,7 +120,7 @@ func _apply_preview_wing_material(model: Node3D) -> void:
 	wing_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
 	wing_material.vertex_color_use_as_albedo = false
 	var body_material := StandardMaterial3D.new()
-	body_material.albedo_color = Color(0.018, 0.027, 0.038)
+	body_material.albedo_color = Color("56645e") if static_watermark else Color(0.018, 0.027, 0.038)
 	body_material.roughness = 0.62
 	body_material.metallic = 0.04
 	body_material.vertex_color_use_as_albedo = false
@@ -235,6 +238,9 @@ func _sync_viewport_size() -> void:
 	# frame while retaining the full angle-aware fit. Lowering the camera target
 	# moves the complete stage upward in the window without changing the model.
 	distance = (distance * inspection_margin + 0.08) * 0.95
+	if static_watermark:
+		# Make the isolated silhouette legible at logo size without cropping it.
+		distance *= 0.88
 	preview_camera.position = look_target + Vector3(0.0, distance * 0.18, distance)
 	preview_camera.look_at(look_target, Vector3.UP)
 	_request_viewport_frame()
@@ -305,7 +311,7 @@ func _process(delta: float) -> void:
 	if not was_visible:
 		was_visible = true
 		render_pending = true
-	if not mouse_dragging:
+	if not static_watermark and not mouse_dragging:
 		idle_elapsed += delta
 		if not user_rotated or idle_elapsed >= RESUME_DELAY:
 			yaw_degrees = wrapf(yaw_degrees + delta * rad_to_deg(AUTO_ROTATION_SPEED), -180.0, 180.0)
@@ -332,3 +338,5 @@ func _process(delta: float) -> void:
 		render_elapsed = fmod(render_elapsed, 1.0 / preview_render_hz)
 		render_pending = false
 		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		if static_watermark:
+			set_process(false)

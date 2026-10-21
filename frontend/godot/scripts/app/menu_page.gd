@@ -1,6 +1,7 @@
 extends Control
 const DesignSystem = preload("res://scripts/app/design_system.gd")
 const HeroMap = preload("res://scripts/app/hero_map.gd")
+const FlyPreview = preload("res://scripts/app/fly_preview.gd")
 @export var page="MainMenu"
 var body: VBoxContainer
 var status: Label
@@ -49,6 +50,7 @@ func _ready():
 		"PauseMenu":pause_screen()
 		"JobProgress":job_progress()
 	label(col,"LOCAL RESEARCH BUILD     /     Historical geometry and armour data remain under validation",13).modulate=Color("7f9389")
+	if page=="MainMenu":main_menu_watermark()
 	var buttons=find_children("*","Button",true,false)
 	if not buttons.is_empty():buttons[0].grab_focus()
 
@@ -101,6 +103,7 @@ func menu_entry(parent: VBoxContainer,title_text: String,description_text: Strin
 	description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	description.modulate=Color("9aaba2")
 func main_menu():
+	var appearance=str(AppState.settings.get("appearance","dark"))
 	var split=HBoxContainer.new();split.add_theme_constant_override("separation",40);body.add_child(split)
 	var left=VBoxContainer.new();left.custom_minimum_size.x=520;left.add_theme_constant_override("separation",8);split.add_child(left)
 	label(left,"CONNECTOME / EMBODIMENT",14).modulate=DesignSystem.ACCENT
@@ -125,6 +128,17 @@ func main_menu():
 	var map_view=HeroMap.new();map_view.custom_minimum_size=Vector2(450,330);map_view.size_flags_horizontal=Control.SIZE_EXPAND_FILL;right.add_child(map_view)
 	label(right,"KRASNY VALLEY  /  1944",24).add_theme_color_override("font_color",DesignSystem.GOLD)
 	var copy=label(right,"16 embodied agents · 6 vehicle families\nTwo independent MaleCNS instances: 2 × batch 8\n2,667,200 simulated neuron states\n\nRule AI and the manual test range work offline.",18);copy.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;copy.modulate=Color("bac5bb")
+
+func main_menu_watermark() -> void:
+	var fly_mark=FlyPreview.new()
+	fly_mark.name="MainMenuFlyWatermark"
+	fly_mark.static_watermark=true
+	fly_mark.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	fly_mark.offset_left=-402
+	fly_mark.offset_top=-322
+	fly_mark.offset_right=-24
+	fly_mark.offset_bottom=-56
+	add_child(fly_mark)
 func common_battle():
 	var s=AppState.session
 	dropdown("Map",["Krasny Valley"],["krasny_valley"],s.map,func(v):s.map=v)

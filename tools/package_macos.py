@@ -303,7 +303,11 @@ def main() -> None:
     parser.add_argument("--version", default=VERSION_DEFAULT)
     parser.add_argument("--output", default=str(ROOT / "build/releases"))
     parser.add_argument("--reuse-backend", action="store_true", help="Reuse an already-built backend in this version's output directory")
-    parser.add_argument("--dataset", help="Bundle a MaleCNS data folder after validating the official FlyBrain SHA-256 checksums")
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        help="Required: bundle brain.npz and weights.npz after validating the official FlyBrain SHA-256 checksums",
+    )
     args = parser.parse_args()
     if not args.build:
         parser.error("Use --build; frontend-only exports are not distributable releases.")

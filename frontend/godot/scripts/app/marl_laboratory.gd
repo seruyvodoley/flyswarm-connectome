@@ -355,7 +355,9 @@ func _on_editor_menu_action(id:int):
 func _make_python_highlighter(appearance:String)->CodeHighlighter:
 	var light=DesignSystem.is_light(appearance)
 	var keyword_color=Color("8157a6") if light else Color("d7a5f2")
-	var type_color=Color("12678d") if light else Color("83c9e8")
+	# Use a high-contrast turquoise for Python/NumPy types; the previous subdued
+	# blue-grey was difficult to distinguish on the dark editor surface.
+	var type_color=Color("12678d") if light else Color("8fe2cf")
 	var builtin_color=Color("8c5a10") if light else Color("e4bf80")
 	var string_color=Color("477c38") if light else Color("a9cb8b")
 	var comment_color=Color("6a7662") if light else Color("879487")

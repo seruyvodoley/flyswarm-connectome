@@ -279,9 +279,13 @@ def _student_reward_process(path: str, connection) -> None:
         connection.close()
 
 
+DEFAULT_STUDENT_WORKER_STARTUP_TIMEOUT_SECONDS = 60.0
+
+
 class ManagedStudentAgent:
     """Persistent isolated policy process with timeout and process-tree cleanup."""
-    def __init__(self,path: str | Path,timeout_seconds: float=2.0,startup_timeout_seconds: float=15.0):
+    def __init__(self,path: str | Path,timeout_seconds: float=2.0,
+                 startup_timeout_seconds: float=DEFAULT_STUDENT_WORKER_STARTUP_TIMEOUT_SECONDS):
         self.timeout_seconds=float(timeout_seconds)
         self.startup_timeout_seconds=float(startup_timeout_seconds)
         context=mp.get_context("spawn")
@@ -358,7 +362,7 @@ class ManagedStudentReward:
     user's filesystem and process permissions.
     """
     def __init__(self, path: str | Path, timeout_seconds: float = 2.0,
-                 startup_timeout_seconds: float = 15.0):
+                 startup_timeout_seconds: float = DEFAULT_STUDENT_WORKER_STARTUP_TIMEOUT_SECONDS):
         self.timeout_seconds = float(timeout_seconds)
         context = mp.get_context("spawn")
         parent, child = context.Pipe(duplex=True)

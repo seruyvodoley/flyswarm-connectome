@@ -1,4 +1,5 @@
 from pathlib import Path
+import ast
 import unittest
 
 
@@ -22,6 +23,21 @@ class MarlStatusScrollContractTests(unittest.TestCase):
         self.assertIn("status_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED", status_scroll)
         self.assertIn("status_card.add_child(status_scroll)", status_card)
         self.assertIn("status_scroll.add_child(status_content)", status_scroll)
+
+    def test_student_workers_allow_slow_frozen_windows_startup(self) -> None:
+        student_code = SOURCE.parents[4] / "src" / "flyswarm" / "marl" / "student_code.py"
+        tree = ast.parse(student_code.read_text(encoding="utf-8"))
+        timeout = next(
+            node.value.value
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name)
+                and target.id == "DEFAULT_STUDENT_WORKER_STARTUP_TIMEOUT_SECONDS"
+                for target in node.targets
+            )
+        )
+        self.assertGreaterEqual(timeout, 60.0)
 
 if __name__ == "__main__":
     unittest.main()

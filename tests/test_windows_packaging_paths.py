@@ -15,6 +15,10 @@ SPEC.loader.exec_module(package_windows)
 
 
 class WindowsPackagingPathTests(unittest.TestCase):
+    def test_pettingzoo_sources_are_bundled_for_registry_bootstrap(self) -> None:
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn('"--collect-all", "pettingzoo"', source)
+
     def test_pyinstaller_uses_ascii_working_directory(self) -> None:
         with tempfile.TemporaryDirectory() as ascii_temp:
             expected = Path(ascii_temp).resolve()

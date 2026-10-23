@@ -132,7 +132,7 @@ def main() -> None:
     run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--name", "FlySwarmBackend",
          "--distpath", str(backend_out), "--workpath", str(work), "--specpath", str(out / "pyinstaller-spec"),
          "--paths", str(ROOT / "src"), "--collect-data", "flybrain", "--collect-data", "matplotlib",
-         "--collect-all", "pettingzoo",
+         "--collect-data", "stable_baselines3", "--collect-all", "pettingzoo",
          "--collect-binaries", "llvmlite", "--collect-binaries", "scipy", "--exclude-module", "pygame",
          "--exclude-module", "torch.utils.tensorboard",
          "--exclude-module", "tensorboard", "--exclude-module", "torchvision", "--exclude-module", "torchaudio",

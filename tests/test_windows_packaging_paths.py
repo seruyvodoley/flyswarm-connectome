@@ -23,6 +23,10 @@ class WindowsPackagingPathTests(unittest.TestCase):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertNotIn('"--exclude-module", "torch.distributed"', source)
 
+    def test_stable_baselines3_runtime_data_is_bundled(self) -> None:
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn('"--collect-data", "stable_baselines3"', source)
+
     def test_pyinstaller_uses_ascii_working_directory(self) -> None:
         with tempfile.TemporaryDirectory() as ascii_temp:
             expected = Path(ascii_temp).resolve()

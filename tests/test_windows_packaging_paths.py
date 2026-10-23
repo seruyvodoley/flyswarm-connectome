@@ -25,6 +25,7 @@ class WindowsPackagingPathTests(unittest.TestCase):
 
     def test_godot_exports_to_ascii_staging_then_moves_to_unicode_path(self) -> None:
         with tempfile.TemporaryDirectory() as ascii_temp:
+            expected = Path(ascii_temp).resolve()
             output = Path(ascii_temp) / "практическая работа" / "FlySwarm.exe"
             exported: list[Path] = []
             working_directories: list[Path] = []
@@ -46,7 +47,7 @@ class WindowsPackagingPathTests(unittest.TestCase):
 
             self.assertEqual(len(exported), 1)
             self.assertEqual(len(working_directories), 1)
-            self.assertEqual(working_directories[0].parent, Path(ascii_temp))
+            self.assertEqual(working_directories[0].parent.resolve(), expected.resolve())
             self.assertFalse(exported[0].exists())
             self.assertEqual(output.read_bytes(), b"MZ test executable")
 

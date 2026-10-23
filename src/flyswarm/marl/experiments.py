@@ -266,7 +266,16 @@ def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    # Godot polls progress.json while the backend is training. Windows can
+    # briefly reject replacing the target while its reader still has it open.
+    for attempt in range(8):
+        try:
+            temporary.replace(path)
+            return
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(0.01 * (attempt + 1))
 
 
 def _source_metadata() -> dict[str, str | None]:

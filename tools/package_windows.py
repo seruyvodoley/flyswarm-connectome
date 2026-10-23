@@ -134,7 +134,7 @@ def main() -> None:
          "--paths", str(ROOT / "src"), "--collect-data", "flybrain", "--collect-data", "matplotlib",
          "--collect-all", "pettingzoo",
          "--collect-binaries", "llvmlite", "--collect-binaries", "scipy", "--exclude-module", "pygame",
-         "--exclude-module", "torch.distributed", "--exclude-module", "torch.utils.tensorboard",
+         "--exclude-module", "torch.utils.tensorboard",
          "--exclude-module", "tensorboard", "--exclude-module", "torchvision", "--exclude-module", "torchaudio",
          "--hidden-import", "flybrain.brain", "--hidden-import", "flybrain.data", "--hidden-import", "flyswarm.marl.cli",
          str(ROOT / "tools/packaged_backend.py")], cwd=pyinstaller_working_directory())

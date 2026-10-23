@@ -19,6 +19,10 @@ class WindowsPackagingPathTests(unittest.TestCase):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn('"--collect-all", "pettingzoo"', source)
 
+    def test_torch_distributed_is_not_excluded_from_ppo_backend(self) -> None:
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertNotIn('"--exclude-module", "torch.distributed"', source)
+
     def test_pyinstaller_uses_ascii_working_directory(self) -> None:
         with tempfile.TemporaryDirectory() as ascii_temp:
             expected = Path(ascii_temp).resolve()

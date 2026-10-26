@@ -114,7 +114,7 @@ def run(args):
         raise RuntimeError("the prespecified directed intervention was not delivered exactly once")
     receiver = parsed.receiver
     effects = []
-    for delta_ticks in (0, 1, 4, 24, 49):
+    for delta_ticks in (0, 1, 5, 25, 50):
         index = parsed.tick - 1 + delta_ticks
         if index >= len(rows):
             effects.append({"horizon_ms": delta_ticks * 20, "available": False})

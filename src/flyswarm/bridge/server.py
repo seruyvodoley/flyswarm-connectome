@@ -127,6 +127,7 @@ def main():
     p.add_argument('--condition',choices=['MALECNS_REAL','MALECNS_ABLATED','MALECNS_SHUFFLED','NON_NEURAL_TRAINED','RULE_BASED'],default='MALECNS_REAL')
     p.add_argument('--ablate-channels',default='DNp09_L,DNp09_R,DNa02_L,DNa02_R,DNp01')
     p.add_argument('--research-log',type=Path)
+    p.add_argument('--causal-config',type=Path,help='Research-only directed communication interventions (JSON)')
     p.add_argument('--experiment-id',default='')
     p.add_argument('--run-id',default='')
     p.add_argument('--non-neural-policy',type=Path)
@@ -158,9 +159,18 @@ def main():
             try:os.kill(a.parent_pid,0)
             except ProcessLookupError:os._exit(0)
     if a.parent_pid:threading.Thread(target=watch_parent,daemon=True).start()
+    if a.causal_config and (a.demo or not a.research_log or not a.experiment_id or not a.run_id):
+        print('Causal interventions require a named research run and logfile; never Open Day',file=sys.stderr)
+        return 2
+    causal_config = None
+    if a.causal_config:
+        causal_config = json.loads(a.causal_config.read_text(encoding='utf-8'))
     try:brain=DemoBrain(a.seed,status=status) if a.demo else DualBrain(a.seed,status=status)
     except Exception as exc:
         status('ERROR',str(exc));return 1
+    if causal_config is not None:
+        try:brain.configure_causal_communication(causal_config)
+        except ValueError as exc:status('ERROR',str(exc));return 2
 
     policies={}
     policy_hashes={}
@@ -213,7 +223,9 @@ def main():
         'platform':platform.platform(),'git_commit':commit,'condition':a.condition,
         'ablate_channels':a.ablate_channels.split(',') if a.condition=='MALECNS_ABLATED' else [],
         'shuffle_procedure':'fixed one-agent cyclic signal reassignment within each team; exact six-channel signal multiset preserved per team and neural step' if a.condition=='MALECNS_SHUFFLED' else None,
-        'experiment_id':a.experiment_id,'run_id':a.run_id})
+        'experiment_id':a.experiment_id,'run_id':a.run_id,
+        'causal_communication_config':causal_config,
+        'causal_communication_config_sha256':hashlib.sha256(a.causal_config.read_bytes()).hexdigest() if a.causal_config else None})
     channel_ids={'DNp09_L':0,'DNp09_R':1,'DNa02_L':2,'DNa02_R':3,'DNp01':4,'wing':5}
     try:ablate_indices=[channel_ids[name.strip()] for name in a.ablate_channels.split(',') if name.strip()]
     except KeyError as exc:raise SystemExit(f'Unknown ablation channel: {exc}')
@@ -301,7 +313,7 @@ def main():
                             })
                         result=dict(version=1,seq=last,actions=actions,control_layers=control_layers,traces=neural_traces.tolist(),effective_traces=effective_traces.tolist(),heard=heard.tolist(),tick_ms=ms,dt=float(brain.brains[0].dt),mode='IMITATION_TEACHER' if a.collect else ('TRAINED_ADAPTER' if policies or team_policies else 'BIOLOGICAL_BASELINE'),metadata=metadata,communication=brain.last_communication,observations=[{k:v for k,v in o.items() if k!='teacher'} for o in obs],sensory_inputs=getattr(brain,'last_sensory_inputs',{}),simulation_time_s=float(packet.get('simulation_time_s',0.0)),physics_step_id=int(packet.get('physics_step_id',0)))
                         if research_stream:
-                            record={'schema':'flyswarm.godot_malecns.neural_step.v1','experiment_id':a.experiment_id,'run_id':a.run_id,'condition':a.condition,'seed':a.seed,'neural_step_id':last,'simulation_time_s':result['simulation_time_s'],'neural_time_s':float((last-1)*result['dt']),'physics_step_id':result['physics_step_id'],'wall_time_unix_s':time.time(),'wall_time_monotonic_s':time.monotonic(),'dt_s':result['dt'],'sensory_inputs':result['sensory_inputs'],'observations':result['observations'],'neural_traces':neural_traces.tolist(),'effective_traces':effective_traces.tolist(),'heard':heard.tolist(),'control_layers':control_layers,'actions':actions,'tick_ms':ms,'metadata':metadata}
+                            record={'schema':'flyswarm.godot_malecns.neural_step.v1','experiment_id':a.experiment_id,'run_id':a.run_id,'condition':a.condition,'seed':a.seed,'neural_step_id':last,'simulation_time_s':result['simulation_time_s'],'neural_time_s':float((last-1)*result['dt']),'physics_step_id':result['physics_step_id'],'wall_time_unix_s':time.time(),'wall_time_monotonic_s':time.monotonic(),'dt_s':result['dt'],'sensory_inputs':result['sensory_inputs'],'observations':result['observations'],'neural_traces':neural_traces.tolist(),'effective_traces':effective_traces.tolist(),'heard':heard.tolist(),'control_layers':control_layers,'actions':actions,'tick_ms':ms,'metadata':metadata,'causal_communication':getattr(brain,'last_communication_frame',None)}
                             research_stream.write(json.dumps(record,separators=(',',':'),allow_nan=False)+'\n')
                         connection.sendall(encode(result))
             except (ConnectionError,ValueError) as e:print(type(e).__name__,str(e),flush=True)

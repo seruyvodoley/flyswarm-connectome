@@ -11,6 +11,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -269,7 +270,25 @@ def package(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     shutil.copytree(app, disk_contents / "FlySwarm.app", symlinks=True)
     (disk_contents / "Applications").symlink_to("/Applications")
     remove_macos_metadata(disk_contents)
-    run(["hdiutil", "create", "-ov", "-format", "UDZO", "-imagekey", "zlib-level=9", "-volname", "FlySwarm", "-srcfolder", disk_contents, dmg_path])
+    # On shared macOS CI runners diskimages-helper can temporarily keep the
+    # staged app busy. Retry *only* that transient hdiutil failure; never mask
+    # persistent I/O, signing, permission, or source-data errors.
+    create_dmg = ["hdiutil", "create", "-ov", "-format", "UDZO",
+                  "-imagekey", "zlib-level=9", "-volname", "FlySwarm",
+                  "-srcfolder", str(disk_contents), str(dmg_path)]
+    for attempt in range(3):
+        completed = subprocess.run(create_dmg, capture_output=True, text=True)
+        print(completed.stdout, end="", flush=True)
+        print(completed.stderr, end="", flush=True)
+        if completed.returncode == 0:
+            break
+        combined = completed.stdout + "\\n" + completed.stderr
+        if "Resource busy" not in combined or attempt == 2:
+            raise subprocess.CalledProcessError(
+                completed.returncode, create_dmg, output=completed.stdout,
+                stderr=completed.stderr)
+        dmg_path.unlink(missing_ok=True)
+        time.sleep(12 * (attempt + 1))
     run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, zip_path])
     with zipfile.ZipFile(zip_path) as archive:
         bad = archive.testzip()

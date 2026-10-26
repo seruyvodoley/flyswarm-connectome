@@ -430,6 +430,12 @@ def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
     episode_total = max(1, int(episodes))
     max_steps = max(1, int(max_steps))
     completed_world_steps = 0
+    write_json(progress_path, {
+        "state": "starting", "phase": "initializing", "command": "student",
+        "completed": 0, "total": episode_total, "episodes": 0,
+        "elapsed_seconds": 0.0, "eta_seconds": None,
+        "message": "Preparing the student strategy evaluation.",
+    })
     rows=[]
     agent = ManagedStudentAgent(agent_file)
     reward_function = ManagedStudentReward(reward_file) if reward_file else None

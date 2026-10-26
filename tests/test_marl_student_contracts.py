@@ -40,6 +40,29 @@ class StudentContractTests(unittest.TestCase):
             self.assertEqual(progress["action_shape"],[[6]]*8)
             self.assertEqual(progress["reward_probe"],1.0)
 
+    def test_student_cli_reports_completed_progress(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            agent=root/"agent.py"
+            agent.write_text(
+                "import numpy as np\n"
+                "def act_team(observations, contexts):\n"
+                "    return np.zeros((len(observations), 6), dtype=np.float32)\n",
+                encoding="utf-8",
+            )
+            output=StringIO()
+            with redirect_stdout(output):
+                result=marl_cli_main([
+                    "--experiment-dir",str(root/"student-run"),"student",
+                    "--agent-file",str(agent),"--episodes","1","--seed","17","--max-steps","2",
+                ])
+            self.assertEqual(result,0)
+            progress=json.loads((root/"student-run"/"progress.json").read_text(encoding="utf-8"))
+            self.assertEqual(progress["state"],"complete")
+            self.assertEqual(progress["completed"],progress["total"])
+            self.assertGreater(progress["world_steps"],0)
+
     def test_8x8_environment_supports_reproducible_swapped_start_sides(self):
         env = FlySwarmParallelEnv(max_steps=2)
         try:

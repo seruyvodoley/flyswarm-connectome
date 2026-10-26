@@ -1,16 +1,6 @@
 name: macOS Student release (Apple Silicon)
 
 on:
-  push:
-    branches: [student]
-    paths:
-      - '.github/workflows/macos-student-release.yml'
-      - 'src/**'
-      - 'frontend/**'
-      - 'tools/**'
-      - 'requirements*.txt'
-      - 'data/**'
-      - 'docs/MALECNS_DATA_NOTICE.txt'
   workflow_dispatch:
 
 permissions:

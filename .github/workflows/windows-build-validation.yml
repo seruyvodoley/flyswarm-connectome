@@ -99,6 +99,20 @@ jobs:
           & $backend --marl --output-root $smoke compare $checkpoint --episodes 1 --seed 31 --max-steps 16
           if ($LASTEXITCODE -ne 0) { throw 'Installed paired comparison smoke failed.' }
 
+          $studentAgent = Join-Path $env:RUNNER_TEMP 'student-agent.py'
+          @'
+          import numpy as np
+          def act_team(observations, contexts):
+              return np.zeros((len(observations), 6), dtype=np.float32)
+          '@ | Set-Content -Path $studentAgent -Encoding utf8
+          $studentDir = Join-Path $smoke 'student-progress'
+          & $backend --marl --output-root $smoke --experiment-dir $studentDir student --agent-file $studentAgent --episodes 1 --seed 41 --max-steps 2
+          if ($LASTEXITCODE -ne 0) { throw 'Installed student strategy smoke failed.' }
+          $studentProgress = Get-Content (Join-Path $studentDir 'progress.json') -Raw | ConvertFrom-Json
+          if ($studentProgress.state -ne 'complete' -or $studentProgress.completed -ne $studentProgress.total -or $studentProgress.world_steps -le 0) {
+            throw "Installed student strategy progress is incorrect: $($studentProgress | ConvertTo-Json -Compress)"
+          }
+
           $portable = Get-ChildItem build/windows -Filter '*windows-x64.zip' | Select-Object -First 1
           if (-not $portable) { throw 'Windows portable archive was not produced.' }
           $portableDir = Join-Path $env:RUNNER_TEMP 'FlySwarmPortable'

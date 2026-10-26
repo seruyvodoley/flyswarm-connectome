@@ -42,5 +42,17 @@ func run() -> void:
 	app.show_page("JobProgress")
 	await process_frame
 	check(app.current_page == "TrainingMenu", "Student Edition blocks a direct combat-training progress route")
+
+	app.show_page("MarlLaboratory")
+	await process_frame
+	var marl_view = app.view
+	marl_view.update_marl_status({
+		"state": "complete", "phase": "process", "completed": 0, "total": 0,
+		"message": "Starting the Python experiment worker…",
+	}, "status-validation-output")
+	await process_frame
+	check(is_equal_approx(marl_view.status_progress.value, marl_view.status_progress.max_value), "Completed MARL status fills the progress bar even if the recorded target is zero")
+	check(not marl_view.detail_label.text.contains("Запускаю процесс Python…") and not marl_view.detail_label.text.contains("Starting the Python experiment worker…"), "Completed MARL status does not retain stale startup text")
+	check(marl_view.detail_label.text.contains("complete"), "Completed MARL status reports its final phase")
 	print("STUDENT EDITION VALIDATION failures=", failures)
 	quit(1 if failures else 0)

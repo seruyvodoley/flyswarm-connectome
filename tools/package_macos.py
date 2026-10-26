@@ -43,7 +43,7 @@ def thin_arm64(path: Path) -> None:
 
 def make_arm64(app: Path) -> None:
     candidates = [
-        app / "Contents/MacOS/FlySwarm",
+        app / "Contents/MacOS" / plistlib.load((app / "Contents/Info.plist").open("rb"))["CFBundleExecutable"],
         app / "Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend",
     ]
     for folder, _dirs, files in os.walk(app):

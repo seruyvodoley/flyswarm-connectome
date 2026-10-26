@@ -78,7 +78,7 @@ for E2.
 
 Results record reference SHA256, seed, E0 maximum numerical errors, the exact
 intervention, E1 changes in six-channel activity, DNp01, decoder controls and
-received signal at 0, 20, 80, 480 and 980 ms. Missing observation horizons are
+received signal at 0, 20, 100, 500 and 1000 ms. Missing observation horizons are
 explicit. The primary interpretation must **not** claim changes to physical
 vehicle trajectories, goal selection or coordinated team outcomes.
 

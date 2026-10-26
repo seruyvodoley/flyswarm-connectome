@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           export PYTHONPATH="$PWD/src"
-          .venv/bin/python -m pytest -q tests
+          .venv/bin/python -m pytest -q tests --ignore=tests/test_flyswarm05.py  # Legacy 2D prototype source is no longer tracked
           "$GODOT" --headless --editor --path frontend/godot --import
           "$GODOT" --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
           "$GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd

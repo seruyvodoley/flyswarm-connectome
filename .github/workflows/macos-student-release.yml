@@ -140,7 +140,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release tag $TAG already exists; refusing to overwrite."
             exit 1

@@ -30,6 +30,8 @@ jobs:
   build:
     name: Validate and package Student Edition arm64
     runs-on: macos-15
+    permissions:
+      contents: write
     timeout-minutes: 180
     env:
       VERSION: ${{ inputs.version }}

@@ -3,7 +3,6 @@ name: Windows x64 build validation
 on:
   push:
     branches: [feat/historical-3d-tank-simulator]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:

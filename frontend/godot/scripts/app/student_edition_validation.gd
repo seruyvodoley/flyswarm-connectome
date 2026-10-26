@@ -20,6 +20,26 @@ func run() -> void:
 	check(ProjectSettings.get_setting("application/config/name") == "FlySwarm Student", "Student app name is configured")
 	check(FileAccess.file_exists("res://assets/flyswarm-student-icon.icns"), "Silver macOS student icon is present")
 	check(FileAccess.file_exists("res://assets/flyswarm-student-icon.png"), "Silver Windows student icon is present")
+	var dataset_test_root := ProjectSettings.globalize_path("user://student-dataset-path-validation")
+	var stale_path := dataset_test_root.path_join("stale-build/MaleCNS")
+	var bundled_path := dataset_test_root.path_join("app/Contents/Resources/MaleCNS")
+	DirAccess.make_dir_recursive_absolute(bundled_path)
+	for file_name in ["brain.npz", "weights.npz"]:
+		var file := FileAccess.open(bundled_path.path_join(file_name), FileAccess.WRITE)
+		if file != null:
+			file.store_string("validation fixture")
+			file.close()
+	check(app.resolve_malecns_dataset_path(stale_path,bundled_path,"/user/fly-data","/user") == bundled_path, "A stale saved path falls back to the bundled MaleCNS dataset")
+	check(app.resolve_malecns_dataset_path("",bundled_path,"/user/fly-data","/user") == bundled_path, "An empty saved path selects the bundled MaleCNS dataset")
+	check(app.resolve_malecns_dataset_path(stale_path,"","/user/fly-data","/user") == stale_path, "An invalid custom path remains visible if no bundled dataset exists")
+	for file_name in ["brain.npz", "weights.npz"]:
+		DirAccess.remove_absolute(bundled_path.path_join(file_name))
+	DirAccess.remove_absolute(bundled_path)
+	DirAccess.remove_absolute(bundled_path.get_base_dir())
+	DirAccess.remove_absolute(bundled_path.get_base_dir().get_base_dir())
+	DirAccess.remove_absolute(bundled_path.get_base_dir().get_base_dir().get_base_dir())
+	DirAccess.remove_absolute(stale_path.get_base_dir())
+	DirAccess.remove_absolute(dataset_test_root)
 
 	app.show_page("MainMenu")
 	await process_frame

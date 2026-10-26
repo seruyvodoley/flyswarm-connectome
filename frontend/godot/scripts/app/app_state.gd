@@ -61,13 +61,9 @@ func _ready():
 		for key in settings:settings[key]=file.get_value("settings",key,settings[key])
 	open_day_policy_mode=str(settings.get("open_day_policy_mode","baseline"))
 	open_day_policy_path=str(settings.get("open_day_policy_path",""))
-	if str(settings.dataset_path)=="":
-		var bundled_dataset=bundle_resources.path_join("MaleCNS") if packaged_app else ""
-		if not bundled_dataset.is_empty() and FileAccess.file_exists(bundled_dataset.path_join("brain.npz")) and FileAccess.file_exists(bundled_dataset.path_join("weights.npz")):
-			settings.dataset_path=bundled_dataset
-		else:
-			settings.dataset_path=OS.get_environment("FLY_DATA")
-			if str(settings.dataset_path)=="":settings.dataset_path=user_home_path().path_join("fly-data")
+	var bundled_dataset=bundle_resources.path_join("MaleCNS") if packaged_app else ""
+	settings.dataset_path=resolve_malecns_dataset_path(
+		str(settings.dataset_path),bundled_dataset,OS.get_environment("FLY_DATA"),user_home_path())
 	if not settings.language in I18n.LANGUAGES:settings.language="en"
 	if str(settings.appearance) not in ["dark", "light"]:settings.appearance="dark"
 	get_tree().auto_accept_quit=false
@@ -224,6 +220,19 @@ func tr_text(text: String) -> String:
 
 func tr_format(key: String,args: Array) -> String:
 	return I18n.format(key,str(settings.get("language","en")),args)
+
+func resolve_malecns_dataset_path(configured_path: String,bundled_path: String,environment_path: String,home_path: String) -> String:
+	# A previous install can leave user://settings.cfg pointing at a temporary
+	# build directory. Prefer an existing configured dataset, then the copy
+	# shipped in this app, before retaining an invalid configured path for repair.
+	if has_malecns_dataset_files(configured_path):return configured_path
+	if has_malecns_dataset_files(bundled_path):return bundled_path
+	if not configured_path.strip_edges().is_empty():return configured_path
+	if not environment_path.strip_edges().is_empty():return environment_path
+	return home_path.path_join("fly-data")
+
+func has_malecns_dataset_files(path: String) -> bool:
+	return not path.strip_edges().is_empty() and FileAccess.file_exists(path.path_join("brain.npz")) and FileAccess.file_exists(path.path_join("weights.npz"))
 
 func validate_malecns_dataset(path: String) -> Dictionary:
 	var result := _run_malecns_dataset_check(path)

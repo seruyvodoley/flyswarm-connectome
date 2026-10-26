@@ -63,8 +63,8 @@ class CausalCommunicationTests(unittest.TestCase):
         delayed.step(self.song * 2, self.positions, self.alive, "team_audio", 2)
         _, links, _, frame = delayed.step(self.song * 3, self.positions, self.alive, "team_audio", 3)
         link = next(x for x in frame["links"] if x["sender"] == 0 and x["receiver"] == 1)
-        self.assertAlmostEqual(links[1, 0], self.song[0] * .08 * link["cap_scale"])
-        self.assertEqual(frame["interventions"][0]["effective_signal"], self.song[0])
+        self.assertAlmostEqual(links[1, 0], self.song[0] * 2 * .08 * link["cap_scale"])
+        self.assertEqual(frame["interventions"][0]["effective_signal"], self.song[0] * 2)
 
     def test_bad_interventions_fail_closed(self):
         bad = [

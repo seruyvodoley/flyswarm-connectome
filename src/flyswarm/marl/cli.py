@@ -170,6 +170,11 @@ def main(argv=None):
             result=evaluate_rule_ai(out,args.episodes,args.seed,args.max_steps,args.tier)
         elif args.command == "student":
             out.mkdir(parents=True)
+            write_json(out / "progress.json", {
+                "state": "starting", "phase": "initializing", "command": "student",
+                "completed": 0, "total": max(1, int(args.episodes) * int(args.max_steps)),
+                "episodes": 0, "message": "Preparing the student strategy evaluation.",
+            })
             with (out/"execution.log").open("a",encoding="utf-8",buffering=1) as console, redirect_stdout(console), redirect_stderr(console):
                 result = run_student_agent(out,args.agent_file,args.episodes,args.seed,args.max_steps,args.reward_file,args.tier)
         elif args.command == "compare-all":

@@ -334,7 +334,8 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
                   seed: int, policy_id: str, run_id: str, replay_path: Path | None = None,
                   ppo_model=None, rng: np.random.Generator | None = None,
                   deterministic: bool = False, student_agent=None,
-                  ppo_architecture: str="centralized",rule_agent:bool=False) -> dict[str, Any]:
+                  ppo_architecture: str="centralized",rule_agent:bool=False,
+                  step_callback=None) -> dict[str, Any]:
     members = BLUE
     rule_red = FixedRulePolicy(env, 1).actions
     total_reward = 0.0
@@ -382,6 +383,8 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
             reward_component_totals[key]=reward_component_totals.get(key,0.0)+value
             standard_component_totals[key]=standard_component_totals.get(key,0.0)+value*DEFAULT_REWARDS.get(key,0.0)
         episode_steps += 1
+        if step_callback is not None:
+            step_callback(episode_steps)
         captures += int(np.count_nonzero((old_owners != 0) & (env.zones_owner == 0)))
         kills += int(np.count_nonzero((old_health[8:] > 0) & (env.health[8:] <= 0)))
         deaths += int(np.count_nonzero((old_health[:8] > 0) & (env.health[:8] <= 0)))
@@ -412,7 +415,8 @@ def _step_episode(env: FlySwarmParallelEnv, observations: dict[str, np.ndarray],
 
 def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
                       seed: int = 101, max_steps: int = 300,
-                      reward_file: Path | None = None,curriculum_tier: str="C") -> dict[str, Any]:
+                      reward_file: Path | None = None,curriculum_tier: str="C",
+                      progress_path: Path | None = None) -> dict[str, Any]:
     """Run a student's real Python strategy in the analytical PettingZoo env."""
     agent_file = Path(agent_file).expanduser().resolve()
     reward_file = Path(reward_file).expanduser().resolve() if reward_file else None
@@ -421,6 +425,11 @@ def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
     shutil.copy2(agent_file, output / "student_code/agent.py")
     if reward_file:
         shutil.copy2(reward_file, output / "student_code/reward.py")
+    progress_path = Path(progress_path) if progress_path else output / "progress.json"
+    started = time.monotonic()
+    episode_total = max(1, int(episodes))
+    max_steps = max(1, int(max_steps))
+    completed_world_steps = 0
     rows=[]
     agent = ManagedStudentAgent(agent_file)
     reward_function = ManagedStudentReward(reward_file) if reward_file else None
@@ -429,15 +438,59 @@ def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
         env=FlySwarmParallelEnv(max_steps=max_steps,reward_function=reward_function,curriculum_tier=curriculum_tier)
         for episode in range(int(episodes)):
             episode_seed=int(seed+episode)
+
+            def report_step(step: int) -> None:
+                if int(step) % 10 != 0 and int(step) < max_steps:
+                    return
+                elapsed = time.monotonic() - started
+                progress_units = episode + min(float(step) / max_steps, 0.99)
+                rate = progress_units / elapsed if elapsed > 0 else 0.0
+                write_json(progress_path, {
+                    "state": "running", "phase": "evaluation",
+                    "command": "student", "episodes": episode,
+                    "completed": progress_units, "total": episode_total,
+                    "world_steps": completed_world_steps + int(step),
+                    "elapsed_seconds": round(elapsed, 2),
+                    "eta_seconds": round((episode_total - progress_units) / rate, 2) if rate > 0 else None,
+                    "message": f"Evaluating student strategy · episode {episode + 1}/{int(episodes)}",
+                })
+
+            write_json(progress_path, {
+                "state": "running", "phase": "evaluation", "command": "student",
+                "episodes": episode, "completed": float(episode), "total": episode_total,
+                "world_steps": completed_world_steps, "elapsed_seconds": round(time.monotonic() - started, 2),
+                "eta_seconds": None,
+                "message": f"Evaluating student strategy · episode {episode + 1}/{int(episodes)}",
+            })
             observations,_=env.reset(seed=episode_seed)
             replay=output/"replays"/f"student-seed-{episode_seed}.jsonl"
             start_replay(replay,env,episode_seed,"student_python_agent")
-            rows.append(_step_episode(env,observations,episode_seed,"student_python_agent",
-                                      f"student-{episode_seed}",replay,student_agent=agent))
+            row=_step_episode(env,observations,episode_seed,"student_python_agent",
+                              f"student-{episode_seed}",replay,student_agent=agent,
+                              step_callback=report_step)
+            rows.append(row)
+            completed_world_steps += int(row["episode_steps"])
+            elapsed = time.monotonic() - started
+            progress_units = float(episode + 1)
+            rate = progress_units / elapsed if elapsed > 0 else 0.0
+            write_json(progress_path, {
+                "state": "running", "phase": "evaluation", "command": "student",
+                "episodes": episode + 1, "completed": progress_units, "total": episode_total,
+                "world_steps": completed_world_steps, "elapsed_seconds": round(elapsed, 2),
+                "eta_seconds": round((episode_total - progress_units) / rate, 2) if rate > 0 else None,
+                "message": f"Completed episode {episode + 1}/{int(episodes)}",
+            })
     finally:
         if env is not None:env.close()
         elif reward_function is not None:reward_function.close()
         agent.close()
+    write_json(progress_path, {
+        "state": "finalizing", "phase": "saving", "command": "student",
+        "episodes": len(rows), "completed": episode_total, "total": episode_total,
+        "world_steps": completed_world_steps,
+        "elapsed_seconds": round(time.monotonic() - started, 2), "eta_seconds": 0.0,
+        "message": "Saving student evaluation results.",
+    })
     _write_run_outputs(output,rows,"student_python_agent",seed,max_steps)
     manifest=json.loads((output/"manifest.json").read_text(encoding="utf-8"))
     manifest.update({"agent_file_sha256":hashlib.sha256(agent_file.read_bytes()).hexdigest(),
@@ -451,6 +504,13 @@ def run_student_agent(output: Path, agent_file: Path, episodes: int = 3,
         "mean_standard_evaluation_reward":_mean(rows,"standard_evaluation_reward"),
         "mean_captures":_mean(rows,"captures"),"mean_kills":_mean(rows,"kills"),
         "blue_win_rate":_win_rate(rows),"runs":rows,
+    })
+    write_json(progress_path, {
+        "state": "complete", "phase": "complete", "command": "student",
+        "episodes": len(rows), "completed": episode_total, "total": episode_total,
+        "world_steps": completed_world_steps,
+        "elapsed_seconds": round(time.monotonic() - started, 2), "eta_seconds": 0.0,
+        "message": "Student strategy evaluation and results are complete.",
     })
     return {"experiment_dir":str(output),"runs":rows,
             "mean_training_reward":_mean(rows,"training_reward"),

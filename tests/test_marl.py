@@ -7,6 +7,7 @@ import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 from pettingzoo.test import parallel_api_test
 from flyswarm.marl import FlySwarmParallelEnv
+from flyswarm.marl import experiments as marl_experiments
 from flyswarm.marl.policy import SharedPPOPolicy
 from flyswarm.marl.roles import ROLE_FEATURE_DIM,role_features,vehicle_profile
 from flyswarm.bridge.server import load_policy,ppo_features
@@ -161,12 +162,20 @@ class MarlTests(unittest.TestCase):
             self.assertEqual(action.shape,(6,));self.assertAlmostEqual(float(action[0]),.5)
             self.assertTrue(np.isfinite(load_reward(reward_file)({"objective_capture":1.0,"damage_dealt":0.0,"own_death":0.0})))
             output=root/"student-run"
-            result=run_student_agent(output,agent_file,episodes=1,seed=71,max_steps=2,reward_file=reward_file)
+            with patch.object(marl_experiments,"write_json",wraps=marl_experiments.write_json) as progress_writer:
+                result=run_student_agent(output,agent_file,episodes=1,seed=71,max_steps=2,reward_file=reward_file)
+            running_progress=[call.args[1] for call in progress_writer.call_args_list
+                              if Path(call.args[0]).name=="progress.json" and call.args[1].get("state")=="running"]
+            self.assertTrue(any(item.get("world_steps",0)>0 for item in running_progress))
             self.assertEqual(result["runs"][0]["episode_steps"],2)
             self.assertTrue((output/"student_code/agent.py").is_file())
             self.assertTrue((output/"student_code/reward.py").is_file())
             self.assertTrue((output/"replays/student-seed-71.jsonl").is_file())
             self.assertTrue((output/"manifest.json").is_file())
+            progress=json.loads((output/"progress.json").read_text(encoding="utf-8"))
+            self.assertEqual(progress["state"],"complete")
+            self.assertEqual(progress["completed"],progress["total"])
+            self.assertEqual(progress["world_steps"],2)
     def test_student_code_rejects_bad_contract_and_nonfinite_values(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)

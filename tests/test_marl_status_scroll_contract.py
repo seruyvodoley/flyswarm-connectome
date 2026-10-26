@@ -39,5 +39,17 @@ class MarlStatusScrollContractTests(unittest.TestCase):
         )
         self.assertGreaterEqual(timeout, 60.0)
 
+    def test_student_evaluation_has_an_explicit_running_status(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn('"running":_t("Проверка стратегии…","Evaluating strategy…")', source)
+        self.assertIn('if state=="complete" and target<=0.0:target=1.0', source)
+        self.assertIn('status_progress.value=status_progress.max_value if state=="complete" else current', source)
+        self.assertIn('state in ["starting","initializing","finalizing"]', source)
+
+    def test_finished_worker_without_progress_file_still_shows_complete(self) -> None:
+        app_state = SOURCE.with_name("app_state.gd").read_text(encoding="utf-8")
+        self.assertIn('marl_progress["state"]="complete" if has_result else "error"', app_state)
+        self.assertIn('marl_progress["message"]="Experiment complete; results saved."', app_state)
+
 if __name__ == "__main__":
     unittest.main()

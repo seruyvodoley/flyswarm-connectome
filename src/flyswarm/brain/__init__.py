@@ -65,7 +65,7 @@ class DualBrain:
         start=time.perf_counter()
         alive=np.array([o['alive'] for o in observations])
         previous_song=self.song.copy()
-        if self.causal_communication is not None:
+        if getattr(self, 'causal_communication', None) is not None:
             heard,contribution,distance,self.last_communication_frame=self.causal_communication.step(
                 previous_song,[o['position'] for o in observations],alive,audio,self.ticks+1)
         else:

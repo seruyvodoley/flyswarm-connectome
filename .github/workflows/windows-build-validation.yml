@@ -19,15 +19,20 @@ on:
         required: true
         type: string
         default: 1.0.0-student-beta.1-windows
+      publish:
+        description: Publish the validated Student Windows installers as a prerelease
+        required: true
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-x64:
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -154,3 +159,21 @@ jobs:
             build/windows/SHA256SUMS-windows.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish Student Windows prerelease only when requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          TAG: v${{ inputs.version }}
+        shell: pwsh
+        run: |
+          $existing = gh release view $env:TAG 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "Refusing to overwrite existing release $env:TAG" }
+          gh release create $env:TAG `
+            "build/windows/FlySwarm-Student-$env:VERSION-windows-x64-setup.exe" `
+            "build/windows/FlySwarm-Student-$env:VERSION-windows-x64.zip" `
+            "build/windows/SHA256SUMS-windows.txt" `
+            --target $env:GITHUB_SHA --prerelease `
+            --title "FlySwarm Student $env:VERSION — Windows x64" `
+            --notes "Student Edition for Windows x64 with MaleCNS brain and weights, relocatable Python backend, and validated installer and portable package."

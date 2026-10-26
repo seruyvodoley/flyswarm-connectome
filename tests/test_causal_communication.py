@@ -29,8 +29,9 @@ class CausalCommunicationTests(unittest.TestCase):
         changed = CausalCommunication({"events": [
             {"tick": 1, "sender": 0, "receiver": 1, "kind": "mute"}
         ]})
-        neutral, neutral_links, _, _ = original.step(self.song, self.positions, self.alive, "team_audio", 1)
-        actual, actual_links, _, report = changed.step(self.song, self.positions, self.alive, "team_audio", 1)
+        small_song = self.song * .01  # No receiver saturation; mute must reduce total.
+        neutral, neutral_links, _, _ = original.step(small_song, self.positions, self.alive, "team_audio", 1)
+        actual, actual_links, _, report = changed.step(small_song, self.positions, self.alive, "team_audio", 1)
         self.assertEqual(actual_links[1, 0], 0.0)
         self.assertLess(actual[1], neutral[1])
         np.testing.assert_allclose(np.delete(actual, 1), np.delete(neutral, 1))
@@ -61,7 +62,8 @@ class CausalCommunicationTests(unittest.TestCase):
         delayed.step(self.song, self.positions, self.alive, "team_audio", 1)
         delayed.step(self.song * 2, self.positions, self.alive, "team_audio", 2)
         _, links, _, frame = delayed.step(self.song * 3, self.positions, self.alive, "team_audio", 3)
-        self.assertAlmostEqual(links[1,0], self.song[0] * .08)
+        link = next(x for x in frame["links"] if x["sender"] == 0 and x["receiver"] == 1)
+        self.assertAlmostEqual(links[1, 0], self.song[0] * .08 * link["cap_scale"])
         self.assertEqual(frame["interventions"][0]["effective_signal"], self.song[0])
 
     def test_bad_interventions_fail_closed(self):

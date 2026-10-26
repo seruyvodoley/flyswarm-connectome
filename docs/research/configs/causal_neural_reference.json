@@ -1,0 +1,9 @@
+{
+  "schema": "flyswarm.research.config.v1",
+  "seconds": 3,
+  "map_seed": 1944,
+  "audio_mode": "team_audio",
+  "seeds": [83001, 83002],
+  "conditions": ["MALECNS_REAL"],
+  "reference_condition": "MALECNS_REAL"
+}

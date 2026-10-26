@@ -479,6 +479,18 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
         checkpoint = config.get("non_neural_checkpoint")
         if not checkpoint or not Path(checkpoint).is_file():
             raise RuntimeError("NON_NEURAL_TRAINED requires a separately trained checkpoint; refusing substitution")
+    audio_mode = config.get("audio_mode", "no_audio")
+    if audio_mode not in ("no_audio", "team_audio", "all_audio"):
+        raise ValueError("audio_mode must be no_audio, team_audio, or all_audio")
+    causal_spec = config.get("causal_communication")
+    if causal_spec is not None:
+        from flyswarm.research.causal_comm import CausalCommunication
+        CausalCommunication(causal_spec)  # Fail before launching backend/Godot.
+        if condition == "RULE_BASED":
+            raise ValueError("causal_communication requires the MaleCNS backend")
+        if audio_mode == "no_audio":
+            raise ValueError("causal_communication cannot intervene when audio_mode=no_audio")
+        atomic_json(run_dir / "causal_config.json", causal_spec)
     port_socket = socket.socket()
     port_socket.bind(("127.0.0.1", 0))
     port = port_socket.getsockname()[1]
@@ -500,6 +512,9 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
             if condition == "MALECNS_ABLATED":
                 channels = config.get("ablate_channels", ["DNp09_L", "DNp09_R", "DNa02_L", "DNa02_R", "DNp01"])
                 backend_args += ["--ablate-channels", ",".join(channels)]
+            if causal_spec is not None:
+                backend_args += ["--causal-config", str(run_dir / "causal_config.json"),
+                                 "--research-log", str(run_dir / "causal_neural_steps.jsonl")]
             if collect_nonneural:
                 backend_args += ["--collect-nonneural", str(collect_nonneural)]
             backend = subprocess.Popen(backend_args, cwd=ROOT, env=env, stdout=backend_log, stderr=subprocess.STDOUT)
@@ -520,14 +535,15 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
                     "condition": condition_name, "seed": seed, "side_swap": swap, "pair_id": f"{condition_name}:{seed}",
                     "duration_s": seconds, "map": "Krasny Valley", "map_seed": int(config.get("map_seed", 1944)),
                     "vehicle_composition": "normalized symmetric t34_85 mirror", "normalized": True,
-                    "audio": "no_audio", "blue_controller": condition_name, "red_controller": "RULE_BASED",
+                    "audio": audio_mode, "causal_communication": causal_spec,
+                    "blue_controller": condition_name, "red_controller": "RULE_BASED",
                     "git": git_state(), "godot": godot, "source_fingerprint": run_source_fingerprint,
                     "combat_event_schema": "flyswarm.combat_event.v1",
                     "step_semantics": "blocking_one_response_per_physics_step" if condition != "RULE_BASED" else "fixed_50hz_rule_step"}
         atomic_json(run_dir / "manifest.json", manifest)
         cmd = [godot, "--headless", "--path", str(ROOT / "frontend/godot"), "--",
                "--normalized", "--mirror", "t34_85", "--seed", str(int(config.get("map_seed", 1944))),
-               "--battle-seed", str(seed), "--seconds", str(seconds), "--quit", "--audio", "no_audio",
+               "--battle-seed", str(seed), "--seconds", str(seconds), "--quit", "--audio", audio_mode,
                "--record", str(run_dir), "--research-record", str(run_dir / "game_steps.jsonl"),
                "--experiment-id", experiment.name, "--run-id", run_id, "--condition", condition_name]
         if swap:

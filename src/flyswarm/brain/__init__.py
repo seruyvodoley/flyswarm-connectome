@@ -21,6 +21,8 @@ class DualBrain:
         if shared_arrays:raise RuntimeError(f'BLUE/RED FlyBrain arrays unexpectedly alias: {shared_arrays}')
         assert self.blue.dt==self.red.dt==.02
         self.brains=[self.blue,self.red]
+        self.causal_communication = None
+        self.last_communication_frame = None
         self.groups=[]
         self.seed=seed
         for b in self.brains:
@@ -35,8 +37,16 @@ class DualBrain:
             self.groups.append(g)
         if status:status("Warming up two independent brains")
         self.reset(seed)
+    def configure_causal_communication(self, specification):
+        from flyswarm.research.causal_comm import CausalCommunication
+        self.causal_communication = CausalCommunication(specification)
+        self.last_communication_frame = None
+
     def reset(self,seed):
         self.seed=seed
+        if self.causal_communication is not None:
+            self.causal_communication.reset()
+        self.last_communication_frame = None
         for i,b in enumerate(self.brains):
             b.reset(seed+i*1000)
             for _ in range(25):b.step()
@@ -55,12 +65,13 @@ class DualBrain:
         start=time.perf_counter()
         alive=np.array([o['alive'] for o in observations])
         previous_song=self.song.copy()
-        heard,contribution,distance=audio_frame(
-            previous_song,
-            [o['position'] for o in observations],
-            alive,
-            audio,
-        )
+        if self.causal_communication is not None:
+            heard,contribution,distance,self.last_communication_frame=self.causal_communication.step(
+                previous_song,[o['position'] for o in observations],alive,audio,self.ticks+1)
+        else:
+            heard,contribution,distance=audio_frame(
+                previous_song,[o['position'] for o in observations],alive,audio)
+            self.last_communication_frame = None
         stimulus=visual(observations)
         self.last_sensory_inputs={key:np.asarray(value,dtype=float).tolist() for key,value in stimulus.items()}
         self.last_sensory_inputs['audio']=heard.astype(float).tolist()

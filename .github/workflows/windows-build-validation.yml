@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - student
+    paths:
+      - '.github/workflows/windows-build-validation.yml'
+      - 'src/**'
+      - 'frontend/**'
+      - 'tools/**'
+      - 'requirements*.txt'
+      - 'data/**'
+      - 'docs/MALECNS_DATA_NOTICE.txt'
   workflow_dispatch:
     inputs:
       version:

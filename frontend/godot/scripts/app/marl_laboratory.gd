@@ -722,6 +722,7 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		"ready":_t("Готово к запуску","Ready to start"),
 		"starting":_t("Запуск Python…","Starting Python…"),
 		"initializing":_t("Подготовка модели…","Preparing model…"),
+		"running":_t("Проверка стратегии…","Evaluating strategy…"),
 		"training":_t("Обучение PPO…","Training PPO…"),
 		"paused":_t("Пауза · checkpoint сохранён","Paused · checkpoint saved"),
 		"finalizing":_t("Сохранение результатов…","Saving results…"),
@@ -734,14 +735,17 @@ func update_marl_status(progress:Dictionary,output_path:String):
 	var target=float(progress.get("target_timesteps",progress.get("total",0)))
 	if target>0.0 and current>target:target=current
 	var terminal=state in ["complete","error","cancelled"]
+	if state=="complete" and target<=0.0:target=1.0
 	status_progress.visible=state!="ready"
 	status_progress.indeterminate=not terminal and (target<=0.0 or state in ["starting","initializing","finalizing"])
 	status_progress.max_value=maxf(1.0,target)
-	status_progress.value=target if state=="complete" else current
+	status_progress.value=status_progress.max_value if state=="complete" else current
 	var lines=[]
 	var progress_message=str(progress.get("message",""))
 	var known_messages={
 		"Starting the Python experiment worker…":_t("Запускаю процесс Python…","Starting Python worker…"),
+		"Preparing the student strategy evaluation.":_t("Готовлю проверку пользовательской стратегии.","Preparing the student strategy evaluation."),
+		"Saving student evaluation results.":_t("Сохраняю результаты проверки стратегии.","Saving student evaluation results."),
 		"Loading Stable-Baselines3 and preparing the PPO model.":_t("Загружаю PPO и готовлю модель.","Loading PPO and preparing the model."),
 		"Preparing the training environment.":_t("Подготавливаю среду обучения.","Preparing the training environment."),
 		"Constructing the PPO policy network.":_t("Создаю сеть политики PPO.","Creating the PPO policy network."),
@@ -750,8 +754,15 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		"Training and checkpoint are ready.":_t("Обучение завершено, модель сохранена.","Training and checkpoint are ready."),
 	}
 	if known_messages.has(progress_message):progress_message=known_messages[progress_message]
+	if state=="complete" and progress_message==_t("Запускаю процесс Python…","Starting Python worker…"):
+		progress_message=_t("Эксперимент завершён, результаты сохранены.","Experiment complete; results saved.")
+	elif progress_message.begins_with("Evaluating student strategy · episode "):
+		progress_message=_t("Проверка стратегии · эпизод ","Evaluating strategy · episode ")+progress_message.trim_prefix("Evaluating student strategy · episode ")
+	elif progress_message.begins_with("Completed episode "):
+		progress_message=_t("Завершён эпизод ","Completed episode ")+progress_message.trim_prefix("Completed episode ")
 	if progress_message!="":lines.append(progress_message)
 	var phase=str(progress.get("phase",""))
+	if state=="complete" and phase=="process":phase="complete"
 	if phase!="":lines.append("%s: %s" % [_t("Этап","Phase"),phase])
 	for key in ["ppo_transitions","agent_transitions","world_steps","ppo_updates","episodes"]:
 		if progress.has(key):lines.append("%s: %s" % [_progress_label(key),str(progress[key])])
@@ -761,6 +772,8 @@ func update_marl_status(progress:Dictionary,output_path:String):
 		lines.append("%s: %.1f %s" % [_t("Прошло","Elapsed"),float(progress.elapsed_seconds)/60.0,_t("мин","min")])
 	if progress.has("eta_seconds") and progress.eta_seconds!=null:
 		lines.append("%s: %.1f %s" % [_t("Осталось","Remaining"),float(progress.eta_seconds)/60.0,_t("мин","min")])
+	if progress.has("world_steps") and not progress.has("timesteps"):
+		lines.append("%s: %s" % [_t("Шаги симуляции","Simulation steps"),str(progress.world_steps)])
 	if progress.has("latest_episode_reward") and progress.latest_episode_reward!=null:
 		lines.append("%s: %s" % [_t("Награда последнего эпизода","Latest episode reward"),str(progress.latest_episode_reward)])
 	var metrics=progress.get("ppo_metrics",{})

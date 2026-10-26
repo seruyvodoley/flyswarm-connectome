@@ -600,7 +600,12 @@ func _process(dt):
 			if not OS.is_process_running(marl_pid):
 				marl_pid=-1
 				var has_result=FileAccess.file_exists(marl_output.path_join("summary.json")) or FileAccess.file_exists(marl_output.path_join("manifest.json"))
-				if str(marl_progress.get("state","")) not in ["error","cancelled"]:marl_progress["state"]="complete" if has_result else "error"
+				if str(marl_progress.get("state","")) not in ["error","cancelled"]:
+					marl_progress["state"]="complete" if has_result else "error"
+					if has_result:
+						marl_progress["phase"]="complete"
+						if str(marl_progress.get("message","")) in ["", "Starting the Python experiment worker…"]:
+							marl_progress["message"]="Experiment complete; results saved."
 				if not has_result and not marl_progress.has("message"):marl_progress["message"]="Experiment process exited without writing a result manifest."
 		if current_page=="MarlLaboratory" and is_instance_valid(view) and view.has_method("update_marl_status"):
 			view.update_marl_status(marl_progress,marl_output)

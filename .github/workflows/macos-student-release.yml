@@ -120,11 +120,17 @@ jobs:
       - name: Save distributable release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FlySwarm-Student-macOS-arm64
+          name: FlySwarm-Student-macOS-arm64-dmg
           path: |
             build/releases/${{ env.VERSION }}/FlySwarm-Student-*.dmg
-            build/releases/${{ env.VERSION }}/FlySwarm-Student-*.zip
             build/releases/${{ env.VERSION }}/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save portable ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlySwarm-Student-macOS-arm64-zip
+          path: build/releases/${{ env.VERSION }}/FlySwarm-Student-*.zip
           if-no-files-found: error
           retention-days: 30
       - name: Publish release only when explicitly requested

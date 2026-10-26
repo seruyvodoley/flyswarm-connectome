@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 180
     env:
       VERSION: ${{ inputs.version }}
-      TAG: v${{ inputs.version }}-student-macos
+      TAG: v${{ inputs.version }}-macos
       PUBLISH: ${{ inputs.publish }}
       PRERELEASE: ${{ inputs.prerelease }}
     steps:
@@ -102,7 +102,11 @@ jobs:
           set -euo pipefail
           out="build/releases/$VERSION"
           dest="$RUNNER_TEMP/FlySwarm Student.app"
-          ditto "$out/FlySwarm Student.app" "$dest"
+          mounted="$RUNNER_TEMP/mounted"
+          mkdir -p "$mounted"
+          hdiutil attach "$out/FlySwarm-Student-$VERSION-macos-arm64.dmg" -nobrowse -readonly -mountpoint "$mounted"
+          test -d "$mounted/FlySwarm Student.app"
+          ditto "$mounted/FlySwarm Student.app" "$dest"
           bin=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$dest/Contents/Info.plist")
           "$dest/Contents/MacOS/$bin" --headless --quit-after 3
           backend="$dest/Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend"
@@ -113,10 +117,7 @@ jobs:
           checkpoint="$RUNNER_TEMP/student-smoke/train/checkpoint/ppo_team.zip"
           "$backend" --marl --output-root "$RUNNER_TEMP/student-smoke" evaluate "$checkpoint" --episodes 1 --seed 21 --max-steps 16
           "$backend" --marl --output-root "$RUNNER_TEMP/student-smoke" compare "$checkpoint" --episodes 1 --seed 31 --max-steps 16
-          mkdir -p "$RUNNER_TEMP/mounted"
-          hdiutil attach "$out/FlySwarm-Student-$VERSION-macos-arm64.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mounted"
-          test -d "$RUNNER_TEMP/mounted/FlySwarm Student.app"
-          hdiutil detach "$RUNNER_TEMP/mounted"
+          hdiutil detach "$mounted"
       - name: Save distributable release artifacts
         uses: actions/upload-artifact@v4
         with:

@@ -95,17 +95,18 @@ jobs:
           set -euo pipefail
           out="build/releases/$VERSION"
           dest="$RUNNER_TEMP/FlySwarm.app"
-          ditto "$out/FlySwarm.app" "$dest"
+          mounted="$RUNNER_TEMP/mounted"
+          mkdir -p "$mounted"
+          hdiutil attach "$out/FlySwarm-$VERSION-macos-arm64.dmg" -nobrowse -readonly -mountpoint "$mounted"
+          test -d "$mounted/FlySwarm.app"
+          ditto "$mounted/FlySwarm.app" "$dest"
           bin=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$dest/Contents/Info.plist")
           "$dest/Contents/MacOS/$bin" --headless --quit-after 3
           backend="$dest/Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend"
           test -x "$backend"
           "$backend" --check-data --data-dir "$dest/Contents/Resources/MaleCNS"
           "$backend" --marl --output-root "$RUNNER_TEMP/main-smoke" baseline --episodes 1 --max-steps 16
-          mkdir -p "$RUNNER_TEMP/mounted"
-          hdiutil attach "$out/FlySwarm-$VERSION-macos-arm64.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mounted"
-          test -d "$RUNNER_TEMP/mounted/FlySwarm.app"
-          hdiutil detach "$RUNNER_TEMP/mounted"
+          hdiutil detach "$mounted"
       - name: Upload signed candidate and checksum manifest
         uses: actions/upload-artifact@v4
         with:

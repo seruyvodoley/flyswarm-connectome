@@ -42,6 +42,7 @@ class MarlStatusScrollContractTests(unittest.TestCase):
     def test_student_evaluation_has_an_explicit_running_status(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")
         self.assertIn('"running":_t("Проверка стратегии…","Evaluating strategy…")', source)
+        self.assertIn('code_stop_button.visible=state in ["starting","initializing","running","training","finalizing"]', source)
         self.assertIn('if state=="complete" and target<=0.0:target=1.0', source)
         self.assertIn('status_progress.value=status_progress.max_value if state=="complete" else current', source)
         self.assertIn('state in ["starting","initializing","finalizing"]', source)

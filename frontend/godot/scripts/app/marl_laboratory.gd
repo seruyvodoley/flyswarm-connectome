@@ -717,7 +717,7 @@ func update_marl_status(progress:Dictionary,output_path:String):
 	if not is_instance_valid(status_label):return
 	var state=str(progress.get("state","ready"))
 	if state=="starting":console_mode="jobs"
-	if is_instance_valid(code_stop_button):code_stop_button.visible=state in ["starting","initializing","training","finalizing"]
+	if is_instance_valid(code_stop_button):code_stop_button.visible=state in ["starting","initializing","running","training","finalizing"]
 	var labels={
 		"ready":_t("Готово к запуску","Ready to start"),
 		"starting":_t("Запуск Python…","Starting Python…"),

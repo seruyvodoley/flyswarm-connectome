@@ -42,10 +42,16 @@ def thin_arm64(path: Path) -> None:
 
 
 def make_arm64(app: Path) -> None:
+    with (app / "Contents/Info.plist").open("rb") as source:
+        executable_name = plistlib.load(source).get("CFBundleExecutable")
+    if not executable_name:
+        raise RuntimeError("Exported app has no CFBundleExecutable")
     candidates = [
-        app / "Contents/MacOS/FlySwarm",
+        app / "Contents/MacOS" / executable_name,
         app / "Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend",
     ]
+    if not candidates[0].is_file():
+        raise RuntimeError(f"Exported app entry point not found: {candidates[0]}")
     for folder, _dirs, files in os.walk(app):
         for name in files:
             path = Path(folder) / name

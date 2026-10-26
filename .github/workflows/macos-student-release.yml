@@ -26,7 +26,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 180
     env:
-      VERSION: 1.0.0-student-beta.2-macos
+      VERSION: 1.0.0-student-beta.2
       TAG: v1.0.0-student-beta.2-macos
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +85,8 @@ jobs:
           test -s "$out/FlySwarm-Student-$VERSION-macos-arm64.zip"
           (cd "$out" && shasum -a 256 --check SHA256SUMS.txt)
           codesign --verify --deep --strict "$out/FlySwarm Student.app"
-          test "$(lipo -archs "$out/FlySwarm Student.app/Contents/MacOS/FlySwarm")" = arm64
+          bin=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$out/FlySwarm Student.app/Contents/Info.plist")
+          test "$(lipo -archs "$out/FlySwarm Student.app/Contents/MacOS/$bin")" = arm64
           df -h .
       - name: Smoke-test installed application
         shell: bash
@@ -94,7 +95,8 @@ jobs:
           out="build/releases/$VERSION"
           dest="$RUNNER_TEMP/FlySwarm Student.app"
           ditto "$out/FlySwarm Student.app" "$dest"
-          "$dest/Contents/MacOS/FlySwarm" --headless --quit-after 3
+          bin=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$dest/Contents/Info.plist")
+          "$dest/Contents/MacOS/$bin" --headless --quit-after 3
           backend="$dest/Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend"
           test -x "$backend"
           "$backend" --check-data --data-dir "$dest/Contents/Resources/MaleCNS"

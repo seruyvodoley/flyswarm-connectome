@@ -17,6 +17,10 @@ const RUBBLE_ASSET="res://assets/environment/props/stone-rubble-pile.glb"
 const DestructibleSection=preload("res://scripts/demo/destructible_section.gd")
 const DestructibleTree=preload("res://scripts/demo/destructible_tree.gd")
 
+const Layout=preload("res://scripts/demo/arena_layout.gd")
+var collision_cache={}
+var visual_cache={}
+var generation_ms=0.0
 var terrain_source: Node3D
 var vegetation_density=1.0
 var rng=RandomNumberGenerator.new()
@@ -27,27 +31,24 @@ func configure(terrain: Node3D,density: float):
 
 func _ready():
 	rng.seed=19441004
+	var started=Time.get_ticks_usec()
 	build_layout()
+	generation_ms=(Time.get_ticks_usec()-started)/1000.0
 
 func ground(x: float,z: float) -> float:
 	return terrain_source.height_at(x,z) if is_instance_valid(terrain_source) else 0.0
 
 func build_layout():
-	# The three full imported models frame a small country lane. One hut is
-	# visually damaged with separate rubble and a broken masonry wall section.
-	add_building(FARM_ASSET,Vector3(-48,ground(-48,-14),-14),deg_to_rad(22),Vector3(13.4,7.02,6.8))
-	add_building(COTTAGE_ASSET,Vector3(48,ground(48,10),10),deg_to_rad(198),Vector3(6.22,5.36,5.08))
-	# Two outlying farm buildings add flank cover while keeping both spawn points
-	# and the central approach clear. Their conservative box proxies share a
-	# single collider each to stay within the arena physics-body budget.
-	add_collision_building(COTTAGE_ASSET,Vector3(-108,ground(-108,-58),-58),deg_to_rad(34),Vector3(6.22,5.36,5.08))
-	add_collision_building(FARM_ASSET,Vector3(108,ground(108,58),58),deg_to_rad(214),Vector3(11.6,6.4,6.0))
-	add_barrier(RUIN_ASSET,Vector3(-38,ground(-38,37),37),deg_to_rad(90),Vector3(2.0,1.91,.36),true)
-	add_barrier(WALL_ASSET,Vector3(42,ground(42,42),42),deg_to_rad(0),Vector3(8.0,2.4,.25),true)
+	# Ten buildings frame two streets and connected yards. Keep models at
+	# authored metre scale and use their real destructible mesh sections.
+	for building in Layout.BUILDINGS:
+		var farm=bool(building[3]);var x=float(building[0]);var z=float(building[1])
+		add_building(FARM_ASSET if farm else COTTAGE_ASSET,Vector3(x,ground(x,z)-.12,z),float(building[2]),Vector3(13.4,7.02,6.8) if farm else Vector3(6.22,5.36,5.08))
+	for p in [Vector2(-45,-28),Vector2(44,30),Vector2(-120,83),Vector2(117,-83)]:
+		add_barrier(WALL_ASSET,Vector3(p.x,ground(p.x,p.y),p.y),0,Vector3(8,2.4,.25),true)
+	add_barrier(RUIN_ASSET,Vector3(82,ground(82,24),24),PI/2,Vector3(2,1.91,.36),true)
 	add_instanced(RUBBLE_ASSET,_rubble_points(),false)
-	build_fences()
-	build_rocks()
-	build_vegetation()
+	build_fences();build_rocks();build_vegetation()
 
 func add_building(path: String,position: Vector3,rotation: float,dimensions: Vector3):
 	var body=Node3D.new()
@@ -74,7 +75,7 @@ func add_collision_building(path:String,position:Vector3,yaw:float,dimensions:Ve
 	body.name="FlankFarmsteadLeft" if position.x<0.0 else "FlankFarmsteadRight"
 	body.position=position
 	body.rotation.y=yaw
-	body.collision_layer=1
+	body.collision_layer=9
 	body.collision_mask=0
 	add_child(body)
 	var model:=_instantiate_model(path)
@@ -106,7 +107,9 @@ func _add_mesh_sections(parent: Node3D,model: Node3D,kind: String,threshold_j: f
 	for node in model.find_children("*","MeshInstance3D",true,false):
 		var mesh_node:=node as MeshInstance3D
 		if mesh_node.mesh==null:continue
-		var trimesh=mesh_node.mesh.create_trimesh_shape()
+		var key=mesh_node.mesh.get_instance_id()
+		if not collision_cache.has(key):collision_cache[key]=mesh_node.mesh.create_trimesh_shape()
+		var trimesh=collision_cache[key]
 		if trimesh==null:continue
 		var section: DestructibleSection=DestructibleSection.new()
 		section.name="Section_%s" % mesh_node.name.to_pascal_case()
@@ -117,7 +120,7 @@ func _add_mesh_sections(parent: Node3D,model: Node3D,kind: String,threshold_j: f
 			section.configure("WOOD",minf(section_strength,480_000.0),Color("765638"))
 		else:
 			section.configure(kind,section_strength,color)
-		section.collision_layer=1
+		section.collision_layer=9
 		section.collision_mask=0
 		section.bind_visual_piece(mesh_node)
 		var collision=CollisionShape3D.new()
@@ -132,7 +135,7 @@ func _add_destructible_box(parent: Node3D,center: Vector3,size: Vector3,kind: St
 	section.name="%sSection" % kind.to_pascal_case()
 	section.position=center
 	section.configure(kind,threshold_j,color)
-	section.collision_layer=1
+	section.collision_layer=9
 	section.collision_mask=0
 	var shape=CollisionShape3D.new()
 	var box=BoxShape3D.new()
@@ -154,77 +157,64 @@ func _instantiate_model(path: String) -> Node3D:
 func add_instanced(path: String,placements: Array,cast_shadows: bool) -> Array[MultiMeshInstance3D]:
 	var batches: Array[MultiMeshInstance3D] = []
 	if placements.is_empty():return batches
-	var template=_instantiate_model(path)
-	if template==null:return batches
-	add_child(template)
-	var template_inverse=template.global_transform.affine_inverse()
-	var mesh_nodes=template.find_children("*","MeshInstance3D",true,false)
-	for mesh_node in mesh_nodes:
-		if mesh_node.mesh==null:continue
-		var relative=template_inverse*mesh_node.global_transform
-		var multi=MultiMesh.new()
-		multi.transform_format=MultiMesh.TRANSFORM_3D
-		multi.mesh=mesh_node.mesh
-		multi.instance_count=placements.size()
+	# Imported trees contain hundreds of separate twig/leaf objects but only
+	# 2–4 materials. Merge their static geometry once per asset/material, then
+	# instance the merged surfaces: hundreds of draw calls become a handful.
+	if not visual_cache.has(path):
+		var template=_instantiate_model(path)
+		if template==null:return batches
+		add_child(template)
+		var inverse=template.global_transform.affine_inverse()
+		var groups={}
+		for mesh_node in template.find_children("*","MeshInstance3D",true,false):
+			if mesh_node.mesh==null:continue
+			for surface in mesh_node.mesh.get_surface_count():
+				var mat=mesh_node.get_active_material(surface)
+				if not groups.has(mat):
+					var builder=SurfaceTool.new();builder.begin(Mesh.PRIMITIVE_TRIANGLES);groups[mat]=builder
+				groups[mat].append_from(mesh_node.mesh,surface,inverse*mesh_node.global_transform)
+		var merged=[]
+		for mat in groups:
+			groups[mat].index()
+			merged.append({"mesh":groups[mat].commit(),"material":mat})
+		visual_cache[path]=merged
+		template.free()
+	for surface in visual_cache[path]:
+		var multi=MultiMesh.new();multi.transform_format=MultiMesh.TRANSFORM_3D
+		multi.mesh=surface.mesh;multi.instance_count=placements.size()
 		for i in range(placements.size()):
-			var placement=placements[i]
-			var scale_value=float(placement.scale)
-			var base=Transform3D(Basis(Vector3.UP,float(placement.yaw)).scaled(Vector3.ONE*scale_value),placement.position)
-			multi.set_instance_transform(i,base*relative)
-		var batch=MultiMeshInstance3D.new()
-		batch.multimesh=multi
-		batch.material_override=mesh_node.material_override
+			var placement=placements[i];var scale_value=float(placement.scale)
+			multi.set_instance_transform(i,Transform3D(Basis(Vector3.UP,float(placement.yaw)).scaled(Vector3.ONE*scale_value),placement.position))
+		var batch=MultiMeshInstance3D.new();batch.multimesh=multi
+		batch.material_override=surface.material
 		batch.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		batch.visibility_range_end=330.0
-		add_child(batch)
-		batches.append(batch)
-	template.queue_free()
+		batch.visibility_range_end=1500.0;batch.visibility_range_end_margin=30.0
+		add_child(batch);batches.append(batch)
 	return batches
 
 func _tree_points(count: int,variant: int) -> Array:
 	var points=[]
+	# Discontinuous groves and field margins, never an impassable tree ring.
 	for i in range(count):
-		var angle=TAU*float(i)/float(count)+rng.randf_range(-.14,.14)
-		var radius=rng.randf_range(137.0,181.0)
-		var x=cos(angle)*radius
-		var z=sin(angle)*radius
-		if absf(x)<62.0 and absf(z)<100.0:continue
-		if Vector2(x+116,z+31).length()<34.0 or Vector2(x-112,z-38).length()<28.0:continue
-		var scale_value=rng.randf_range(.74,1.08)
-		if variant==2:scale_value=rng.randf_range(.52,.70)
-		points.append({"position":Vector3(x,ground(x,z),z),"yaw":rng.randf_range(-PI,PI),"scale":scale_value})
+		var centers=[Vector2(-240,-110),Vector2(-210,160),Vector2(220,95),Vector2(220,-175),Vector2(-60,270),Vector2(85,-280)]
+		var p=centers[i%centers.size()]+Vector2(rng.randf_range(-43,43),rng.randf_range(-40,40))
+		if Layout.route_distance(p)<12.0 or Layout.building_blocked(p,10):continue
+		var scale_value=rng.randf_range(.74,1.08) if variant!=2 else rng.randf_range(.52,.70)
+		points.append({"position":Vector3(p.x,ground(p.x,p.y),p.y),"yaw":rng.randf_range(-PI,PI),"scale":scale_value})
 	return points
 
 func build_vegetation():
-	var maple_count=maxi(8,roundi(17*vegetation_density))
-	var pine_count=maxi(5,roundi(11*vegetation_density))
-	var oak_count=maxi(2,roundi(4*vegetation_density))
-	var maple=_tree_points(maple_count,0)
-	var pine=_tree_points(pine_count,1)
-	var oak=_tree_points(oak_count,2)
-	# Every visible tree now has a matching trunk collider and destruction state.
-	# Previously the distant forest was a MultiMesh with no physics, which made
-	# those trees purely visual and let a tank drive straight through them.
-	_add_tree_group(maple,"maple")
-	_add_tree_group(pine,"conifer")
-	_add_tree_group(oak,"oak")
-	# Keep nine additional trees close to the lane as interactive obstacles.
-	var near_positions=[Vector2(-32,-24),Vector2(-25,34),Vector2(-18,-43),Vector2(18,42),Vector2(28,-31),Vector2(38,16),Vector2(-44,12),Vector2(46,-8),Vector2(8,-52)]
-	for i in range(near_positions.size()):
-		var p: Vector2=near_positions[i]
-		var kind="maple" if i%3==0 else ("conifer" if i%3==1 else "oak")
-		var path=TREE_ASSETS[kind]
-		_add_interactive_tree(path,{"position":Vector3(p.x,ground(p.x,p.y),p.y),"yaw":rng.randf_range(-PI,PI),"scale":rng.randf_range(.58,.82)},kind)
+	_add_tree_group(_tree_points(roundi(38*vegetation_density),0),"maple")
+	_add_tree_group(_tree_points(roundi(30*vegetation_density),1),"conifer")
+	_add_tree_group(_tree_points(maxi(1,roundi(3*vegetation_density)),2),"oak")
 	var shrubs=[];var grasses=[]
-	for i in range(roundi(56*vegetation_density)):
-		var x=rng.randf_range(-165,165);var z=rng.randf_range(-165,165)
-		if absf(x)<46 and absf(z)<82:continue
-		if Vector2(x+48,z+14).length()<22 or Vector2(x-48,z-10).length()<19:continue
+	for i in range(roundi(150*vegetation_density)):
+		var x=rng.randf_range(-310,310);var z=rng.randf_range(-310,310)
+		if Layout.route_distance(Vector2(x,z))<7 or Layout.building_blocked(Vector2(x,z),5):continue
 		var item={"position":Vector3(x,ground(x,z),z),"yaw":rng.randf_range(-PI,PI),"scale":rng.randf_range(.75,1.35)}
 		if i%3==0:grasses.append(item)
 		else:shrubs.append(item)
-	add_instanced(SHRUB_ASSET,shrubs,false)
-	add_instanced(GRASS_ASSET,grasses,false)
+	add_instanced(SHRUB_ASSET,shrubs,false);add_instanced(GRASS_ASSET,grasses,false)
 
 func _add_interactive_tree(path: String,placement: Dictionary,kind: String,batches: Array[MultiMeshInstance3D]=[],instance_index: int=-1) -> void:
 	var tree: DestructibleTree=DestructibleTree.new()
@@ -234,7 +224,7 @@ func _add_interactive_tree(path: String,placement: Dictionary,kind: String,batch
 	var scale_value=float(placement.scale)
 	var threshold=180_000.0 if kind=="maple" else (260_000.0 if kind=="conifer" else 340_000.0)
 	tree.configure("WOOD",threshold,Color("62513b"))
-	tree.collision_layer=1
+	tree.collision_layer=9
 	tree.collision_mask=0
 	var collider=CollisionShape3D.new()
 	var trunk=CapsuleShape3D.new()
@@ -275,10 +265,10 @@ func build_fences() -> void:
 
 func _rock_points() -> Array:
 	var result=[]
-	for i in range(26):
-		var x=rng.randf_range(-170,170);var z=rng.randf_range(-160,160)
-		if absf(x)<48 and absf(z)<86:continue
-		result.append({"position":Vector3(x,ground(x,z),z),"yaw":rng.randf_range(-PI,PI),"scale":rng.randf_range(.55,1.15)})
+	for center in Layout.ROCKS:
+		for i in 2:
+			var p=center+Vector2(i*4.8,0)
+			result.append({"position":Vector3(p.x,ground(p.x,p.y),p.y),"yaw":rng.randf_range(-PI,PI),"scale":rng.randf_range(.85,1.3)})
 	return result
 
 func build_rocks() -> void:
@@ -309,17 +299,15 @@ func build_rocks() -> void:
 
 func _rubble_points() -> Array:
 	var points=[]
-	for i in range(8):
-		var x=-38+rng.randf_range(-4.0,4.0);var z=37+rng.randf_range(-3.0,3.0)
+	for i in range(10):
+		var x=82+rng.randf_range(-4,4);var z=24+rng.randf_range(-3,3)
 		points.append({"position":Vector3(x,ground(x,z),z),"yaw":rng.randf_range(-.5,.5),"scale":rng.randf_range(.55,1.0)})
 	return points
 
 func _fence_points() -> Array:
 	var points=[]
-	for i in range(10):
-		var x=-102.0+i*3.2;var z=72.0+sin(x*.035)*4.0
-		points.append({"position":Vector3(x,ground(x,z),z),"yaw":rng.randf_range(-.025,.025),"scale":1.0})
-	for i in range(8):
-		var x=72.0+i*3.2;var z=-78.0+sin(x*.04)*3.0
-		points.append({"position":Vector3(x,ground(x,z),z),"yaw":PI+rng.randf_range(-.025,.025),"scale":1.0})
+	for center in [Vector2(-57,-82),Vector2(54,80),Vector2(86,-55)]:
+		for i in 6:
+			var x=center.x+i*3.2;var z=center.y
+			points.append({"position":Vector3(x,ground(x,z),z),"yaw":0.0,"scale":1.0})
 	return points

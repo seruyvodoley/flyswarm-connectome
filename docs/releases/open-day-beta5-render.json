@@ -1,0 +1,46 @@
+{
+  "before": {
+    "display": "macOS",
+    "draw_calls": {
+      "count": 1201,
+      "max": 2207.0,
+      "mean": 2194.26061615321,
+      "p95": 2207.0,
+      "p99": 2207.0
+    },
+    "fps": 60.0005715291743,
+    "frame_ms": {
+      "count": 1201,
+      "max": 19.238,
+      "mean": 16.6665079100749,
+      "p95": 16.916,
+      "p99": 17.154
+    },
+    "map_and_scene_generation_ms": 2076.497,
+    "renderer": "Apple M2 (Apple8)",
+    "source": "beta4",
+    "viewport_px": "(1280.0, 800.0)"
+  },
+  "after": {
+    "display": "macOS",
+    "draw_calls": {
+      "count": 1198,
+      "max": 337.0,
+      "mean": 324.257095158598,
+      "p95": 337.0,
+      "p99": 337.0
+    },
+    "fps": 59.8977089126341,
+    "frame_ms": {
+      "count": 1198,
+      "max": 33.099,
+      "mean": 16.6951293823038,
+      "p95": 17.53,
+      "p99": 18.142
+    },
+    "map_and_scene_generation_ms": 2555.417,
+    "renderer": "Apple M2 (Apple8)",
+    "source": "beta5",
+    "viewport_px": "(1280.0, 800.0)"
+  }
+}

@@ -17,23 +17,34 @@ void vertex() {
 	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
-float road_center(float x) {
-	return sin(x * 0.027) * 4.2 + sin(x * 0.011 + 0.8) * 2.0;
+float segment_distance(vec2 p, vec2 a, vec2 b) {
+	vec2 d=b-a;
+	return length(p-a-d*clamp(dot(p-a,d)/dot(d,d),0.0,1.0));
 }
 
 void fragment() {
-	float center = road_center(world_position.x);
-	float across = abs(world_position.z - center);
-	float road = 1.0 - smoothstep(5.6, 9.8, across);
-	float shoulder = 1.0 - smoothstep(9.0, 24.0, across);
-	vec2 ground_uv = world_position.xz * 0.024;
-	vec2 road_uv = vec2(world_position.x * 0.038, (world_position.z - center) * 0.075);
+	vec2 p=world_position.xz;
+	float center=-28.0+18.0*smoothstep(40.0,150.0,p.y);
+	float across=length(vec2(p.x-center,max(abs(p.y)-205.0,0.0)));
+	across=min(across,length(vec2(p.x-142.0-10.0*sin(p.y*.012),max(abs(p.y)-140.0,0.0))));
+	across=min(across,length(vec2(p.x+142.0-10.0*sin(p.y*.012),max(abs(p.y)-140.0,0.0))));
+	across=min(across,segment_distance(p,vec2(-24,-205),vec2(142,-120)));
+	across=min(across,segment_distance(p,vec2(-24,-205),vec2(-142,-120)));
+	across=min(across,segment_distance(p,vec2(24,205),vec2(142,120)));
+	across=min(across,segment_distance(p,vec2(24,205),vec2(-142,120)));
+	across=min(across,segment_distance(p,vec2(-85,30),vec2(85,30)));
+	across=min(across,segment_distance(p,vec2(-85,-28),vec2(85,-28)));
+	float road=1.0-smoothstep(3.6,7.8,across);
+	float shoulder=1.0-smoothstep(7.0,14.0,across);
+	vec2 ground_uv=p*.024;
+	vec2 road_uv=p*.065;
 
 	vec3 grass_color = texture(grass_diffuse, ground_uv).rgb * vec3(0.75, 0.82, 0.58);
 	vec3 dirt_color = texture(dirt_diffuse, ground_uv * 0.72).rgb * vec3(0.80, 0.74, 0.63);
 	vec3 road_color = texture(road_diffuse, road_uv).rgb * vec3(0.72, 0.66, 0.54);
 	float worn = shoulder * 0.28;
-	vec3 color = mix(grass_color, dirt_color, worn);
+	float field_variation=0.94+0.06*sin(p.x*.071)*cos(p.y*.045)+0.045*sin(p.x*.012+p.y*.025);
+	vec3 color = mix(grass_color, dirt_color, worn)*field_variation;
 	color = mix(color, road_color, road);
 
 	vec3 grass_n = texture(grass_normal, ground_uv).rgb;

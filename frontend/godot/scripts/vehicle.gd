@@ -295,6 +295,13 @@ func step(dt: float):
 	contact_state=world.tracks.contact(self,dt)
 	drive_throttle=move_toward(drive_throttle,throttle,dt/maxf(.05,float(cfg.throttle_response_s)))
 	var power_acc=minf(minf(minf(float(cfg.traction),contact_state.grip)*9.81,float(cfg.engine_kw)*1000*.7/(float(cfg.mass_kg)*maxf(2,absf(speed)))),float(cfg.drive_accel_m_s2))
+	if demo_protected:
+		# The catalogue drive_accel is a flat-ground acceleration/comfort limit,
+		# not the engine's maximum tractive force. On Open Day hills, compensate
+		# grade load within the existing engine-power and track-grip envelope.
+		# Scientific modes retain their original force calculation verbatim.
+		var available=minf(minf(float(cfg.traction),contact_state.grip)*9.81,float(cfg.engine_kw)*1000*.7/(float(cfg.mass_kg)*maxf(2,absf(speed))))
+		power_acc=minf(available,float(cfg.drive_accel_m_s2)+maxf(0.0,slope*signf(drive_throttle))*9.81)
 	if not modules.transmission and not demo_protected: power_acc*=.2
 	var accel=drive_throttle*power_acc-slope*9.81
 	if absf(speed)>.05: accel-=signf(speed)*float(contact_state.resistance)*9.81

@@ -1,5 +1,6 @@
 extends Node3D
 # Contact-pressure/slip approximation. Visual rut depth does not edit terrain colliders.
+const DemoLayout=preload("res://scripts/demo/arena_layout.gd")
 var world
 var multimesh: MultiMesh
 var cursor=0
@@ -27,6 +28,11 @@ func setup(battle):
 	instance.material_override=material
 	add_child(instance)
 func soil(position: Vector3) -> Dictionary:
+	if world.is_demo:
+		var p=Vector2(position.x,position.z)
+		var lane=DemoLayout.route_distance(p)<7.5
+		lane=lane or (absf(p.x)<90.0 and minf(absf(p.y-30.0),absf(p.y+28.0))<6.0)
+		return {"name":"road" if lane else "soil","stiffness":18000000.0 if lane else 4000000.0,"resistance":.035 if lane else .055,"grip":.7 if lane else .6,"mark":.18 if lane else .6}
 	if absf(position.x)<20 or absf(position.z)<12:return {"name":"road","stiffness":18000000.0,"resistance":.035,"grip":.7,"mark":.18}
 	if absf(position.z-25*sin(position.x/180))<30:return {"name":"riverbed","stiffness":1200000.0,"resistance":.09,"grip":.43,"mark":.85}
 	return {"name":"soil","stiffness":4000000.0,"resistance":.055,"grip":.6,"mark":.6}

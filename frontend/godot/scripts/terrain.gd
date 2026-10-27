@@ -70,13 +70,16 @@ func _west_road_x(z: float) -> float:
 	return -248.0 + sin(z * 0.011 + 1.2) * 9.0
 
 func demo_height_at(x: float,z: float) -> float:
-	# Low, broad shoulders give hull-down approaches without putting a hard wall
-	# across the short 1v1 sight line or making any vehicle-class slope unsafe.
-	var base=.38*sin(x/78.0)*cos(z/92.0)+.22*sin(z/46.0)*sin(x/61.0)
-	var shoulders=2.4*exp(-pow((x+105.0)/48.0,2.0)-pow((z-32.0)/40.0,2.0))
-	shoulders+=2.6*exp(-pow((x-105.0)/50.0,2.0)-pow((z+34.0)/40.0,2.0))
-	var swales=-.9*exp(-pow(x/42.0,2.0)-pow((z-54.0)/33.0,2.0))-.8*exp(-pow(x/44.0,2.0)-pow((z+54.0)/33.0,2.0))
-	return base+shoulders+swales
+	# Broad ridges and reverse slopes: up to 11 m, with traversable grades.
+	# The village has a gentle foundation; all three approaches retain relief.
+	var base=.65*sin(x/91.0)*cos(z/112.0)
+	var west=10.5*exp(-pow((x+182.0)/70.0,2.0)-pow((z-18.0)/100.0,2.0))
+	west+=7.8*exp(-pow((x+156.0)/72.0,2.0)-pow((z+134.0)/65.0,2.0))
+	var east=8.8*exp(-pow((x-185.0)/82.0,2.0)-pow((z+30.0)/84.0,2.0))
+	east+=6.5*exp(-pow((x-140.0)/90.0,2.0)-pow((z-164.0)/62.0,2.0))
+	var swale=-3.6*exp(-pow((x+100.0+12.0*sin(z/74.0))/29.0,2.0)-pow(z/185.0,2.0))
+	swale-=2.7*exp(-pow((x-93.0)/32.0,2.0)-pow((z-28.0)/154.0,2.0))
+	return base+west+east+swale
 
 func material(c: Color) -> StandardMaterial3D:
 	var m=StandardMaterial3D.new()
@@ -231,19 +234,28 @@ func build(is_training: bool, seed_value: int, size: float):
 func build_demo_ground(size: float):
 	var surface=SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var steps=112
+	var steps=140
 	var spacing=size/float(steps)
+	# Cache the shared grid and normals once, rather than five height-function
+	# evaluations for every duplicated triangle vertex.
+	var stride=steps+3
+	var heights=PackedFloat32Array();heights.resize(stride*stride)
+	for zi in range(-1,steps+2):
+		for xi in range(-1,steps+2):
+			heights[(zi+1)*stride+xi+1]=height_at(-extent+xi*spacing,-extent+zi*spacing)
+	var normals=PackedVector3Array();normals.resize(stride*stride)
+	for zi in range(steps+1):
+		for xi in range(steps+1):
+			var index=(zi+1)*stride+xi+1
+			normals[index]=Vector3(heights[index-1]-heights[index+1],2.0*spacing,heights[index-stride]-heights[index+stride]).normalized()
 	for zi in range(steps):
 		for xi in range(steps):
-			var x=-extent+xi*spacing
-			var z=-extent+zi*spacing
-			for offset in [Vector2(0,0),Vector2(1,0),Vector2(0,1),Vector2(1,0),Vector2(1,1),Vector2(0,1)]:
-				var px=x+offset.x*spacing
-				var pz=z+offset.y*spacing
-				var normal=Vector3(height_at(px-1,pz)-height_at(px+1,pz),2.0,height_at(px,pz-1)-height_at(px,pz+1)).normalized()
-				surface.set_normal(normal)
-				surface.set_uv(Vector2(px,pz)/16.0)
-				surface.add_vertex(Vector3(px,height_at(px,pz),pz))
+			for offset in [Vector2i(0,0),Vector2i(1,0),Vector2i(0,1),Vector2i(1,0),Vector2i(1,1),Vector2i(0,1)]:
+				var gx=xi+offset.x;var gz=zi+offset.y
+				var px=-extent+gx*spacing;var pz=-extent+gz*spacing
+				var index=(gz+1)*stride+gx+1
+				surface.set_normal(normals[index]);surface.set_uv(Vector2(px,pz)/16.0)
+				surface.add_vertex(Vector3(px,heights[index],pz))
 	var ground=MeshInstance3D.new()
 	ground.name="DemoArenaGround"
 	ground.mesh=surface.commit()
@@ -302,7 +314,7 @@ func _legacy_collision_surface_height(x: float,z: float) -> float:
 	return (1.0-tz)*h10 + (tx+tz-1.0)*h11 + (1.0-tx)*h01
 
 func forest_blocks(a: Vector3,b: Vector3) -> bool:
-	if training or range_flat: return false
+	if training or range_flat or demo_mode: return false
 	var length_inside=0.0
 	for i in range(20):
 		var p=a.lerp(b,(i+.5)/20.0)

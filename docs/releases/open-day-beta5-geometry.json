@@ -1,0 +1,83 @@
+{
+  "buildings": 10,
+  "corridors": [
+    {
+      "clear": true,
+      "length_m": 589.510446548462
+    },
+    {
+      "clear": true,
+      "length_m": 451.404353141785
+    },
+    {
+      "clear": true,
+      "length_m": 585.555966377258
+    }
+  ],
+  "extent_m": 700,
+  "failures": 0,
+  "flank_physical_motion_m": 45.2878074645996,
+  "height_max_m": 9.92214861996234,
+  "height_min_m": -2.17376671550678,
+  "map_build_ms": 867.889,
+  "max_grade": 0.22719894349575,
+  "nav_build_ms": 158.94,
+  "route_calls": 151,
+  "route_total_ms": 4.731,
+  "route_vehicles": [
+    {
+      "completed": true,
+      "distance_m": 582.148625339443,
+      "position": "(22.10071, 0.705833, 209.7912)",
+      "route_index": 36,
+      "sim_seconds": 110.5,
+      "stuck_recoveries": 0,
+      "vehicle": "t34_85"
+    },
+    {
+      "completed": true,
+      "distance_m": 576.757819619344,
+      "position": "(22.02809, 0.70592, 209.8772)",
+      "route_index": 36,
+      "sim_seconds": 176.44,
+      "stuck_recoveries": 0,
+      "vehicle": "is2_1944"
+    },
+    {
+      "completed": true,
+      "distance_m": 580.644841553709,
+      "position": "(22.01726, 0.709685, 209.842)",
+      "route_index": 36,
+      "sim_seconds": 114.26,
+      "stuck_recoveries": 0,
+      "vehicle": "panther_g"
+    },
+    {
+      "completed": true,
+      "distance_m": 579.549345273604,
+      "position": "(22.08744, 0.709963, 209.8003)",
+      "route_index": 36,
+      "sim_seconds": 154.18,
+      "stuck_recoveries": 0,
+      "vehicle": "tiger_i"
+    },
+    {
+      "completed": true,
+      "distance_m": 582.324416452346,
+      "position": "(22.05137, 0.712245, 209.7584)",
+      "route_index": 36,
+      "sim_seconds": 127.4,
+      "stuck_recoveries": 0,
+      "vehicle": "jagdpanther"
+    },
+    {
+      "completed": true,
+      "distance_m": 580.617703161402,
+      "position": "(22.02088, 0.703987, 209.8196)",
+      "route_index": 36,
+      "sim_seconds": 115.66,
+      "stuck_recoveries": 0,
+      "vehicle": "su100"
+    }
+  ]
+}

@@ -106,7 +106,7 @@ jobs:
           ditto "$mounted/FlySwarm.app" "$dest"
           bin=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$dest/Contents/Info.plist")
           "$dest/Contents/MacOS/$bin" --headless --quit-after 3
-          "$dest/Contents/MacOS/$bin" --headless --fixed-fps 120 --script res://scripts/app/open_day_motion_validation.gd
+          .venv/bin/python -c 'import subprocess,sys; subprocess.run(sys.argv[1:],check=True,timeout=600)' "$dest/Contents/MacOS/$bin" --headless --fixed-fps 120 -- --validate-open-day-motion
           backend="$dest/Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend"
           test -x "$backend"
           "$backend" --check-data --data-dir "$dest/Contents/Resources/MaleCNS"

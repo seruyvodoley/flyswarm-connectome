@@ -37,6 +37,8 @@ Open Day Beta 5: карта 700×700 м, деревня из десяти пос
 удерживает дальность, обходит укрытия и отступает. Исходные данные MaleCNS не изменяются.
 [Карта, аппаратные матчи, замеры и ограничения](docs/releases/open-day-beta5-report.md).
 
+![Бой именно установленной Beta 5 со встроенным MaleCNS](docs/media/open-day-beta5/installed/live-match-1.png)
+
 ![Деревня новой карты Open Day](docs/media/open-day-beta5/village.png)
 
 ### FlySwarm Student
@@ -54,6 +56,7 @@ Open Day Beta 5: карта 700×700 м, деревня из десяти пос
 | FlySwarm, полная версия | [DMG и ZIP — Beta 5](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-beta.5) | Windows-версия Open Day не публикуется |
 | FlySwarm Student | [DMG и ZIP — Student Beta 3](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.3-macos) | [Установщик и portable ZIP — Student Beta 3](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.3-windows) |
 
+Эталонная полная версия: [Beta 5 — состав и проверки](docs/releases/REFERENCE.md).
 Рядом с пакетами опубликован `SHA256SUMS.txt` для проверки загрузки.
 macOS-приложение подписано ad-hoc и не нотариализовано; при первом запуске
 Gatekeeper может попросить разрешить открытие приложения.

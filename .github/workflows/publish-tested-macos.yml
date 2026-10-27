@@ -1,0 +1,71 @@
+name: Publish verified full macOS candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful macos-main-release workflow run containing the candidate
+        required: true
+        type: string
+      version:
+        description: Candidate package version
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-full-macos-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN: ${{ inputs.run_id }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify source run and unchanged application code
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_RUN" =~ ^[0-9]+$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]
+          run_path="repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN"
+          test "$(gh api "$run_path" --jq .conclusion)" = success
+          test "$(gh api "$run_path" --jq .head_branch)" = main
+          test "$(gh api "$run_path" --jq .path)" = .github/workflows/macos-main-release.yml
+          source_sha=$(gh api "$run_path" --jq .head_sha)
+          git diff --exit-code "$source_sha" HEAD -- frontend/godot src data requirements.txt requirements-dev.txt tools/package_macos.py .github/workflows/macos-main-release.yml
+          echo "SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Refusing to overwrite an existing release"
+            exit 1
+          fi
+      - name: Fetch the already tested artifact and verify both packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir candidate
+          gh run download "$BUILD_RUN" -n "FlySwarm-Full-macOS-arm64-$VERSION" -D candidate
+          test -s "candidate/FlySwarm-$VERSION-macos-arm64.dmg"
+          test -s "candidate/FlySwarm-$VERSION-macos-arm64.zip"
+          (cd candidate && shasum -a 256 --check SHA256SUMS.txt)
+      - name: Publish full edition without rebuilding or touching Student
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" \
+            "candidate/FlySwarm-$VERSION-macos-arm64.dmg" \
+            "candidate/FlySwarm-$VERSION-macos-arm64.zip" \
+            candidate/SHA256SUMS.txt \
+            --target "$SOURCE_SHA" --prerelease \
+            --title "FlySwarm $VERSION — macOS arm64" \
+            --notes-file "docs/releases/$VERSION.md"

@@ -1,0 +1,2720 @@
+{
+  "failures": 0,
+  "matches": [
+    {
+      "backend_disconnects": 0,
+      "completion": "complete",
+      "direct_exposure_s": 18.040000000002,
+      "fly_distance_m": 159.809880194343,
+      "fly_hits": 6,
+      "fly_shots": 7,
+      "fps": 59.0109288240182,
+      "frame_ms": {
+        "count": 2950,
+        "max": 304.061,
+        "mean": 16.946013559322,
+        "p95": 19.177,
+        "p99": 19.507
+      },
+      "map_build_ms": 1846.742,
+      "native_renderer": "Apple M2 (Apple8)",
+      "navigation": {
+        "build_ms": 181.808,
+        "ray_count": 26781,
+        "routes": 100,
+        "total_route_ms": 7.021
+      },
+      "neural_responses": 2453,
+      "neuron_count": 166700.0,
+      "player_hits": 0,
+      "player_shots": 1,
+      "seconds": 49.5600000000021,
+      "seed": 204,
+      "shot_ranges_m": {
+        "0": [
+          354.01025390625
+        ],
+        "8": [
+          353.279266357422,
+          193.20246887207,
+          186.256240844727,
+          186.256240844727,
+          186.256240844727,
+          186.256240844727,
+          186.256240844727
+        ]
+      },
+      "stuck_recoveries": 0,
+      "tactics": {
+        "decision_ms": 8.693,
+        "decisions": 41,
+        "flank_attempts": 2,
+        "position_changes": 5,
+        "recoveries": 0,
+        "states_s": {
+          "ambush": 4.87999999999998,
+          "flank": 26.7199999999995,
+          "hold": 12.7599999999998,
+          "pressure": 4.87999999999998
+        }
+      },
+      "trace": [
+        {
+          "distance": 416.274780273438,
+          "fly": [
+            36.0,
+            205.000015258789
+          ],
+          "fly_shots": 0,
+          "mode": "",
+          "player": [
+            -36.0,
+            -205.0
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            -1.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-112.0, -1.248606, 140.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 1.2,
+            "reverse": false,
+            "route_remaining": 25,
+            "standoff": 169.14,
+            "waypoint": "(-56.0, 0.422986, -196.0)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.022787019610405,
+          "time": 0.32
+        },
+        {
+          "distance": 403.730255126953,
+          "fly": [
+            29.8484973907471,
+            196.26708984375
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -41.8629913330078,
+            -201.042541503906
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.140204951854317
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-112.0, -1.248606, 140.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 6.01999999999999,
+            "reverse": false,
+            "route_remaining": 25,
+            "standoff": 169.14,
+            "waypoint": "(-56.0, 0.422986, -196.0)"
+          },
+          "player_speed": 3.12292845136499,
+          "player_yaw": -1.14642441272736,
+          "time": 5.53999999999997
+        },
+        {
+          "distance": 369.563262939453,
+          "fly": [
+            4.45503807067871,
+            172.720489501953
+          ],
+          "fly_shots": 0,
+          "mode": "pressure",
+          "player": [
+            -58.170955657959,
+            -191.497711181641
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.95943246917199
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-140.0, 1.795743, 112.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 10.8999999999999,
+            "reverse": false,
+            "route_remaining": 22,
+            "standoff": 169.14,
+            "waypoint": "(-56.0, 0.502685, -182.0)"
+          },
+          "player_speed": 2.81249005902445,
+          "player_yaw": -0.335284948348999,
+          "time": 10.7399999999999
+        },
+        {
+          "distance": 319.209869384766,
+          "fly": [
+            -25.1032161712646,
+            142.927276611328
+          ],
+          "fly_shots": 1,
+          "mode": "ambush",
+          "player": [
+            -56.7546653747559,
+            -174.709365844727
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-56.76363, 0.524525, -174.7746)",
+            "holding": true,
+            "mode": "ambush",
+            "next_decision": 16.9999999999998,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 169.14,
+            "waypoint": "(-56.75608, 0.524804, -174.7196)"
+          },
+          "player_speed": 0.548261081128663,
+          "player_yaw": 0.136421784758568,
+          "time": 15.8999999999997
+        },
+        {
+          "distance": 315.350280761719,
+          "fly": [
+            -27.5014171600342,
+            140.492660522461
+          ],
+          "fly_shots": 1,
+          "mode": "flank",
+          "player": [
+            -56.6503486633301,
+            -173.507415771484
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0688756794650649
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-168.0, 8.237358, 56.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 21.8799999999996,
+            "reverse": false,
+            "route_remaining": 16,
+            "standoff": 169.14,
+            "waypoint": "(-56.0, 0.606455, -154.0)"
+          },
+          "player_speed": 1.62646170139523,
+          "player_yaw": 0.0734394714236259,
+          "time": 21.0999999999996
+        },
+        {
+          "distance": 278.809417724609,
+          "fly": [
+            -40.8234901428223,
+            126.77156829834
+          ],
+          "fly_shots": 1,
+          "mode": "flank",
+          "player": [
+            -55.9300384521484,
+            -151.627853393555
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0310709150956061
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-168.0, 8.237358, 56.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 26.7599999999995,
+            "reverse": false,
+            "route_remaining": 15,
+            "standoff": 169.14,
+            "waypoint": "(-56.0, 0.566268, -140.0)"
+          },
+          "player_speed": 6.20990499685515,
+          "player_yaw": 0.0122581999748945,
+          "time": 26.2999999999995
+        },
+        {
+          "distance": 228.384674072266,
+          "fly": [
+            -45.4170303344727,
+            108.814361572266
+          ],
+          "fly_shots": 1,
+          "mode": "flank",
+          "player": [
+            -58.8048782348633,
+            -119.177429199219
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.715006348821253
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-210.0, 3.537832, 112.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 31.6399999999994,
+            "reverse": false,
+            "route_remaining": 17,
+            "standoff": 169.14,
+            "waypoint": "(-70.0, -0.0203, -112.0)"
+          },
+          "player_speed": 4.41134490444273,
+          "player_yaw": -0.582312524318695,
+          "time": 31.4999999999994
+        },
+        {
+          "distance": 193.521743774414,
+          "fly": [
+            -62.1425552368164,
+            91.1086196899414
+          ],
+          "fly_shots": 1,
+          "mode": "flank",
+          "player": [
+            -80.5991592407227,
+            -101.530700683594
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-79.47296, -0.339894, -102.4712)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 37.6600000000001,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 169.14,
+            "waypoint": "(-80.51102, -0.36258, -101.6044)"
+          },
+          "player_speed": 5.55500000721429,
+          "player_yaw": -0.875126123428345,
+          "time": 36.7000000000001
+        },
+        {
+          "distance": 186.256240844727,
+          "fly": [
+            -66.8317184448242,
+            86.7417068481445
+          ],
+          "fly_shots": 4,
+          "mode": "hold",
+          "player": [
+            -83.9460220336914,
+            -98.7264175415039
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-83.94602, -0.317272, -98.72642)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 42.4600000000009,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 169.14,
+            "waypoint": "(-83.94602, -0.317272, -98.72642)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.875126123428345,
+          "time": 41.900000000001
+        },
+        {
+          "distance": 186.256240844727,
+          "fly": [
+            -66.8317184448242,
+            86.7417068481445
+          ],
+          "fly_shots": 6,
+          "mode": "hold",
+          "player": [
+            -83.9460220336914,
+            -98.7264175415039
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-83.94602, -0.317272, -98.72642)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 47.2600000000016,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 169.14,
+            "waypoint": "(-83.94602, -0.317272, -98.72642)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.875126123428345,
+          "time": 47.1000000000018
+        }
+      ],
+      "vehicle": "t34_85",
+      "viewport_px": "(1280.0, 800.0)",
+      "winner": "fly"
+    },
+    {
+      "backend_disconnects": 0,
+      "completion": "complete",
+      "direct_exposure_s": 48.3600000000016,
+      "fly_distance_m": 156.14421794155,
+      "fly_hits": 6,
+      "fly_shots": 9,
+      "fps": 59.3773762388468,
+      "frame_ms": {
+        "count": 4153,
+        "max": 302.967,
+        "mean": 16.8414312545148,
+        "p95": 19.138,
+        "p99": 19.551
+      },
+      "map_build_ms": 1958.974,
+      "native_renderer": "Apple M2 (Apple8)",
+      "navigation": {
+        "build_ms": 161.372,
+        "ray_count": 27083,
+        "routes": 150,
+        "total_route_ms": 6.246
+      },
+      "neural_responses": 3460,
+      "neuron_count": 166700.0,
+      "player_hits": 3,
+      "player_shots": 6,
+      "seconds": 69.6600000000033,
+      "seed": 205,
+      "shot_ranges_m": {
+        "0": [
+          319.429962158203,
+          286.089813232422,
+          255.143157958984,
+          239.178009033203,
+          239.174423217773,
+          235.938629150391
+        ],
+        "8": [
+          326.996032714844,
+          279.4580078125,
+          239.178009033203,
+          230.711669921875,
+          219.132415771484,
+          188.73779296875,
+          188.73779296875,
+          188.73779296875,
+          188.73779296875
+        ]
+      },
+      "stuck_recoveries": 0,
+      "tactics": {
+        "decision_ms": 14.682,
+        "decisions": 58,
+        "flank_attempts": 2,
+        "position_changes": 10,
+        "recoveries": 0,
+        "states_s": {
+          "disengage": 6.09999999999996,
+          "flank": 18.1399999999997,
+          "hold": 16.3799999999997,
+          "pressure": 10.9799999999999,
+          "relocate": 17.9999999999997
+        }
+      },
+      "trace": [
+        {
+          "distance": 412.789398193359,
+          "fly": [
+            23.9999675750732,
+            204.999984741211
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -24.0001544952393,
+            -204.988632202148
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.680231377282838
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-140.0, 1.795743, 112.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 1.2,
+            "reverse": false,
+            "route_remaining": 23,
+            "standoff": 193.45,
+            "waypoint": "(-28.0, 0.263038, -196.0)"
+          },
+          "player_speed": 0.142133245725038,
+          "player_yaw": -0.020888103172183,
+          "time": 0.32
+        },
+        {
+          "distance": 392.235778808594,
+          "fly": [
+            16.4375019073486,
+            196.661102294922
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -27.4425716400146,
+            -193.112091064453
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.224815154927473
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-140.0, 1.795743, 112.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 6.01999999999999,
+            "reverse": false,
+            "route_remaining": 22,
+            "standoff": 193.45,
+            "waypoint": "(-28.0, 0.294484, -182.0)"
+          },
+          "player_speed": 4.31258584773187,
+          "player_yaw": -0.181971311569214,
+          "time": 5.47999999999997
+        },
+        {
+          "distance": 344.789611816406,
+          "fly": [
+            -8.81184768676758,
+            173.754730224609
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -30.0036888122559,
+            -170.38298034668
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -1.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-112.0, 0.05448, 28.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 10.8999999999999,
+            "reverse": false,
+            "route_remaining": 15,
+            "standoff": 193.45,
+            "waypoint": "(-42.0, 0.476697, -168.0)"
+          },
+          "player_speed": 2.36097157894854,
+          "player_yaw": -0.587496757507324,
+          "time": 10.6799999999999
+        },
+        {
+          "distance": 314.972534179688,
+          "fly": [
+            -29.3188571929932,
+            150.953704833984
+          ],
+          "fly_shots": 1,
+          "mode": "disengage",
+          "player": [
+            -32.0720100402832,
+            -164.006774902344
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.348492436531417
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.0, 0.008826, -42.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 16.9999999999998,
+            "reverse": false,
+            "route_remaining": 9,
+            "standoff": 193.45,
+            "waypoint": "(-28.0, 0.348089, -154.0)"
+          },
+          "player_speed": 2.54692247584549,
+          "player_yaw": 0.18294358253479,
+          "time": 15.8599999999998
+        },
+        {
+          "distance": 293.343841552734,
+          "fly": [
+            -29.4200897216797,
+            151.062728881836
+          ],
+          "fly_shots": 1,
+          "mode": "pressure",
+          "player": [
+            -27.3512687683105,
+            -142.273803710938
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.196969176676539
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.0, 0.008826, -42.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 21.8799999999996,
+            "reverse": false,
+            "route_remaining": 7,
+            "standoff": 193.45,
+            "waypoint": "(-28.0, 0.323285, -126.0)"
+          },
+          "player_speed": 5.68946226887684,
+          "player_yaw": 0.0756892710924149,
+          "time": 21.0599999999996
+        },
+        {
+          "distance": 259.053863525391,
+          "fly": [
+            -29.4200897216797,
+            151.062728881836
+          ],
+          "fly_shots": 2,
+          "mode": "pressure",
+          "player": [
+            -27.9264278411865,
+            -107.986839294434
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.0410879687219472
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.0, 0.008826, -42.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 26.7599999999995,
+            "reverse": false,
+            "route_remaining": 5,
+            "standoff": 193.45,
+            "waypoint": "(-28.0, 0.208465, -98.0)"
+          },
+          "player_speed": 6.94187644639932,
+          "player_yaw": -0.0316483527421951,
+          "time": 26.2599999999995
+        },
+        {
+          "distance": 239.178009033203,
+          "fly": [
+            -29.8370952606201,
+            150.201950073242
+          ],
+          "fly_shots": 2,
+          "mode": "hold",
+          "player": [
+            -28.2554550170898,
+            -88.9708099365234
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.25546, 0.144672, -88.97081)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 31.6399999999994,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-28.25546, 0.144672, -88.97081)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.010749964043498,
+          "time": 31.4599999999994
+        },
+        {
+          "distance": 235.493865966797,
+          "fly": [
+            -32.8334159851074,
+            146.478546142578
+          ],
+          "fly_shots": 3,
+          "mode": "relocate",
+          "player": [
+            -28.2554550170898,
+            -88.9708099365234
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.25546, 0.144672, -88.97081)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 37.6600000000001,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-28.25546, 0.144672, -88.97081)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.0107501624152064,
+          "time": 36.6600000000001
+        },
+        {
+          "distance": 228.505798339844,
+          "fly": [
+            -41.9930458068848,
+            139.121673583984
+          ],
+          "fly_shots": 4,
+          "mode": "relocate",
+          "player": [
+            -28.2554550170898,
+            -88.9708099365234
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.25546, 0.144672, -88.97081)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 42.4600000000009,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-28.25546, 0.144672, -88.97081)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.0107501624152064,
+          "time": 41.8600000000009
+        },
+        {
+          "distance": 217.059906005859,
+          "fly": [
+            -55.6911010742188,
+            126.348190307617
+          ],
+          "fly_shots": 5,
+          "mode": "hold",
+          "player": [
+            -28.2554550170898,
+            -88.9708099365234
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.25546, 0.144672, -88.97081)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 47.2600000000016,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-28.25546, 0.144672, -88.97081)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.0107501624152064,
+          "time": 47.0600000000018
+        },
+        {
+          "distance": 207.404403686523,
+          "fly": [
+            -57.5598907470703,
+            116.352882385254
+          ],
+          "fly_shots": 5,
+          "mode": "relocate",
+          "player": [
+            -28.2554550170898,
+            -88.9708099365234
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-28.25546, 0.144672, -88.97081)",
+            "holding": true,
+            "mode": "ambush",
+            "next_decision": 53.2600000000025,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-28.25546, 0.144672, -88.97081)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": -0.0107501624152064,
+          "time": 52.2600000000026
+        },
+        {
+          "distance": 192.559753417969,
+          "fly": [
+            -61.9719200134277,
+            100.614074707031
+          ],
+          "fly_shots": 5,
+          "mode": "flank",
+          "player": [
+            -28.2554550170898,
+            -88.9708099365234
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            1.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-126.0, 3.937605, -70.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 58.0600000000033,
+            "reverse": false,
+            "route_remaining": 8,
+            "standoff": 193.45,
+            "waypoint": "(-28.0, 0.208465, -98.0)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 1.52422869205475,
+          "time": 57.4600000000034
+        },
+        {
+          "distance": 188.73779296875,
+          "fly": [
+            -74.843994140625,
+            92.7294158935547
+          ],
+          "fly_shots": 6,
+          "mode": "hold",
+          "player": [
+            -27.6026592254639,
+            -90.0000762939453
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-27.60266, 0.148579, -90.00008)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 62.860000000004,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-27.60266, 0.148579, -90.00008)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 2.83815097808838,
+          "time": 62.6600000000042
+        },
+        {
+          "distance": 188.73779296875,
+          "fly": [
+            -74.843994140625,
+            92.7294158935547
+          ],
+          "fly_shots": 8,
+          "mode": "hold",
+          "player": [
+            -27.6026592254639,
+            -90.0000762939453
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-27.60266, 0.148579, -90.00008)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 68.9200000000037,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 193.45,
+            "waypoint": "(-27.60266, 0.148579, -90.00008)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 2.83815097808838,
+          "time": 67.8600000000036
+        }
+      ],
+      "vehicle": "panther_g",
+      "viewport_px": "(1280.0, 800.0)",
+      "winner": "fly"
+    },
+    {
+      "backend_disconnects": 0,
+      "completion": "complete",
+      "direct_exposure_s": 52.0599999999997,
+      "fly_distance_m": 198.170016261784,
+      "fly_hits": 6,
+      "fly_shots": 7,
+      "fps": 59.5050185622292,
+      "frame_ms": {
+        "count": 5386,
+        "max": 318.205,
+        "mean": 16.8053052357965,
+        "p95": 19.717,
+        "p99": 20.21
+      },
+      "map_build_ms": 1960.172,
+      "native_renderer": "Apple M2 (Apple8)",
+      "navigation": {
+        "build_ms": 168.199,
+        "ray_count": 27125,
+        "routes": 160,
+        "total_route_ms": 7.498
+      },
+      "neural_responses": 4471,
+      "neuron_count": 166700.0,
+      "player_hits": 0,
+      "player_shots": 6,
+      "seconds": 90.1799999999992,
+      "seed": 206,
+      "shot_ranges_m": {
+        "0": [
+          346.595153808594,
+          267.716003417969,
+          267.343658447266,
+          267.343658447266,
+          267.253784179688,
+          262.36279296875
+        ],
+        "8": [
+          267.343658447266,
+          267.343658447266,
+          267.343658447266,
+          253.739105224609,
+          243.773880004883,
+          215.637542724609,
+          215.637542724609
+        ]
+      },
+      "stuck_recoveries": 0,
+      "tactics": {
+        "decision_ms": 15.586,
+        "decisions": 75,
+        "flank_attempts": 4,
+        "position_changes": 10,
+        "recoveries": 0,
+        "states_s": {
+          "ambush": 14.5399999999998,
+          "flank": 20.6599999999996,
+          "hold": 24.5399999999996,
+          "pressure": 12.1999999999998,
+          "relocate": 18.0999999999997
+        }
+      },
+      "trace": [
+        {
+          "distance": 412.785552978516,
+          "fly": [
+            -23.9999122619629,
+            204.993316650391
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            24.000114440918,
+            -204.991836547852
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.680070168031871
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(98.0, -0.165434, 28.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 1.2,
+            "reverse": false,
+            "route_remaining": 18,
+            "standoff": 214.65,
+            "waypoint": "(28.0, 0.068779, -196.0)"
+          },
+          "player_speed": 0.109568581649593,
+          "player_yaw": 0.020888103172183,
+          "time": 0.32
+        },
+        {
+          "distance": 397.708862304688,
+          "fly": [
+            -18.8297100067139,
+            198.937225341797
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            26.735523223877,
+            -196.152709960938
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.216513642258192
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(98.0, -0.165434, 28.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 6.01999999999999,
+            "reverse": false,
+            "route_remaining": 17,
+            "standoff": 214.65,
+            "waypoint": "(28.0, 0.097678, -182.0)"
+          },
+          "player_speed": 3.19020571829443,
+          "player_yaw": 0.215526431798935,
+          "time": 5.45999999999997
+        },
+        {
+          "distance": 354.316070556641,
+          "fly": [
+            0.264864802360535,
+            181.926177978516
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            28.4872856140137,
+            -171.263702392578
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0319506262283228
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(98.0, -0.165434, 28.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 10.8999999999999,
+            "reverse": false,
+            "route_remaining": 15,
+            "standoff": 214.65,
+            "waypoint": "(28.0, 0.163393, -154.0)"
+          },
+          "player_speed": 6.44373216133667,
+          "player_yaw": -0.00946939177811146,
+          "time": 10.6599999999999
+        },
+        {
+          "distance": 310.571563720703,
+          "fly": [
+            25.9563007354736,
+            156.132766723633
+          ],
+          "fly_shots": 0,
+          "mode": "pressure",
+          "player": [
+            19.1077785491943,
+            -154.360717773438
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            1.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(14.0, 0.242613, -98.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 16.9999999999998,
+            "reverse": false,
+            "route_remaining": 4,
+            "standoff": 214.65,
+            "waypoint": "(14.0, 0.179685, -140.0)"
+          },
+          "player_speed": 3.09565103442268,
+          "player_yaw": -1.19074416160583,
+          "time": 15.8599999999998
+        },
+        {
+          "distance": 278.0439453125,
+          "fly": [
+            51.009449005127,
+            130.934295654297
+          ],
+          "fly_shots": 0,
+          "mode": "ambush",
+          "player": [
+            12.6974582672119,
+            -144.452758789062
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(12.70909, 0.15082, -145.2499)",
+            "holding": true,
+            "mode": "ambush",
+            "next_decision": 21.8799999999996,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(12.69785, 0.151936, -144.4821)"
+          },
+          "player_speed": 1.47770462106804,
+          "player_yaw": -0.0134757617488503,
+          "time": 21.0599999999996
+        },
+        {
+          "distance": 274.311584472656,
+          "fly": [
+            54.9867858886719,
+            126.963371276855
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            12.6979141235352,
+            -144.064529418945
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            1.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(210.0, 8.580992, -28.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 26.7599999999995,
+            "reverse": false,
+            "route_remaining": 14,
+            "standoff": 214.65,
+            "waypoint": "(28.0, 0.241185, -126.0)"
+          },
+          "player_speed": 0.369700941525753,
+          "player_yaw": 0.08328527957201,
+          "time": 26.2599999999995
+        },
+        {
+          "distance": 267.343627929688,
+          "fly": [
+            61.2940063476562,
+            120.590881347656
+          ],
+          "fly_shots": 0,
+          "mode": "hold",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 31.6399999999994,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 31.4599999999994
+        },
+        {
+          "distance": 267.343658447266,
+          "fly": [
+            61.2940063476562,
+            120.590881347656
+          ],
+          "fly_shots": 2,
+          "mode": "hold",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 37.6600000000001,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 36.5600000000001
+        },
+        {
+          "distance": 263.739471435547,
+          "fly": [
+            62.154182434082,
+            116.76668548584
+          ],
+          "fly_shots": 3,
+          "mode": "relocate",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 42.4600000000009,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 41.7600000000009
+        },
+        {
+          "distance": 256.391784667969,
+          "fly": [
+            73.3996124267578,
+            106.844093322754
+          ],
+          "fly_shots": 3,
+          "mode": "ambush",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 47.2600000000016,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 46.9600000000017
+        },
+        {
+          "distance": 255.831954956055,
+          "fly": [
+            74.2745590209961,
+            106.055389404297
+          ],
+          "fly_shots": 3,
+          "mode": "flank",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 53.2600000000025,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 52.1600000000026
+        },
+        {
+          "distance": 253.739105224609,
+          "fly": [
+            77.7788772583008,
+            103.006874084473
+          ],
+          "fly_shots": 4,
+          "mode": "relocate",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 58.0600000000033,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 57.3600000000034
+        },
+        {
+          "distance": 245.388442993164,
+          "fly": [
+            85.1633758544922,
+            92.228401184082
+          ],
+          "fly_shots": 4,
+          "mode": "relocate",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 62.860000000004,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 62.5600000000042
+        },
+        {
+          "distance": 242.824340820312,
+          "fly": [
+            88.2885513305664,
+            88.5544052124023
+          ],
+          "fly_shots": 5,
+          "mode": "relocate",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 68.9200000000037,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 67.7600000000037
+        },
+        {
+          "distance": 221.787063598633,
+          "fly": [
+            83.8431701660156,
+            67.8665618896484
+          ],
+          "fly_shots": 5,
+          "mode": "hold",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(13.34025, 0.155412, -142.4134)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 73.8000000000027,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(13.34025, 0.155412, -142.4134)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.17467799782753,
+          "time": 72.9600000000026
+        },
+        {
+          "distance": 219.15217590332,
+          "fly": [
+            83.5033798217773,
+            65.2006301879883
+          ],
+          "fly_shots": 5,
+          "mode": "flank",
+          "player": [
+            13.3402452468872,
+            -142.41340637207
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            1.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(98.0, -0.188948, -168.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 78.6800000000017,
+            "reverse": false,
+            "route_remaining": 6,
+            "standoff": 214.65,
+            "waypoint": "(28.0, 0.163393, -154.0)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.266063421964645,
+          "time": 78.1600000000016
+        },
+        {
+          "distance": 215.823760986328,
+          "fly": [
+            89.4678726196289,
+            59.645866394043
+          ],
+          "fly_shots": 5,
+          "mode": "flank",
+          "player": [
+            15.5821237564087,
+            -143.133438110352
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.418721985474006
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(98.0, -0.188948, -168.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 83.5600000000008,
+            "reverse": false,
+            "route_remaining": 6,
+            "standoff": 214.65,
+            "waypoint": "(28.0, 0.163393, -154.0)"
+          },
+          "player_speed": 1.6102027452143,
+          "player_yaw": 2.04549717903137,
+          "time": 83.3600000000006
+        },
+        {
+          "distance": 215.637542724609,
+          "fly": [
+            91.2351150512695,
+            58.6728668212891
+          ],
+          "fly_shots": 6,
+          "mode": "hold",
+          "player": [
+            16.2638034820557,
+            -143.509124755859
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(16.2638, 0.156215, -143.5091)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 89.6599999999995,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 214.65,
+            "waypoint": "(16.2638, 0.156215, -143.5091)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 2.09305453300476,
+          "time": 88.5599999999995
+        }
+      ],
+      "vehicle": "su100",
+      "viewport_px": "(1280.0, 800.0)",
+      "winner": "fly"
+    },
+    {
+      "backend_disconnects": 0,
+      "completion": "complete",
+      "direct_exposure_s": 87.2599999999979,
+      "fly_distance_m": 97.6379979199774,
+      "fly_hits": 6,
+      "fly_shots": 10,
+      "fps": 59.5687330320842,
+      "frame_ms": {
+        "count": 5812,
+        "max": 303.406,
+        "mean": 16.7873303509979,
+        "p95": 19.068,
+        "p99": 19.494
+      },
+      "map_build_ms": 1894.408,
+      "native_renderer": "Apple M2 (Apple8)",
+      "navigation": {
+        "build_ms": 161.015,
+        "ray_count": 27222,
+        "routes": 170,
+        "total_route_ms": 7.844
+      },
+      "neural_responses": 4840,
+      "neuron_count": 166700.0,
+      "player_hits": 0,
+      "player_shots": 3,
+      "seconds": 97.2599999999978,
+      "seed": 207,
+      "shot_ranges_m": {
+        "0": [
+          357.682434082031,
+          323.2578125,
+          300.475372314453
+        ],
+        "8": [
+          380.875579833984,
+          364.447601318359,
+          331.777313232422,
+          308.112365722656,
+          223.247299194336,
+          202.325637817383,
+          201.464553833008,
+          194.459747314453,
+          185.673400878906,
+          176.749069213867
+        ]
+      },
+      "stuck_recoveries": 0,
+      "tactics": {
+        "decision_ms": 20.07,
+        "decisions": 81,
+        "flank_attempts": 1,
+        "position_changes": 14,
+        "recoveries": 0,
+        "states_s": {
+          "disengage": 18.1999999999997,
+          "flank": 10.9399999999999,
+          "hold": 15.9399999999997,
+          "pressure": 21.7399999999996,
+          "relocate": 30.3999999999994
+        }
+      },
+      "trace": [
+        {
+          "distance": 416.267456054688,
+          "fly": [
+            -36.0000076293945,
+            204.996459960938
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            35.9999809265137,
+            -204.99690246582
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -1.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-154.0, 5.094931, 84.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 1.2,
+            "reverse": false,
+            "route_remaining": 23,
+            "standoff": 165.91,
+            "waypoint": "(28.0, 0.068779, -196.0)"
+          },
+          "player_speed": 0.0546531663619419,
+          "player_yaw": -0.0132924309000373,
+          "time": 0.32
+        },
+        {
+          "distance": 408.541198730469,
+          "fly": [
+            -38.1587066650391,
+            200.696151733398
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            33.7635917663574,
+            -201.464340209961
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.171608487636744
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-154.0, 5.094931, 84.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 6.01999999999999,
+            "reverse": false,
+            "route_remaining": 23,
+            "standoff": 165.91,
+            "waypoint": "(28.0, 0.068779, -196.0)"
+          },
+          "player_speed": 1.62580417976224,
+          "player_yaw": -0.711647689342499,
+          "time": 5.45999999999997
+        },
+        {
+          "distance": 388.335784912109,
+          "fly": [
+            -41.5821685791016,
+            190.783233642578
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            24.3767757415771,
+            -191.909957885742
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0201132013614864
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-154.0, 5.094931, 84.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 10.8999999999999,
+            "reverse": false,
+            "route_remaining": 22,
+            "standoff": 165.91,
+            "waypoint": "(14.0, 0.115178, -182.0)"
+          },
+          "player_speed": 3.64674670996661,
+          "player_yaw": -0.796612679958344,
+          "time": 10.6599999999999
+        },
+        {
+          "distance": 358.851379394531,
+          "fly": [
+            -42.42626953125,
+            177.034774780273
+          ],
+          "fly_shots": 2,
+          "mode": "disengage",
+          "player": [
+            12.7008838653564,
+            -177.556976318359
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.653576276350842
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.054273, 28.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 15.7799999999998,
+            "reverse": false,
+            "route_remaining": 15,
+            "standoff": 165.91,
+            "waypoint": "(14.0, 0.136116, -168.0)"
+          },
+          "player_speed": 2.51507132164364,
+          "player_yaw": -0.247863262891769,
+          "time": 15.7799999999998
+        },
+        {
+          "distance": 345.075042724609,
+          "fly": [
+            -42.42626953125,
+            177.034774780273
+          ],
+          "fly_shots": 2,
+          "mode": "pressure",
+          "player": [
+            12.8774671554565,
+            -163.579788208008
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.0488117998509776
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.054273, 28.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 21.8799999999996,
+            "reverse": false,
+            "route_remaining": 14,
+            "standoff": 165.91,
+            "waypoint": "(14.0, 0.157854, -154.0)"
+          },
+          "player_speed": 3.51721705384046,
+          "player_yaw": 0.0879646688699722,
+          "time": 20.9799999999996
+        },
+        {
+          "distance": 324.04736328125,
+          "fly": [
+            -42.42626953125,
+            177.034774780273
+          ],
+          "fly_shots": 3,
+          "mode": "disengage",
+          "player": [
+            14.0957717895508,
+            -142.04508972168
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -1.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.054273, 28.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 26.7599999999995,
+            "reverse": false,
+            "route_remaining": 12,
+            "standoff": 165.91,
+            "waypoint": "(0.0, 0.18604, -126.0)"
+          },
+          "player_speed": 3.4409955442258,
+          "player_yaw": -0.102008141577244,
+          "time": 26.1799999999995
+        },
+        {
+          "distance": 312.454650878906,
+          "fly": [
+            -42.2106094360352,
+            177.268981933594
+          ],
+          "fly_shots": 3,
+          "mode": "pressure",
+          "player": [
+            7.63386201858521,
+            -131.184326171875
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.246370494328267
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.054273, 28.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 31.6399999999994,
+            "reverse": false,
+            "route_remaining": 12,
+            "standoff": 165.91,
+            "waypoint": "(0.0, 0.18604, -126.0)"
+          },
+          "player_speed": 2.5213949761556,
+          "player_yaw": -0.829804003238678,
+          "time": 31.3799999999994
+        },
+        {
+          "distance": 303.379425048828,
+          "fly": [
+            -42.2106094360352,
+            177.268981933594
+          ],
+          "fly_shots": 4,
+          "mode": "relocate",
+          "player": [
+            0.63681161403656,
+            -123.069465637207
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.402149301097031
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.054273, 28.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 37.6600000000001,
+            "reverse": false,
+            "route_remaining": 11,
+            "standoff": 165.91,
+            "waypoint": "(0.0, 0.186257, -112.0)"
+          },
+          "player_speed": 1.78214327084047,
+          "player_yaw": -0.292559325695038,
+          "time": 36.5800000000001
+        },
+        {
+          "distance": 287.831695556641,
+          "fly": [
+            -41.1479568481445,
+            173.957305908203
+          ],
+          "fly_shots": 4,
+          "mode": "pressure",
+          "player": [
+            -0.544677436351776,
+            -110.996124267578
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.0838055694631333
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.054273, 28.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 42.4600000000009,
+            "reverse": false,
+            "route_remaining": 10,
+            "standoff": 165.91,
+            "waypoint": "(0.0, 0.183254, -98.0)"
+          },
+          "player_speed": 3.08448867849586,
+          "player_yaw": -0.00722071807831526,
+          "time": 41.7800000000009
+        },
+        {
+          "distance": 251.756607055664,
+          "fly": [
+            -41.3590202331543,
+            158.406723022461
+          ],
+          "fly_shots": 4,
+          "mode": "pressure",
+          "player": [
+            -0.0810104534029961,
+            -89.9428634643555
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0146009910464429
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(-14.0, 0.055882, 0.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 47.2600000000016,
+            "reverse": false,
+            "route_remaining": 7,
+            "standoff": 165.91,
+            "waypoint": "(0.0, 0.179051, -84.0)"
+          },
+          "player_speed": 5.11838710012472,
+          "player_yaw": 0.0223004873842001,
+          "time": 46.9800000000017
+        },
+        {
+          "distance": 202.759918212891,
+          "fly": [
+            -42.2842674255371,
+            136.259658813477
+          ],
+          "fly_shots": 5,
+          "mode": "disengage",
+          "player": [
+            0.133035317063332,
+            -62.0137596130371
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.133079, 0.154587, -62.25028)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 53.2600000000025,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.133044, 0.154552, -62.04971)"
+          },
+          "player_speed": 1.79553735691759,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 52.1800000000026
+        },
+        {
+          "distance": 202.325637817383,
+          "fly": [
+            -42.2842674255371,
+            136.259658813477
+          ],
+          "fly_shots": 5,
+          "mode": "hold",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 58.0600000000033,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 57.3800000000034
+        },
+        {
+          "distance": 202.325637817383,
+          "fly": [
+            -42.2842674255371,
+            136.259658813477
+          ],
+          "fly_shots": 5,
+          "mode": "hold",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 62.860000000004,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 62.5800000000042
+        },
+        {
+          "distance": 202.324584960938,
+          "fly": [
+            -42.2864723205566,
+            136.258117675781
+          ],
+          "fly_shots": 6,
+          "mode": "relocate",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 68.9200000000037,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 67.7800000000037
+        },
+        {
+          "distance": 201.464553833008,
+          "fly": [
+            -42.7725563049316,
+            135.27311706543
+          ],
+          "fly_shots": 6,
+          "mode": "hold",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 73.8000000000027,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 72.9800000000026
+        },
+        {
+          "distance": 200.930465698242,
+          "fly": [
+            -42.8198623657227,
+            134.716110229492
+          ],
+          "fly_shots": 7,
+          "mode": "relocate",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 78.6800000000017,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 78.1800000000016
+        },
+        {
+          "distance": 193.692428588867,
+          "fly": [
+            -42.4955520629883,
+            127.37361907959
+          ],
+          "fly_shots": 8,
+          "mode": "hold",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 83.5600000000008,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 83.3800000000005
+        },
+        {
+          "distance": 188.511993408203,
+          "fly": [
+            -42.3097801208496,
+            122.10228729248
+          ],
+          "fly_shots": 8,
+          "mode": "relocate",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 89.6599999999995,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 88.5799999999995
+        },
+        {
+          "distance": 183.122161865234,
+          "fly": [
+            -42.1566772460938,
+            116.602478027344
+          ],
+          "fly_shots": 9,
+          "mode": "relocate",
+          "player": [
+            0.132855072617531,
+            -61.5696792602539
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": -1.0,
+            "goal": "(0.132855, 0.154468, -61.56968)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 94.5399999999986,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 165.91,
+            "waypoint": "(0.132855, 0.154468, -61.56968)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 7.82999904913595e-06,
+          "time": 93.7799999999985
+        }
+      ],
+      "vehicle": "tiger_i",
+      "viewport_px": "(1280.0, 800.0)",
+      "winner": "fly"
+    },
+    {
+      "backend_disconnects": 0,
+      "completion": "complete",
+      "direct_exposure_s": 42.9000000000028,
+      "fly_distance_m": 68.6491883511626,
+      "fly_hits": 6,
+      "fly_shots": 7,
+      "fps": 66.6101932903956,
+      "frame_ms": {
+        "count": 4195,
+        "max": 428.431,
+        "mean": 15.0127172824792,
+        "p95": 19.106,
+        "p99": 22.376
+      },
+      "map_build_ms": 1969.76,
+      "native_renderer": "Apple M2 (Apple8)",
+      "navigation": {
+        "build_ms": 160.867,
+        "ray_count": 26907,
+        "routes": 120,
+        "total_route_ms": 4.507
+      },
+      "neural_responses": 2823,
+      "neuron_count": 166700.0,
+      "player_hits": 0,
+      "player_shots": 1,
+      "seconds": 62.7800000000042,
+      "seed": 208,
+      "shot_ranges_m": {
+        "0": [
+          340.423034667969
+        ],
+        "8": [
+          344.285888671875,
+          262.3017578125,
+          249.947967529297,
+          238.294967651367,
+          238.294967651367,
+          238.294967651367,
+          238.294967651367
+        ]
+      },
+      "stuck_recoveries": 0,
+      "tactics": {
+        "decision_ms": 13.035,
+        "decisions": 52,
+        "flank_attempts": 2,
+        "position_changes": 9,
+        "recoveries": 0,
+        "states_s": {
+          "ambush": 3.6,
+          "disengage": 6.09999999999996,
+          "flank": 16.9399999999997,
+          "hold": 14.2399999999998,
+          "pressure": 9.75999999999988,
+          "relocate": 12.0399999999998
+        }
+      },
+      "trace": [
+        {
+          "distance": 416.271240234375,
+          "fly": [
+            35.99951171875,
+            205.000457763672
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -35.9999618530273,
+            -204.995986938477
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            1.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(196.0, 4.842353, 42.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 1.2,
+            "reverse": false,
+            "route_remaining": 19,
+            "standoff": 225.0,
+            "waypoint": "(-28.0, 0.263038, -196.0)"
+          },
+          "player_speed": 0.0822224998466101,
+          "player_yaw": 0.0170902665704489,
+          "time": 0.32
+        },
+        {
+          "distance": 400.971466064453,
+          "fly": [
+            40.2146339416504,
+            196.827545166016
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -30.7079105377197,
+            -197.819900512695
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.0797588285439478
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(196.0, 4.842353, 42.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 6.01999999999999,
+            "reverse": false,
+            "route_remaining": 18,
+            "standoff": 225.0,
+            "waypoint": "(-14.0, 0.198479, -182.0)"
+          },
+          "player_speed": 3.55477885035262,
+          "player_yaw": 0.766107141971588,
+          "time": 5.51999999999997
+        },
+        {
+          "distance": 360.190216064453,
+          "fly": [
+            45.0697059631348,
+            178.496200561523
+          ],
+          "fly_shots": 0,
+          "mode": "flank",
+          "player": [
+            -9.62302207946777,
+            -177.512435913086
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0272919416568321
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(196.0, 4.842353, 42.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 10.8999999999999,
+            "reverse": false,
+            "route_remaining": 17,
+            "standoff": 225.0,
+            "waypoint": "(0.0, 0.158089, -168.0)"
+          },
+          "player_speed": 7.14438838411675,
+          "player_yaw": 0.807266652584076,
+          "time": 10.7199999999999
+        },
+        {
+          "distance": 336.279296875,
+          "fly": [
+            46.2481918334961,
+            176.59700012207
+          ],
+          "fly_shots": 1,
+          "mode": "disengage",
+          "player": [
+            2.794189453125,
+            -156.85725402832
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0568662609051332
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(14.0, 0.306042, -42.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 16.9999999999998,
+            "reverse": false,
+            "route_remaining": 8,
+            "standoff": 225.0,
+            "waypoint": "(0.0, 0.181135, -140.0)"
+          },
+          "player_speed": 3.38087049146938,
+          "player_yaw": -0.131346300244331,
+          "time": 15.8599999999998
+        },
+        {
+          "distance": 312.513122558594,
+          "fly": [
+            45.5539131164551,
+            177.084335327148
+          ],
+          "fly_shots": 1,
+          "mode": "pressure",
+          "player": [
+            -0.383635252714157,
+            -132.028091430664
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.196023642011854
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(14.0, 0.306042, -42.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 21.8799999999996,
+            "reverse": false,
+            "route_remaining": 7,
+            "standoff": 225.0,
+            "waypoint": "(0.0, 0.18604, -126.0)"
+          },
+          "player_speed": 5.77755609237663,
+          "player_yaw": -0.0529041960835457,
+          "time": 21.0599999999996
+        },
+        {
+          "distance": 276.276824951172,
+          "fly": [
+            39.1220283508301,
+            175.816848754883
+          ],
+          "fly_shots": 1,
+          "mode": "pressure",
+          "player": [
+            -0.111742176115513,
+            -97.6547698974609
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            -0.0276414861620917
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(14.0, 0.306042, -42.0)",
+            "holding": false,
+            "mode": "pressure",
+            "next_decision": 26.7599999999995,
+            "reverse": false,
+            "route_remaining": 4,
+            "standoff": 225.0,
+            "waypoint": "(0.0, 0.179051, -84.0)"
+          },
+          "player_speed": 7.49827834477546,
+          "player_yaw": 0.0244870129972696,
+          "time": 26.2599999999995
+        },
+        {
+          "distance": 260.976928710938,
+          "fly": [
+            36.0940246582031,
+            173.027572631836
+          ],
+          "fly_shots": 2,
+          "mode": "relocate",
+          "player": [
+            0.14885325729847,
+            -85.4573822021484
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(0.148853, 0.160134, -85.45738)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 31.6399999999994,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 225.0,
+            "waypoint": "(0.148853, 0.160134, -85.45738)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.0208349917083979,
+          "time": 31.4599999999994
+        },
+        {
+          "distance": 249.93017578125,
+          "fly": [
+            32.0414543151855,
+            162.425323486328
+          ],
+          "fly_shots": 3,
+          "mode": "relocate",
+          "player": [
+            0.14885325729847,
+            -85.4573822021484
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(0.148853, 0.160134, -85.45738)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 37.6600000000001,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 225.0,
+            "waypoint": "(0.148853, 0.160134, -85.45738)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.0208345074206591,
+          "time": 36.6600000000001
+        },
+        {
+          "distance": 244.039489746094,
+          "fly": [
+            26.6114616394043,
+            157.139663696289
+          ],
+          "fly_shots": 3,
+          "mode": "relocate",
+          "player": [
+            0.14885325729847,
+            -85.4573822021484
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(0.148853, 0.160134, -85.45738)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 42.4600000000009,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 225.0,
+            "waypoint": "(0.148853, 0.160134, -85.45738)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.0208340231329203,
+          "time": 41.8600000000009
+        },
+        {
+          "distance": 242.005599975586,
+          "fly": [
+            22.5826168060303,
+            155.503463745117
+          ],
+          "fly_shots": 3,
+          "mode": "flank",
+          "player": [
+            0.14885325729847,
+            -85.4573822021484
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            1.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(196.0, 7.220083, 14.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 47.2600000000016,
+            "reverse": false,
+            "route_remaining": 14,
+            "standoff": 225.0,
+            "waypoint": "(14.0, 0.262338, -84.0)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 0.181054949760437,
+          "time": 47.0600000000018
+        },
+        {
+          "distance": 238.716552734375,
+          "fly": [
+            23.3633651733398,
+            153.756881713867
+          ],
+          "fly_shots": 3,
+          "mode": "flank",
+          "player": [
+            3.96706295013428,
+            -84.1677474975586
+          ],
+          "player_motion": [
+            0.88,
+            0.0,
+            0.216943289467846
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(196.0, 7.220083, 14.0)",
+            "holding": false,
+            "mode": "flank",
+            "next_decision": 52.0600000000024,
+            "reverse": false,
+            "route_remaining": 14,
+            "standoff": 225.0,
+            "waypoint": "(14.0, 0.262338, -84.0)"
+          },
+          "player_speed": 1.9968155634725,
+          "player_yaw": 1.42741012573242,
+          "time": 52.0600000000025
+        },
+        {
+          "distance": 238.294967651367,
+          "fly": [
+            23.6240940093994,
+            153.427368164062
+          ],
+          "fly_shots": 4,
+          "mode": "hold",
+          "player": [
+            4.48922252655029,
+            -84.0955123901367
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(4.489223, 0.181422, -84.09551)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 58.0600000000033,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 225.0,
+            "waypoint": "(4.489223, 0.181422, -84.09551)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 1.43491804599762,
+          "time": 57.1400000000033
+        },
+        {
+          "distance": 238.294967651367,
+          "fly": [
+            23.6240940093994,
+            153.427368164062
+          ],
+          "fly_shots": 6,
+          "mode": "hold",
+          "player": [
+            4.48922252655029,
+            -84.0955123901367
+          ],
+          "player_motion": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "player_plan": {
+            "flank_sign": 1.0,
+            "goal": "(4.489223, 0.181422, -84.09551)",
+            "holding": true,
+            "mode": "hold",
+            "next_decision": 62.860000000004,
+            "reverse": false,
+            "route_remaining": 0,
+            "standoff": 225.0,
+            "waypoint": "(4.489223, 0.181422, -84.09551)"
+          },
+          "player_speed": 0.0,
+          "player_yaw": 1.43491804599762,
+          "time": 62.2600000000041
+        }
+      ],
+      "vehicle": "jagdpanther",
+      "viewport_px": "(1280.0, 800.0)",
+      "winner": "fly"
+    }
+  ],
+  "rule_only": false,
+  "synthetic_player_input": true,
+  "source_commit": "a5c2820b24337c472d1a637d1a3caafe6fd9a291",
+  "hardware": {
+    "cpu": "Apple M2",
+    "ram_bytes": 8589934592,
+    "os": "macOS 27.0.1",
+    "godot": "4.7.2",
+    "renderer": "Metal Mobile"
+  }
+}

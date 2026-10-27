@@ -1,0 +1,115 @@
+{
+  "backend_state": "READY",
+  "battle_simulation_seconds": 21.3799999999996,
+  "camera_override": -1,
+  "cpu_gpu_load": "not sampled by Godot; use Activity Monitor for a separate OS-level capture",
+  "disabled_previews": [],
+  "display_backend": "macOS",
+  "draw_calls": {
+    "max": 769.0,
+    "mean": 576.624581939799,
+    "p99": 746.0
+  },
+  "frame_ms": {
+    "max": 109.432,
+    "mean": 16.6960175585284,
+    "p99": 22.221
+  },
+  "godot_version": {
+    "build": "official",
+    "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+    "hex": 263938,
+    "major": 4,
+    "minor": 7,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.7.2-stable (official)",
+    "timestamp": 0
+  },
+  "gpu_time": "not exposed by the active Godot renderer/API",
+  "graphics_overrides": {},
+  "impact_frame_count": 2,
+  "impact_frame_ms": {
+    "max": 29.204,
+    "mean": 23.236,
+    "p99": 29.204
+  },
+  "ipc_latency_ms_series": {
+    "max": 263.493,
+    "mean": 19.433653304442,
+    "p99": 61.264
+  },
+  "male_cns": "real FlyBrain(batch=1)",
+  "male_cns_request_count": 990,
+  "male_cns_response_count": 989,
+  "male_cns_tick_ms": 5.25424999068491,
+  "male_cns_tick_ms_series": {
+    "max": 85.9534580085892,
+    "mean": 6.44763736844488,
+    "p99": 37.3678750183899
+  },
+  "mode": "battle-brain",
+  "physics_ms": {
+    "max": 97.556,
+    "mean": 10.8767642140468,
+    "p99": 97.556
+  },
+  "presentation_fps": 59.7515683662607,
+  "preview_rate_hz": 30.0,
+  "process_ms": {
+    "max": 23.988,
+    "mean": 17.4696814381271,
+    "p99": 23.988
+  },
+  "rendered_objects": {
+    "max": 1794.0,
+    "mean": 1602.3152173913,
+    "p99": 1771.0
+  },
+  "rendered_primitives": {
+    "max": 3389641.0,
+    "mean": 2413160.07692308,
+    "p99": 3387929.0
+  },
+  "renderer": "Apple M2 (Apple8)",
+  "requested_sample_seconds": 20.0,
+  "root_viewport_px": [
+    1280,
+    800
+  ],
+  "sample_neural_response_rate_hz": 46.1126234130925,
+  "sample_neural_responses": 923,
+  "sample_physics_steps": 1002,
+  "sample_realtime_factor": 1.00118848667211,
+  "sample_simulation_elapsed_seconds": 20.0399999999996,
+  "sample_wall_elapsed_seconds": 20.016211,
+  "sampled_frames": 1196,
+  "screen_pixels": [
+    2880,
+    1800
+  ],
+  "screen_scale": 2.0,
+  "shot_frame_count": 2,
+  "shot_frame_ms": {
+    "max": 45.33,
+    "mean": 31.1645,
+    "p99": 45.33
+  },
+  "static_memory_bytes": {
+    "max": 309892947.0,
+    "mean": 305779285.362876,
+    "p99": 309719299.0
+  },
+  "subviewport_count": 0,
+  "synthetic_fire_input": true,
+  "video_memory_bytes": {
+    "max": 337526784.0,
+    "mean": 337526784.0,
+    "p99": 337526784.0
+  },
+  "vsync_mode": 1,
+  "window_logical_px": [
+    1280,
+    800
+  ]
+}

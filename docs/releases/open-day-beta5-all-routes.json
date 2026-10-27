@@ -1,0 +1,254 @@
+[
+  {
+    "buildings": 10,
+    "corridors": [
+      {
+        "clear": true,
+        "length_m": 589.510446548462
+      },
+      {
+        "clear": true,
+        "length_m": 451.404353141785
+      },
+      {
+        "clear": true,
+        "length_m": 585.555966377258
+      }
+    ],
+    "extent_m": 700,
+    "failures": 0,
+    "flank_physical_motion_m": 45.2878074645996,
+    "height_max_m": 9.92214861996234,
+    "height_min_m": -2.17376671550678,
+    "map_build_ms": 865.295,
+    "max_grade": 0.22719894349575,
+    "nav_build_ms": 160.985,
+    "route_calls": 151,
+    "route_total_ms": 4.786,
+    "route_vehicles": [
+      {
+        "completed": true,
+        "distance_m": 582.166877048665,
+        "position": "(22.11953, 0.705886, 209.8065)",
+        "route_index": 36,
+        "sim_seconds": 117.56,
+        "stuck_recoveries": 0,
+        "vehicle": "t34_85"
+      },
+      {
+        "completed": true,
+        "distance_m": 577.330293430961,
+        "position": "(22.02897, 0.706012, 209.8733)",
+        "route_index": 36,
+        "sim_seconds": 176.44,
+        "stuck_recoveries": 0,
+        "vehicle": "is2_1944"
+      },
+      {
+        "completed": true,
+        "distance_m": 580.748960500649,
+        "position": "(22.10512, 0.712319, 209.8262)",
+        "route_index": 36,
+        "sim_seconds": 114.3,
+        "stuck_recoveries": 0,
+        "vehicle": "panther_g"
+      },
+      {
+        "completed": true,
+        "distance_m": 579.477236739561,
+        "position": "(22.04886, 0.70921, 209.8055)",
+        "route_index": 36,
+        "sim_seconds": 154.12,
+        "stuck_recoveries": 0,
+        "vehicle": "tiger_i"
+      },
+      {
+        "completed": true,
+        "distance_m": 582.225874058237,
+        "position": "(22.02069, 0.711449, 209.7677)",
+        "route_index": 36,
+        "sim_seconds": 127.34,
+        "stuck_recoveries": 0,
+        "vehicle": "jagdpanther"
+      },
+      {
+        "completed": true,
+        "distance_m": 580.627694460163,
+        "position": "(22.01405, 0.70382, 209.8226)",
+        "route_index": 36,
+        "sim_seconds": 115.68,
+        "stuck_recoveries": 0,
+        "vehicle": "su100"
+      }
+    ],
+    "corridor": "west"
+  },
+  {
+    "buildings": 10,
+    "corridors": [
+      {
+        "clear": true,
+        "length_m": 589.510446548462
+      },
+      {
+        "clear": true,
+        "length_m": 451.404353141785
+      },
+      {
+        "clear": true,
+        "length_m": 585.555966377258
+      }
+    ],
+    "extent_m": 700,
+    "failures": 0,
+    "flank_physical_motion_m": 45.2878074645996,
+    "height_max_m": 9.92214861996234,
+    "height_min_m": -2.17376671550678,
+    "map_build_ms": 848.478,
+    "max_grade": 0.22719894349575,
+    "nav_build_ms": 158.97,
+    "route_calls": 151,
+    "route_total_ms": 4.679,
+    "route_vehicles": [
+      {
+        "completed": true,
+        "distance_m": 445.489428170788,
+        "position": "(22.1814, 0.728244, 208.5858)",
+        "route_index": 32,
+        "sim_seconds": 73.62,
+        "stuck_recoveries": 0,
+        "vehicle": "t34_85"
+      },
+      {
+        "completed": true,
+        "distance_m": 443.437177888304,
+        "position": "(22.23496, 0.733181, 208.3576)",
+        "route_index": 32,
+        "sim_seconds": 115.04,
+        "stuck_recoveries": 0,
+        "vehicle": "is2_1944"
+      },
+      {
+        "completed": true,
+        "distance_m": 445.279514214445,
+        "position": "(22.19955, 0.725205, 208.778)",
+        "route_index": 32,
+        "sim_seconds": 78.22,
+        "stuck_recoveries": 0,
+        "vehicle": "panther_g"
+      },
+      {
+        "completed": true,
+        "distance_m": 444.074947213018,
+        "position": "(22.21061, 0.729874, 208.522)",
+        "route_index": 32,
+        "sim_seconds": 102.12,
+        "stuck_recoveries": 0,
+        "vehicle": "tiger_i"
+      },
+      {
+        "completed": true,
+        "distance_m": 445.166432492972,
+        "position": "(22.13145, 0.723398, 208.8132)",
+        "route_index": 32,
+        "sim_seconds": 84.1,
+        "stuck_recoveries": 0,
+        "vehicle": "jagdpanther"
+      },
+      {
+        "completed": true,
+        "distance_m": 445.062475777712,
+        "position": "(22.17761, 0.726558, 208.6785)",
+        "route_index": 32,
+        "sim_seconds": 79.4,
+        "stuck_recoveries": 0,
+        "vehicle": "su100"
+      }
+    ],
+    "corridor": "village"
+  },
+  {
+    "buildings": 10,
+    "corridors": [
+      {
+        "clear": true,
+        "length_m": 589.510446548462
+      },
+      {
+        "clear": true,
+        "length_m": 451.404353141785
+      },
+      {
+        "clear": true,
+        "length_m": 585.555966377258
+      }
+    ],
+    "extent_m": 700,
+    "failures": 0,
+    "flank_physical_motion_m": 45.2878074645996,
+    "height_max_m": 9.92214861996234,
+    "height_min_m": -2.17376671550678,
+    "map_build_ms": 853.233,
+    "max_grade": 0.22719894349575,
+    "nav_build_ms": 157.976,
+    "route_calls": 151,
+    "route_total_ms": 5.027,
+    "route_vehicles": [
+      {
+        "completed": true,
+        "distance_m": 579.543732570799,
+        "position": "(24.75377, 0.848575, 204.9802)",
+        "route_index": 37,
+        "sim_seconds": 107.22,
+        "stuck_recoveries": 0,
+        "vehicle": "t34_85"
+      },
+      {
+        "completed": true,
+        "distance_m": 576.267645728776,
+        "position": "(25.46642, 0.879925, 204.602)",
+        "route_index": 37,
+        "sim_seconds": 169.22,
+        "stuck_recoveries": 0,
+        "vehicle": "is2_1944"
+      },
+      {
+        "completed": true,
+        "distance_m": 579.125911090612,
+        "position": "(24.95495, 0.868277, 204.8438)",
+        "route_index": 37,
+        "sim_seconds": 112.88,
+        "stuck_recoveries": 0,
+        "vehicle": "panther_g"
+      },
+      {
+        "completed": true,
+        "distance_m": 577.445883087967,
+        "position": "(25.14987, 0.872474, 204.7698)",
+        "route_index": 37,
+        "sim_seconds": 151.84,
+        "stuck_recoveries": 0,
+        "vehicle": "tiger_i"
+      },
+      {
+        "completed": true,
+        "distance_m": 579.371857304532,
+        "position": "(24.72928, 0.858688, 205.0383)",
+        "route_index": 37,
+        "sim_seconds": 122.76,
+        "stuck_recoveries": 0,
+        "vehicle": "jagdpanther"
+      },
+      {
+        "completed": true,
+        "distance_m": 578.694786628746,
+        "position": "(25.06023, 0.859717, 204.8221)",
+        "route_index": 37,
+        "sim_seconds": 114.06,
+        "stuck_recoveries": 0,
+        "vehicle": "su100"
+      }
+    ],
+    "corridor": "east"
+  }
+]

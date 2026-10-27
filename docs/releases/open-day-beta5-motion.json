@@ -1,0 +1,84 @@
+{
+  "baseline": false,
+  "failures": 0,
+  "results": [
+    {
+      "input": "mouse",
+      "max_aim_drift_m": 7.62939453125e-06,
+      "max_relative_step_m": 8.94069671630859e-07,
+      "scenario": "camera_translation_turn_and_scope"
+    },
+    {
+      "input": "controller",
+      "max_aim_drift_m": 0.0,
+      "max_relative_step_m": 8.94069671630859e-07,
+      "scenario": "camera_translation_turn_and_scope"
+    },
+    {
+      "distance_m": 13.8429848727355,
+      "hits": 12,
+      "penetrations": 12,
+      "shots": 13,
+      "tactical_modes": [
+        "hold",
+        "relocate"
+      ],
+      "vehicle": "t34_85"
+    },
+    {
+      "distance_m": 5.10269485155732,
+      "hits": 13,
+      "penetrations": 13,
+      "shots": 14,
+      "tactical_modes": [
+        "hold",
+        "relocate"
+      ],
+      "vehicle": "is2_1944"
+    },
+    {
+      "distance_m": 1.35682745624035,
+      "hits": 12,
+      "penetrations": 12,
+      "shots": 13,
+      "tactical_modes": [
+        "hold",
+        "relocate"
+      ],
+      "vehicle": "panther_g"
+    },
+    {
+      "distance_m": 6.48501026077065,
+      "hits": 13,
+      "penetrations": 13,
+      "shots": 14,
+      "tactical_modes": [
+        "hold",
+        "relocate"
+      ],
+      "vehicle": "tiger_i"
+    },
+    {
+      "distance_m": 4.70057995516981,
+      "hits": 10,
+      "penetrations": 10,
+      "shots": 12,
+      "tactical_modes": [
+        "hold",
+        "relocate"
+      ],
+      "vehicle": "jagdpanther"
+    },
+    {
+      "distance_m": 1.19089867789262,
+      "hits": 8,
+      "penetrations": 8,
+      "shots": 10,
+      "tactical_modes": [
+        "hold",
+        "relocate"
+      ],
+      "vehicle": "su100"
+    }
+  ]
+}

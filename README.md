@@ -19,7 +19,8 @@ Student Edition скрывает Open Day и MaleCNS Combat Training. В обе�
 Главные экраны ниже сняты 22 октября 2026 года непосредственно из установленных
 приложений FlySwarm и FlySwarm Student на macOS. Боевые сцены — кадры реальных
 запущенных сцен Godot с живой телеметрией MaleCNS; это отдельные проверочные
-запуски, а не скриншоты из установленного окна.
+запуски, а не скриншоты из установленного окна. Кадры нового Open Day ниже сняты
+28 октября на Mac M2 при проверке Beta 5 с настоящим MaleCNS.
 
 ### FlySwarm
 
@@ -27,12 +28,16 @@ Student Edition скрывает Open Day и MaleCNS Combat Training. В обе�
 
 ### Боевые сцены FlySwarm
 
-| Open Day · Т-34-85 | Open Day · Panther G | Open Day · Tiger I |
+| Open Day · Т-34-85 | Open Day · Panther G | Open Day · СУ-100 |
 |---|---|---|
-| ![Бой Open Day на Т-34-85 с сигналами MaleCNS](artifacts/open_day_final_validation/battle-t34_85.png) | ![Бой Open Day на Panther G с сигналами MaleCNS](artifacts/open_day_final_validation/battle-panther_g.png) | ![Бой Open Day на Tiger I с сигналами MaleCNS](artifacts/open_day_final_validation/battle-tiger_i.png) |
+| ![Т-34 с реальным MaleCNS](docs/media/open-day-beta5/live-match-1.png) | ![Panther G с реальным MaleCNS](docs/media/open-day-beta5/live-match-2.png) | ![СУ-100 с реальным MaleCNS](docs/media/open-day-beta5/live-match-3.png) |
 
-Кадры Open Day сняты во время проверки настоящего подключения MaleCNS и его
-сигналов. Валидационные сценарии проверяют три варианта техники.
+Open Day Beta 5: карта 700×700 м, деревня из десяти построек, гребни и ложбины,
+три направления движения. Внешний игровой контроллер выбирает огневые позиции,
+удерживает дальность, обходит укрытия и отступает. Исходные данные MaleCNS не изменяются.
+[Карта, аппаратные матчи, замеры и ограничения](docs/releases/open-day-beta5-report.md).
+
+![Деревня новой карты Open Day](docs/media/open-day-beta5/village.png)
 
 ### FlySwarm Student
 
@@ -40,13 +45,13 @@ Student Edition скрывает Open Day и MaleCNS Combat Training. В обе�
 
 ## Скачать
 
-Beta 1 включает само приложение, Python backend, необходимые библиотеки, модели
+Готовые сборки включают само приложение, Python backend, необходимые библиотеки, модели
 техники и дрозофилы, а также `brain.npz` и `weights.npz`. Для этих сборок не
 нужно отдельно устанавливать Python или искать файлы мозга.
 
 | Приложение | macOS Apple Silicon | Windows x64 |
 |---|---|---|
-| FlySwarm, полная версия | [DMG и ZIP — Beta 4](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-beta.4) | Windows-версия Open Day не публикуется |
+| FlySwarm, полная версия | [DMG и ZIP — Beta 5](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-beta.5) | Windows-версия Open Day не публикуется |
 | FlySwarm Student | [DMG и ZIP — Student Beta 3](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.3-macos) | [Установщик и portable ZIP — Student Beta 3](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.3-windows) |
 
 Рядом с пакетами опубликован `SHA256SUMS.txt` для проверки загрузки.

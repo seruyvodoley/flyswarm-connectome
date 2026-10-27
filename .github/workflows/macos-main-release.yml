@@ -68,7 +68,7 @@ jobs:
           "$GODOT" --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
           "$GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd
           "$GODOT" --headless --path frontend/godot --fixed-fps 120 --script res://scripts/app/open_day_motion_validation.gd
-          "$GODOT" --headless --path frontend/godot --script res://scripts/app/camera_interpolation_validation.gd
+          "$GODOT" --headless --fixed-fps 120 --path frontend/godot --script res://scripts/app/camera_interpolation_validation.gd
       - name: Acquire and checksum-verify the MaleCNS model
         shell: bash
         run: |

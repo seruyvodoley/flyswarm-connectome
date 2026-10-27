@@ -7,7 +7,7 @@ on:
         description: SemVer version for the full FlySwarm macOS package
         required: true
         type: string
-        default: 1.0.0-beta.3
+        default: 1.0.0-beta.4
       publish:
         description: Publish the GitHub Release after every validation step passes
         required: true
@@ -24,6 +24,8 @@ concurrency:
 jobs:
   build-release:
     runs-on: macos-15
+    permissions:
+      contents: write
     timeout-minutes: 180
     env:
       VERSION: ${{ inputs.version }}
@@ -65,6 +67,8 @@ jobs:
           "$GODOT" --headless --editor --path frontend/godot --import
           "$GODOT" --headless --path frontend/godot --script res://scripts/app/bridge_protocol_validation.gd
           "$GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_validation.gd
+          "$GODOT" --headless --path frontend/godot --fixed-fps 120 --script res://scripts/app/open_day_motion_validation.gd
+          "$GODOT" --headless --path frontend/godot --script res://scripts/app/camera_interpolation_validation.gd
       - name: Acquire and checksum-verify the MaleCNS model
         shell: bash
         run: |
@@ -76,7 +80,7 @@ jobs:
           FLY_DATA: ${{ runner.temp }}/malecns
         run: |
           set -euo pipefail
-          "$GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_real_validation.gd
+          "$GODOT" --headless --path frontend/godot --script res://scripts/app/open_day_real_validation.gd -- --duration=30
       - name: Build complete FlySwarm full app for macOS arm64
         shell: bash
         run: |
@@ -102,6 +106,7 @@ jobs:
           ditto "$mounted/FlySwarm.app" "$dest"
           bin=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$dest/Contents/Info.plist")
           "$dest/Contents/MacOS/$bin" --headless --quit-after 3
+          "$dest/Contents/MacOS/$bin" --headless --fixed-fps 120 --script res://scripts/app/open_day_motion_validation.gd
           backend="$dest/Contents/Resources/backend/FlySwarmBackend/FlySwarmBackend"
           test -x "$backend"
           "$backend" --check-data --data-dir "$dest/Contents/Resources/MaleCNS"
@@ -134,4 +139,4 @@ jobs:
             "build/releases/$VERSION/SHA256SUMS.txt" \
             --target "$GITHUB_SHA" --prerelease \
             --title "FlySwarm $VERSION — macOS arm64" \
-            --notes "Full edition with Open Day, MARL Laboratory improvements and an opt-in research-only causal communication diagnostic. E0/E1 local neural replay is exploratory; complete Godot+MaleCNS checkpoint/restore, E3/E4 behavior studies, and scientific readiness are NOT validated. Ad-hoc signed; not notarized."
+            --notes-file docs/releases/1.0.0-beta.4.md

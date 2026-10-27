@@ -19,6 +19,7 @@ const GunnerReticle=preload("res://scripts/gunner_reticle.gd")
 const ImpactKillcam=preload("res://scripts/impact_killcam.gd")
 const VehicleDamageStatus=preload("res://scripts/vehicle_damage_status.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
+const OpenDayTactics=preload("res://scripts/app/open_day_tactics.gd")
 const DemoFlyPreview=preload("res://scripts/app/fly_preview.gd")
 const FlyBrainPreview=preload("res://scripts/app/fly_brain_preview.gd")
 const DemoHealthHud=preload("res://scripts/app/demo_health_hud.gd")
@@ -120,11 +121,14 @@ var demo_hud_clock=0.0
 var demo_sniper_mode=false
 var demo_aim_world_point=Vector3.ZERO
 var demo_aim_world_valid=false
-var demo_aim_vehicle_local_point=Vector3.ZERO
+var demo_aim_vehicle_offset=Vector3.ZERO
+var demo_follow_offset=Vector3.ZERO
+var demo_follow_valid=false
+var demo_tactics=OpenDayTactics.new()
+var demo_tactical_plan={}
 var demo_fly_target_velocity=Vector3.ZERO
 var demo_fly_target_acceleration=Vector3.ZERO
 var demo_fly_velocity_valid=false
-var demo_opening_flank_sign=1.0
 var aim_prediction_timer=0.0
 var mouse_fire_pending=false
 var middle_drag_active=false
@@ -320,7 +324,7 @@ func _ready():
 	# Keep stochastic combat (shell dispersion) independent of visual debris and
 	# particle generation. Rendering cadence must never perturb weapon outcomes.
 	cosmetic_rng.seed=int(option("--battle-seed",str(scenario.seed))) ^ 0x5F3759DF
-	demo_opening_flank_sign=1.0 if (rng.seed & 1)==0 else -1.0
+	demo_tactics.configure(rng.seed)
 	tickets=[float(scenario.tickets),float(scenario.tickets)]
 	terrain=Terrain.new()
 	add_child(terrain)
@@ -442,6 +446,9 @@ func _ready():
 	sensor_debug=MeshInstance3D.new()
 	add_child(sensor_debug)
 	camera=Camera3D.new()
+	# The camera consumes interpolated vehicle poses in _process. Interpolating
+	# this render-driven node again introduces a second, 50 Hz camera timeline.
+	camera.physics_interpolation_mode=Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.far=620 if is_demo else 4000
 	camera.near=.1
 	camera.fov=62
@@ -989,7 +996,9 @@ func demo_apply_mouse_motion(cursor: Vector2,_hull_turning: bool=false):
 		var ray_distance=(floor_y-origin.y)/denominator if absf(denominator)>.04 else 110.0
 		target=origin+ray*clampf(ray_distance,25.0,180.0)
 	demo_aim_world_point=target
-	demo_aim_vehicle_local_point=vehicle.to_local(target)
+	# Translation-relative, world-oriented: turning the hull must not turn the
+	# selected sight direction. Anchor picking to the same pose visible on screen.
+	demo_aim_vehicle_offset=target-vehicle.get_global_transform_interpolated().origin
 	demo_aim_world_valid=true
 	demo_update_aim_from_world_point(vehicle,target)
 
@@ -1010,7 +1019,10 @@ func demo_update_aim_from_world_point(vehicle,target: Vector3):
 	var elevation=atan2(dy,horizontal)
 	if discriminant>=0.0:
 		elevation=atan((muzzle_speed*muzzle_speed-sqrt(discriminant))/(gravity*horizontal))
-	vehicle.manual_gun_target=clampf(elevation,deg_to_rad(float(vehicle.cfg.elevation_deg[0])),deg_to_rad(float(vehicle.cfg.elevation_deg[1])))
+	var world_direction=Vector3(sin(world_yaw)*cos(elevation),sin(elevation),cos(world_yaw)*cos(elevation))
+	var local_angles=vehicle.aim_angles_for_direction(world_direction)
+	vehicle.manual_turret_target=wrapf(local_angles.x,-PI,PI) if vehicle.cfg.turreted else clampf(local_angles.x,-traverse,traverse)
+	vehicle.manual_gun_target=clampf(local_angles.y,deg_to_rad(float(vehicle.cfg.elevation_deg[0])),deg_to_rad(float(vehicle.cfg.elevation_deg[1])))
 
 func demo_set_sniper_mode(enabled: bool):
 	if not is_demo:return
@@ -1029,7 +1041,9 @@ func demo_player_command(fire_pressed: bool=false) -> Array:
 	var opponent=vehicles[8]
 	var delta=opponent.global_position-vehicle.global_position;delta.y=0
 	var desired=atan2(delta.x,delta.z)
-	if delta.length()<48.0:desired+=.35 if int(sim_time/16.0)%2==0 else -.35
+	# Blend the mouse-only autopilot's close-range arc. Crossing a hard radius
+	# or a timer boundary used to abruptly reverse its requested steering.
+	desired+=.35*sin(sim_time*.10)*(1.0-smoothstep(36.0,64.0,delta.length()))
 	var edge=Vector2(vehicle.position.x,vehicle.position.z)
 	if edge.length()>terrain.extent-30.0:desired=atan2(-vehicle.position.x,-vehicle.position.z)
 	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
@@ -1062,7 +1076,7 @@ func demo_apply_gamepad_aim() -> void:
 		var distance=(floor_y-origin.y)/ray.y if absf(ray.y)>.035 else 120.0
 		target=origin+ray*clampf(distance,25.0,220.0)
 	demo_aim_world_point=target
-	demo_aim_vehicle_local_point=vehicle.to_local(target)
+	demo_aim_vehicle_offset=target-vehicle.get_global_transform_interpolated().origin
 	demo_aim_world_valid=true
 	demo_update_aim_from_world_point(vehicle,target)
 
@@ -1087,57 +1101,70 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 		vehicle.aim_error=wrapf(atan2(target_delta.x,target_delta.z)-vehicle.rotation.y-vehicle.turret_angle,-PI,PI)
 		vehicle.elevation_error=atan2(target_delta.y,Vector2(target_delta.x,target_delta.z).length())-vehicle.gun_angle
 	var waypoint: Vector3
-	# Circle to a changing standoff point; periodically reverse the flank.
 	var radial=Vector2(vehicle.position.x-player.position.x,vehicle.position.z-player.position.z)
 	if radial.length()<.01:radial=Vector2(0.0,1.0)
-	var flank_sign=demo_opening_flank_sign if int(sim_time/12.0)%2==0 else -demo_opening_flank_sign
-	var flank_angle=flank_sign*deg_to_rad(58.0+18.0*sin(sim_time*.23))
-	var standoff=clampf(48.0+7.0*sin(sim_time*.29),40.0,58.0)
 	var player_to_fly=(vehicle.global_position-player.global_position).normalized()
 	var player_gun_forward=Vector3(sin(player.rotation.y+player.turret_angle),0.0,cos(player.rotation.y+player.turret_angle))
-	if player_gun_forward.dot(player_to_fly)>.94:
-		# Break the firing line when the opponent has settled its gun on us.
-		flank_angle=flank_sign*deg_to_rad(82.0)
-		standoff+=10.0
-	var offset=radial.normalized().rotated(flank_angle)*standoff
+	var threatened=target_visible and player_gun_forward.dot(player_to_fly)>.94 and player.reload_left<.8
+	demo_tactical_plan=demo_tactics.plan(sim_time,not vehicle.cfg.turreted,float(vehicle.demo_health)/maxf(1.0,float(vehicle.demo_health_max)),distance,vehicle.reload_left>.1,threatened)
+	var offset=radial.normalized().rotated(float(demo_tactical_plan.flank_angle))*float(demo_tactical_plan.standoff)
 	waypoint=Vector3(player.position.x+offset.x,player.position.y,player.position.z+offset.y)
-	if distance<32.0:
-		waypoint=player.position+Vector3(radial.normalized().x*44.0,0.0,radial.normalized().y*44.0)
+	if distance<28.0:
+		waypoint=player.position+Vector3(radial.normalized().x*52.0,0.0,radial.normalized().y*52.0)
 	var to_waypoint=waypoint-vehicle.global_position;to_waypoint.y=0
 	var desired=atan2(to_waypoint.x,to_waypoint.z)
 	var error=wrapf(desired-vehicle.rotation.y,-PI,PI)
 	var nav_steer=clampf(error*1.6,-1.0,1.0)
 	var target_bearing=wrapf(atan2(delta.x,delta.z)-vehicle.rotation.y,-PI,PI)
-	var hull_reorient=target_visible and absf(target_bearing)>deg_to_rad(82.0)
+	var reposition=target_visible and str(demo_tactical_plan.mode) in ["relocate","disengage"] and distance>32.0 and float(demo_tactical_plan.next_decision)-sim_time>1.25
+	var casemate_acquire=target_visible and not reposition and not vehicle.cfg.turreted and vehicle.reload_left<.6
+	var hull_reorient=target_visible and (casemate_acquire or (not reposition and vehicle.reload_left<.25 and absf(target_bearing)>deg_to_rad(110.0)))
+	vehicle.manual_hull_aim=casemate_acquire
+	if casemate_acquire:vehicle.manual_hull_target=atan2(delta.x,delta.z)
 	if hull_reorient:
 		error=target_bearing
 		nav_steer=clampf(error*2.0,-1.0,1.0)
-	# A short look-ahead ray adds obstacle avoidance without overriding the CNS.
-	var forward=Vector3(sin(vehicle.rotation.y),0.0,cos(vehicle.rotation.y))
-	var ray_start=vehicle.global_position+Vector3(0,1.8,0)
-	var obstacle_query=PhysicsRayQueryParameters3D.create(ray_start,ray_start+forward*22.0,1,vehicle.excluded())
-	var obstacle=get_world_3d().direct_space_state.intersect_ray(obstacle_query)
-	if not obstacle.is_empty():nav_steer=1.0 if int(vehicle.agent_id+sim_time/3.0)%2==0 else -1.0
 	var neural_throttle=float(command[0]);var neural_steer=float(command[2])
-	var approach_throttle=.72 if to_waypoint.length()>20.0 else .42
-	if hull_reorient:
+	var approach_throttle=.78 if to_waypoint.length()>20.0 else .42
+	if absf(error)>1.0:approach_throttle=.32
+	var settle=target_visible and not reposition and distance<220.0 and vehicle.reload_left<.25
+	var hold_position=target_visible and not threatened and str(demo_tactical_plan.mode)=="hold" and absf(distance-float(demo_tactical_plan.standoff))<12.0
+	if hull_reorient or settle or hold_position:
+		# Reload on the move, then briefly stabilise the gun. Casemates acquire
+		# with their hull instead of endlessly orbiting outside their gun arc.
 		command[0]=0.0
 		command[1]=1.0
-		command[2]=signf(error)
+		command[2]=nav_steer if hull_reorient else 0.0
 	else:
 		command[0]=maxf(neural_throttle,approach_throttle)
 		command[1]=0.0
 		command[2]=clampf(neural_steer*.25+nav_steer*.75,-1.0,1.0)
+	# Choose an actually clear side instead of flipping a timer-based turn.
+	var forward=Vector3(sin(vehicle.rotation.y),0.0,cos(vehicle.rotation.y))
+	var ray_start=vehicle.global_position+Vector3(0,1.2,0)
+	var obstacle_query=PhysicsRayQueryParameters3D.create(ray_start,ray_start+forward*14.0,1,vehicle.excluded())
+	var space=get_world_3d().direct_space_state
+	var obstacle=space.intersect_ray(obstacle_query)
+	if not obstacle.is_empty():
+		var clearance=[]
+		for side in [-1.0,1.0]:
+			var side_end=ray_start+forward.rotated(Vector3.UP,side*.7)*18.0
+			var side_hit=space.intersect_ray(PhysicsRayQueryParameters3D.create(ray_start,side_end,1,vehicle.excluded()))
+			clearance.append(18.0 if side_hit.is_empty() else ray_start.distance_to(side_hit.position))
+		command[2]=float(demo_tactical_plan.flank_sign) if absf(clearance[0]-clearance[1])<1.0 else (-1.0 if clearance[0]>clearance[1] else 1.0)
+		command[0]=-.45 if maxf(clearance[0],clearance[1])<7.0 else .28
+		command[1]=0.0
+		vehicle.manual_hull_aim=false
 	# The CNS keeps influencing motor commands, but a firing impulse alone may
 	# never discharge the gun. Only the ballistic solution below can release it.
 	command[5]=0.0
 	if target_visible and vehicle.target==0 and distance<280.0:
 		var velocity_delta=maxf(.001,dt)
-		var measured_velocity=player.velocity
+		var measured_velocity=Vector3(player.velocity.x,0.0,player.velocity.z)
 		if demo_fly_velocity_valid:
 			var measured_acceleration=(measured_velocity-demo_fly_target_velocity)/velocity_delta
 			measured_acceleration.y=0.0
-			demo_fly_target_acceleration=demo_fly_target_acceleration.lerp(measured_acceleration.limit_length(7.0),.28)
+			demo_fly_target_acceleration=demo_fly_target_acceleration.lerp(measured_acceleration.limit_length(7.0),1.0-exp(-velocity_delta*9.0))
 		else:
 			demo_fly_target_acceleration=Vector3.ZERO
 		demo_fly_target_velocity=measured_velocity
@@ -1149,8 +1176,8 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 		# Iteratively lead the target using shell flight time and smoothed
 		# acceleration, so a steering change does not leave the solution behind.
 		for _iteration in 4:
-			var lead_velocity=demo_fly_target_velocity+demo_fly_target_acceleration*flight_time
-			predicted_target=player.global_position+Vector3(0,1.45,0)+lead_velocity*flight_time+demo_fly_target_acceleration*.5*flight_time*flight_time
+			var relative_velocity=demo_fly_target_velocity-Vector3(vehicle.velocity.x,0.0,vehicle.velocity.z)
+			predicted_target=OpenDayTactics.lead_position(player.global_position+Vector3(0,1.45,0),relative_velocity,demo_fly_target_acceleration,flight_time)
 			aim_delta=predicted_target-vehicle.muzzle.global_position
 			flight_time=aim_delta.length()/maxf(1.0,projectile_speed)
 		var horizontal=Vector2(aim_delta.x,aim_delta.z).length()
@@ -1160,11 +1187,16 @@ func apply_demo_tactical_aux(vehicle,source: Array,dt: float=.1) -> Array:
 		var disc=projectile_speed**4-grav*(grav*horizontal*horizontal+2.0*aim_delta.y*projectile_speed*projectile_speed)
 		var desired_elevation=atan2(aim_delta.y,maxf(1.0,horizontal))
 		if disc>=0.0:desired_elevation=atan((projectile_speed*projectile_speed-sqrt(disc))/(grav*maxf(1.0,horizontal)))
-		var elevation_error=wrapf(desired_elevation-vehicle.gun_angle,-PI,PI)
+		var world_direction=Vector3(sin(desired_yaw)*cos(desired_elevation),sin(desired_elevation),cos(desired_yaw)*cos(desired_elevation))
+		var local_angles=vehicle.aim_angles_for_direction(world_direction)
+		turret_error=wrapf(local_angles.x-vehicle.turret_angle,-PI,PI)
+		var elevation_error=local_angles.y-vehicle.gun_angle
 		var neural_turret=float(command[3]);var neural_elevation=float(command[4])
-		command[3]=clampf(neural_turret*.18+clampf(turret_error*2.8,-1.0,1.0)*.82,-1.0,1.0)
-		command[4]=clampf(neural_elevation*.18+clampf(elevation_error*3.6,-1.0,1.0)*.82,-1.0,1.0)
-		if disc>=0.0 and absf(turret_error)<deg_to_rad(.85) and absf(elevation_error)<deg_to_rad(.8) and vehicle.weapon_block_reason()=="":
+		command[3]=OpenDayTactics.aim_command(turret_error,vehicle.yaw_rate,deg_to_rad(float(vehicle.cfg.turret_rate_deg_s)),neural_turret)
+		command[4]=OpenDayTactics.aim_command(elevation_error,0.0,deg_to_rad(float(vehicle.cfg.gun_rate_deg_s)),neural_elevation)
+		if vehicle.manual_hull_aim:vehicle.manual_hull_target=desired_yaw
+		demo_tactical_plan["aim_error_deg"]=rad_to_deg(turret_error)
+		if not reposition and disc>=0.0 and absf(turret_error)<deg_to_rad(.85) and absf(elevation_error)<deg_to_rad(.8) and vehicle.weapon_block_reason()=="":
 			command[5]=1.0
 	elif not target_visible or vehicle.target!=0:
 		demo_fly_velocity_valid=false
@@ -1233,6 +1265,16 @@ func demo_camera_basis_for_aim(_cursor: Vector2,target: Vector3) -> Basis:
 	var up=right.cross(forward).normalized()
 	return Basis(right,up,-forward).orthonormalized()
 
+func demo_follow_position(render_position: Vector3, desired_offset: Vector3, dt: float, response: float) -> Vector3:
+	# Smooth the orbit, not the tank's world translation. Both mesh and camera
+	# advance from one render pose even when physics and display rates differ.
+	if not demo_follow_valid or last_camera_mode!=camera_mode:
+		demo_follow_offset=desired_offset
+		demo_follow_valid=true
+	else:
+		demo_follow_offset=demo_follow_offset.lerp(desired_offset,1.0-exp(-dt*response))
+	return render_position+demo_follow_offset
+
 func _physics_process(delta):
 	if paused:return
 	if is_demo and demo_intro_left>0:return
@@ -1280,6 +1322,10 @@ func _physics_process(delta):
 
 		return
 	if ended or paused:return
+	if is_demo and demo_aim_world_valid and not vehicles.is_empty():
+		# Motor targets are solved once per authoritative physics tick; render
+		# interpolation and zoom must never feed stale poses back into the servo.
+		demo_update_aim_from_world_point(vehicles[0],vehicles[0].global_position+demo_aim_vehicle_offset)
 	if is_demo and not simulation_clock_started:
 		# Realtime factor measures the running match, excluding its visible intro.
 		start_wall=Time.get_ticks_usec()
@@ -1340,6 +1386,7 @@ func _physics_process(delta):
 				var decoded_layer=layer.get("decoder_action",null)
 				layer["decoded_commands"]=decoded_layer if decoded_layer is Array else before_tactical.duplicate()
 				layer["navigation_assistance"]=[]
+				layer["open_day_tactics"]=demo_tactical_plan.duplicate(true)
 				layer["gunnery_assistance"]=[]
 				var intervention=0.0
 				for j in range(6):
@@ -2528,10 +2575,9 @@ func _process(dt):
 		var target_fov=42.0 if is_demo and demo_sniper_mode else 62.0
 		camera.fov=move_toward(camera.fov,target_fov,45.0*dt) if is_demo else 62.0
 		var rendered_turret: Transform3D=v.turret.get_global_transform_interpolated()
-		var demo_forward=demo_camera_forward(v) if is_demo else Vector3(rendered_turret.basis.z.x,0,rendered_turret.basis.z.z).normalized()
-		# Keep the selected aim point attached to the vehicle's local frame. A
-		# fixed world point drifts behind a moving tank and makes the camera
-		# swing around to chase it, which reads as jitter and loses the vehicle.
+		var demo_forward=Vector3(rendered_turret.basis.z.x,0,rendered_turret.basis.z.z).normalized()
+		# Follow translation while keeping the chosen sight direction independent
+		# of hull rotation. A fixed world point trails behind a moving vehicle.
 		if is_demo and demo_gamepad_active:
 			var forward=OpenDayController.camera_forward(demo_camera_yaw,demo_camera_pitch)
 			var flat_forward=Vector3(sin(demo_camera_yaw),0.0,cos(demo_camera_yaw)).normalized()
@@ -2540,11 +2586,11 @@ func _process(dt):
 			var camera_ray=PhysicsRayQueryParameters3D.create(focus,desired_position,7,v.excluded())
 			var obstruction=get_world_3d().direct_space_state.intersect_ray(camera_ray)
 			if not obstruction.is_empty():desired_position=obstruction.position+(focus-desired_position).normalized()*.45
-			camera.position=desired_position if last_camera_mode!=camera_mode else camera.position.lerp(desired_position,1.0-exp(-dt*7.0))
+			camera.position=demo_follow_position(render_position,desired_position-render_position,dt,7.0)
 			camera.look_at(camera.position+forward,Vector3.UP)
 			demo_apply_gamepad_aim()
 		else:
-			if is_demo and demo_aim_world_valid:demo_aim_world_point=render_transform*demo_aim_vehicle_local_point
+			if is_demo and demo_aim_world_valid:demo_aim_world_point=render_position+demo_aim_vehicle_offset
 			var follow_forward=Vector3(render_transform.basis.z.x,0,render_transform.basis.z.z).normalized() if is_demo else demo_forward
 			if is_demo and demo_aim_world_valid:
 				var aim_heading=demo_aim_world_point-render_position
@@ -2552,7 +2598,7 @@ func _process(dt):
 				if aim_heading.length_squared()>.01:follow_forward=aim_heading.normalized()
 			var follow=render_position-follow_forward*(15.0 if is_demo else 16.0)+Vector3(0,8,0)
 			var follow_weight=1.0-exp(-dt*3.5)
-			camera.position=follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,follow_weight)
+			camera.position=demo_follow_position(render_position,follow-render_position,dt,3.5) if is_demo else (follow if last_camera_mode!=camera_mode else camera.position.lerp(follow,follow_weight))
 			if is_demo and demo_aim_world_valid:
 				# Mouse aim moves the camera target; gamepad aim owns the view direction.
 				var cursor=get_viewport().get_mouse_position()
@@ -2585,15 +2631,14 @@ func _process(dt):
 		if aim_prediction_timer<=0.0:
 			aim_prediction_timer=1.0/60.0 if is_demo else .12
 			if is_demo:
-				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
+				var sight_pose: Transform3D=v.muzzle.get_global_transform_interpolated()
+				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,sight_pose.origin,sight_pose.basis.z,v.cfg.ammo_data,v.excluded())
 				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
 				var aligned=absf(wrapf(v.manual_turret_target-v.turret_angle,-PI,PI))<deg_to_rad(.8) and absf(v.manual_gun_target-v.gun_angle)<deg_to_rad(.6)
 				gunner_reticle.set_aim_ready(aligned and v.reload_left<=0.0)
 			else:
 				var predicted=Combat.predict_impact(get_world_3d().direct_space_state,v.muzzle.global_position,v.muzzle.global_basis.z,v.cfg.ammo_data,v.excluded())
 				if not camera.is_position_behind(predicted):gunner_reticle.set_aim_screen_position(camera.unproject_position(predicted))
-	if is_demo and not demo_gamepad_active and not paused and demo_intro_left<=0.0 and vehicles.size()>0 and demo_aim_world_valid:
-		demo_update_aim_from_world_point(vehicles[0],demo_aim_world_point)
 	update_identification_labels()
 	var connection=AppState.tr_text("BRAIN BACKEND DISCONNECTED · RULE_BASED_CONTROL")
 	if requires_brain:

@@ -3,6 +3,7 @@ var app
 var failures=0
 var screenshot_dir=""
 var combat_policy=""
+var duration=1.0
 func check(condition: bool,message: String):
 	if not condition:failures+=1;push_error(message)
 func _initialize():call_deferred("run")
@@ -15,9 +16,11 @@ func wait_battle() -> bool:
 func run():
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--combat-policy="):combat_policy=argument.trim_prefix("--combat-policy=")
+		if argument.begins_with("--duration="):duration=clampf(float(argument.trim_prefix("--duration=")),1.0,120.0)
 	screenshot_dir=ProjectSettings.globalize_path("res://../../artifacts/performance/open_day_real_validation")
 	DirAccess.make_dir_recursive_absolute(screenshot_dir)
-	app=root.get_node("AppState");app.configure_demo("t34_85");app.session.seconds=1.0
+	app=root.get_node("AppState");app.configure_demo("t34_85");app.session.seconds=duration
+	if OS.has_environment("FLY_DATA"):app.settings.dataset_path=OS.get_environment("FLY_DATA")
 	if combat_policy!="":
 		app.session.red_controller="adapter";app.session.red_policy=combat_policy
 	app.launch()
@@ -34,7 +37,7 @@ func run():
 		if DisplayServer.get_name()!="headless":
 			await process_frame;await RenderingServer.frame_post_draw
 			root.get_texture().get_image().save_png(screenshot_dir.path_join("battle-live-malecns-1280x720.png"))
-	for attempt in range(400):
+	for attempt in range(int(duration*20.0)+400):
 		if app.current_page=="DemoResult":break
 		await create_timer(.1).timeout
 	check(app.current_page=="DemoResult","Demo reaches its dedicated result page")
@@ -50,6 +53,9 @@ func run():
 		check(layers.size()>8 and layers[8].get("adapter_action",null) is Array,"PPO supplied the opponent's actual action in the live Open Day backend")
 	check(app.last_report.vehicles[8].position!=[fly_start.x,fly_start.y,fly_start.z],"MaleCNS opponent moves")
 	check(app.last_report.vehicles[0].metrics.distance_travelled>0,"Mouse-only player default forward drive works")
+	if duration>=25.0:
+		check(int(app.last_report.vehicles[8].metrics.shots)>0,"Real MaleCNS opponent acquires a ballistic solution after the opening smoke clears")
+		check(int(app.last_report.get("neural_steps",0))>10,"Extended combat uses repeated real neural responses")
 	check(app.view.find_child("PlayAgain",true,false)!=null,"Fast restart control exists")
 	if DisplayServer.get_name()!="headless":
 		await process_frame;await RenderingServer.frame_post_draw

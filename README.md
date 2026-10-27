@@ -46,8 +46,8 @@ Beta 1 включает само приложение, Python backend, необ�
 
 | Приложение | macOS Apple Silicon | Windows x64 |
 |---|---|---|
-| FlySwarm, полная версия | [DMG и ZIP — Beta 1](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-beta.1) | Windows-версия Open Day не публикуется |
-| FlySwarm Student | [DMG и ZIP — Student Beta 1](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.1-macos) | [Установщик и portable ZIP — Student Beta 1](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.1-windows) |
+| FlySwarm, полная версия | [DMG и ZIP — Beta 4](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-beta.4) | Windows-версия Open Day не публикуется |
+| FlySwarm Student | [DMG и ZIP — Student Beta 3](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.3-macos) | [Установщик и portable ZIP — Student Beta 3](https://github.com/seruyvodoley/flyswarm-connectome/releases/tag/v1.0.0-student-beta.3-windows) |
 
 Рядом с пакетами опубликован `SHA256SUMS.txt` для проверки загрузки.
 macOS-приложение подписано ad-hoc и не нотариализовано; при первом запуске
@@ -89,7 +89,7 @@ MARL Laboratory использует аналитическую PettingZoo-ср�
 
 В исходниках `Rule AI` и полигон доступны без MaleCNS dataset. Для Open Day и
 боёв с настоящим FlyBrain настройте совместимый dataset в разделе параметров
-MaleCNS. macOS-релизы Beta 1 включают проверенные `brain.npz` и `weights.npz`.
+MaleCNS. macOS-релизы включают проверенные `brain.npz` и `weights.npz`.
 
 Основные команды MARL CLI:
 

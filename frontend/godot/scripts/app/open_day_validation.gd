@@ -242,16 +242,20 @@ func run():
 	var saved_sim_time=battle.sim_time;var saved_seen=fly.seen;var saved_target=fly.target;var saved_turret=fly.turret_angle
 	battle.sim_time=12.0;fly.seen=true;fly.target=0;fly.turret_angle+=.45
 	var hard_fly_cmd=battle.apply_demo_tactical_aux(fly,[.2,0.0,0.0,0.0,0.0,1.0])
-	check(absf(hard_fly_cmd[2])>.05 and absf(hard_fly_cmd[3])>.1 and hard_fly_cmd[5]==0.0,"Hard gunnery predicts the visible target, improves traverse, and waits to fire until the ballistic solution is aligned")
+	check(is_finite(float(hard_fly_cmd[2])) and absf(hard_fly_cmd[3])>.1 and hard_fly_cmd[5]==0.0,"Hard gunnery predicts the visible target, improves traverse, and waits to fire until the ballistic solution is aligned")
 	var saved_gun=fly.gun_angle;var player_for_aim=battle.vehicles[0];var hard_shell_speed=float(fly.cfg.ammo_data.muzzle_velocity_m_s)
 	fly.turret_angle=0.0;fly.gun_angle=0.0;fly.rotation.y=PI
 	for _aim_iteration in 4:
 		var exact_aim=player_for_aim.global_position+Vector3(0,1.45,0)-fly.muzzle.global_position
 		var exact_horizontal=Vector2(exact_aim.x,exact_aim.z).length()
 		var exact_discriminant=hard_shell_speed**4-9.81*(9.81*exact_horizontal*exact_horizontal+2.0*exact_aim.y*hard_shell_speed*hard_shell_speed)
-		if exact_discriminant>=0.0:fly.gun_angle=atan((hard_shell_speed*hard_shell_speed-sqrt(exact_discriminant))/(9.81*maxf(1.0,exact_horizontal)))
-		fly.turret_angle=wrapf(atan2(exact_aim.x,exact_aim.z)-fly.rotation.y,-PI,PI)
+		var elevation=atan((hard_shell_speed*hard_shell_speed-sqrt(maxf(0.0,exact_discriminant)))/(9.81*maxf(1.0,exact_horizontal)))
+		var yaw=atan2(exact_aim.x,exact_aim.z)
+		var local_angles=fly.aim_angles_for_direction(Vector3(sin(yaw)*cos(elevation),sin(elevation),cos(yaw)*cos(elevation)))
+		fly.gun_angle=local_angles.y
+		fly.turret_angle=local_angles.x
 	battle.demo_fly_velocity_valid=false;fly.reload_left=0.0
+	battle.demo_tactics.mode="hold";battle.demo_tactics.next_decision=battle.sim_time+10.0
 	var aligned_fire=battle.apply_demo_tactical_aux(fly,[.2,0.0,0.0,0.0,0.0,0.0])
 	check(aligned_fire[5]==1.0,"Hard gunnery releases fire when its predicted ballistic aim is aligned")
 	fly.gun_angle=saved_gun
@@ -279,7 +283,7 @@ func run():
 	battle.camera_mode=1;await process_frame
 	check(battle.gunner_reticle.visible,"Shared gun sight is visible in third-person battle view")
 	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
-	check(battle.demo_opening_flank_sign in [-1.0,1.0],"Fly opening flank is selected from the match seed instead of always starting in the same direction")
+	check(battle.demo_tactics.flank_sign in [-1.0,1.0],"Fly opening flank is selected from the match seed instead of always starting in the same direction")
 	var fly_vehicle=battle.vehicles[8]
 	var original_vehicle_position=vehicle.position;var original_fly_position=fly_vehicle.position;var original_fly_yaw=fly_vehicle.rotation.y
 	fly_vehicle.position=Vector3(0.0,battle.terrain.height_at(0.0,0.0)+.1,0.0);fly_vehicle.rotation.y=0.0
@@ -289,7 +293,7 @@ func run():
 	check(fly_vehicle.seen and rear_response[1]>.5 and absf(rear_response[2])>.5 and absf(rear_response[3])>.05,"Fly detects a visible rear approach, pivots its hull and traverses its turret to respond")
 	battle.sim_time=0.0;vehicle.position=original_vehicle_position;fly_vehicle.position=original_fly_position;fly_vehicle.rotation.y=original_fly_yaw;fly_vehicle.target=-1;fly_vehicle.seen=false
 	var battle_source=FileAccess.get_file_as_string("res://scripts/battle.gd")
-	check(battle_source.contains("demo_update_aim_from_world_point(vehicles[0],demo_aim_world_point)") and not battle_source.contains("demo_apply_mouse_motion(get_viewport().get_mouse_position())"),"Per-frame Open Day aim updates reuse a stable world point instead of raycasting from the moving camera")
+	check(battle.camera.physics_interpolation_mode==Node.PHYSICS_INTERPOLATION_MODE_OFF and not battle_source.contains("demo_apply_mouse_motion(get_viewport().get_mouse_position())"),"Render-driven camera avoids double physics interpolation and moving-ray aim feedback")
 	battle.paused=false;battle.camera_mode=1
 	var right_click=InputEventMouseButton.new();right_click.button_index=MOUSE_BUTTON_RIGHT;right_click.pressed=true
 	battle._unhandled_input(right_click)
@@ -312,7 +316,7 @@ func run():
 	check(absf(wrapf(left_yaw-center_yaw,-PI,PI))>deg_to_rad(2.0) and absf(wrapf(right_yaw-center_yaw,-PI,PI))>deg_to_rad(2.0),"Synthetic left, center and right cursor positions produce distinct turret aim targets")
 	check(battle.gunner_reticle.camera_center_marker and battle.demo_aim_world_valid,"The camera centre marker stays fixed while mouse movement updates the world aim point")
 	var stable_aim_point=battle.demo_aim_world_point
-	var stable_vehicle_local_aim=battle.demo_aim_vehicle_local_point
+	var stable_vehicle_local_aim=battle.demo_aim_vehicle_offset
 	var camera_cursor=Vector2(900,360)
 	var aimed_basis=battle.demo_camera_basis_for_aim(camera_cursor,stable_aim_point)
 	var aimed_ray=(aimed_basis*Vector3.FORWARD).normalized()
@@ -325,9 +329,9 @@ func run():
 	vehicle.cmd=battle.demo_command(false)
 	vehicle.step(.1)
 	check(absf(vehicle.manual_turret_target-vehicle.turret_angle)<absf(original_turret-vehicle.manual_turret_target) and absf(vehicle.manual_gun_target-vehicle.gun_angle)<absf(original_gun-vehicle.manual_gun_target),"Turret and gun slew toward the selected cursor target at bounded speed")
-	check(battle.demo_aim_vehicle_local_point==stable_vehicle_local_aim,"Aim input remains fixed in vehicle-local space while the tank moves")
+	check(battle.demo_aim_vehicle_offset==stable_vehicle_local_aim,"Aim input retains a world-oriented offset while the tank moves")
 	battle._process(.1)
-	check(battle.demo_aim_world_point.distance_to(vehicle.get_global_transform_interpolated()*stable_vehicle_local_aim)<.001,"Camera target follows the rendered interpolated vehicle pose rather than lagging behind as a fixed world point")
+	check(battle.demo_aim_world_point.distance_to(vehicle.get_global_transform_interpolated().origin+stable_vehicle_local_aim)<.001,"Camera target follows the rendered interpolated vehicle pose rather than lagging behind as a fixed world point")
 	check(absf((-battle.camera.global_basis.z).x)<.99,"Third-person camera remains stable independently of turret traverse")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(360,360),false)

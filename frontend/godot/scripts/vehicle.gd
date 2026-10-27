@@ -2,6 +2,8 @@ extends CharacterBody3D
 const Combat=preload("res://scripts/combat.gd")
 const VehicleAppearance=preload("res://scripts/vehicles/vehicle_appearance.gd")
 const DEMO_HEALTH_POINTS=6
+const DEMO_PLAYER_RELOAD_S=3.0
+const DEMO_FLY_RELOAD_ADVANTAGE_S=.5
 var cfg: Dictionary
 var world
 var agent_id=0
@@ -370,11 +372,17 @@ func step(dt: float):
 	gun_rate=move_toward(gun_rate,desired_gun_rate,deg_to_rad(float(cfg.gun_accel_deg_s2))*traverse_factor*dt)
 	if manual_aim and modules.gunner:
 		var remaining=wrapf(manual_turret_target-turret_angle,-PI,PI) if cfg.turreted else manual_turret_target-turret_angle
-		turret_angle+=clampf(turret_rate*dt,-absf(remaining),absf(remaining))
-		if absf(remaining)<=absf(turret_rate*dt):turret_rate=0.0
+		var turn_step=turret_rate*dt
+		if signf(turn_step)==signf(remaining) and absf(turn_step)>=absf(remaining):
+			turret_angle+=remaining
+			turret_rate=0.0
+		else:turret_angle+=turn_step
 		remaining=manual_gun_target-gun_angle
-		gun_angle+=clampf(gun_rate*dt,-absf(remaining),absf(remaining))
-		if absf(remaining)<=absf(gun_rate*dt):gun_rate=0.0
+		var elevation_step=gun_rate*dt
+		if signf(elevation_step)==signf(remaining) and absf(elevation_step)>=absf(remaining):
+			gun_angle+=remaining
+			gun_rate=0.0
+		else:gun_angle+=elevation_step
 	else:
 		turret_angle+=turret_rate*dt
 		gun_angle+=gun_rate*dt
@@ -392,7 +400,7 @@ func step(dt: float):
 	if cmd[5]>.5 and weapon_block_reason()=="":
 		world.fire(self)
 		gun.position-=Vector3(0,0,.22)
-		reload_left=(4.0 if world.is_demo and agent_id==8 else (3.0 if world.is_demo and agent_id==0 else float(cfg.reload_s)*(1 if modules.loader else 2.5)))
+		reload_left=reload_duration()
 		ammo_left-=1
 		metrics.shots+=1
 	metrics.distance_travelled+=moved
@@ -400,6 +408,17 @@ func step(dt: float):
 	if speed<-.1:metrics.reverse_s+=dt
 	if seen:metrics.target_visible_s+=dt
 	if target>=0 and absf(yaw_rate)>.02:metrics.chassis_aim_s+=dt
+
+func aim_angles_for_direction(world_direction: Vector3) -> Vector2:
+	# Turret/gun pivots live below the terrain-aligned visual hull. Solve in
+	# that frame so slopes and hull roll do not become systematic aiming error.
+	var local_direction=model.global_basis.orthonormalized().inverse()*world_direction.normalized()
+	return Vector2(atan2(local_direction.x,local_direction.z),atan2(local_direction.y,Vector2(local_direction.x,local_direction.z).length()))
+
+func reload_duration() -> float:
+	if world.is_demo and agent_id in [0,8]:
+		return DEMO_PLAYER_RELOAD_S-(DEMO_FLY_RELOAD_ADVANTAGE_S if agent_id==8 else 0.0)
+	return float(cfg.reload_s)*(1.0 if modules.loader else 2.5)
 
 func weapon_block_reason() -> String:
 	if not alive:return "destroyed"

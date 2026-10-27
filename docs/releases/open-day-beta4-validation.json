@@ -1,0 +1,191 @@
+{
+  "baseline_commit": "4b934fb4add182c3f40ff36b959ecd2ba63d3341",
+  "scenario": {
+    "battle_seed": 7,
+    "duration_s_per_vehicle": 40,
+    "physics_hz": 50,
+    "render_simulation_hz": 120,
+    "neural_input": "fixed synthetic motor commands [0.15, 0, 0.1, 0.8, -0.6, 1]; not a brain training run",
+    "player_input": "moving and gently turning; no fire",
+    "purpose": "regression of camera synchronisation and engineered Open Day assistance; not human-player win rate or FPS benchmark"
+  },
+  "before": {
+    "baseline": true,
+    "failures": 11,
+    "results": [
+      {
+        "input": "mouse",
+        "max_aim_drift_m": 142.03596496582,
+        "max_relative_step_m": 0.0879442170262337,
+        "scenario": "camera_translation_turn_and_scope"
+      },
+      {
+        "input": "controller",
+        "max_aim_drift_m": 0.0,
+        "max_relative_step_m": 0.084374874830246,
+        "scenario": "camera_translation_turn_and_scope"
+      },
+      {
+        "distance_m": 74.0702925051861,
+        "hits": 1,
+        "penetrations": 1,
+        "shots": 1,
+        "tactical_modes": [],
+        "vehicle": "t34_85"
+      },
+      {
+        "distance_m": 24.4448210454231,
+        "hits": 1,
+        "penetrations": 1,
+        "shots": 1,
+        "tactical_modes": [],
+        "vehicle": "is2_1944"
+      },
+      {
+        "distance_m": 70.8903119133191,
+        "hits": 1,
+        "penetrations": 1,
+        "shots": 1,
+        "tactical_modes": [],
+        "vehicle": "panther_g"
+      },
+      {
+        "distance_m": 56.4914935936912,
+        "hits": 1,
+        "penetrations": 1,
+        "shots": 1,
+        "tactical_modes": [],
+        "vehicle": "tiger_i"
+      },
+      {
+        "distance_m": 77.0098206021157,
+        "hits": 1,
+        "penetrations": 1,
+        "shots": 1,
+        "tactical_modes": [],
+        "vehicle": "jagdpanther"
+      },
+      {
+        "distance_m": 69.6776938072169,
+        "hits": 1,
+        "penetrations": 1,
+        "shots": 1,
+        "tactical_modes": [],
+        "vehicle": "su100"
+      }
+    ]
+  },
+  "after": {
+    "baseline": false,
+    "failures": 0,
+    "results": [
+      {
+        "input": "mouse",
+        "max_aim_drift_m": 0.0,
+        "max_relative_step_m": 8.94566255738027e-07,
+        "scenario": "camera_translation_turn_and_scope"
+      },
+      {
+        "input": "controller",
+        "max_aim_drift_m": 0.0,
+        "max_relative_step_m": 8.94566255738027e-07,
+        "scenario": "camera_translation_turn_and_scope"
+      },
+      {
+        "distance_m": 47.2642113362862,
+        "hits": 10,
+        "penetrations": 10,
+        "shots": 10,
+        "tactical_modes": [
+          "hold",
+          "disengage",
+          "relocate",
+          "flank",
+          "pressure"
+        ],
+        "vehicle": "t34_85"
+      },
+      {
+        "distance_m": 7.81448807912284,
+        "hits": 9,
+        "penetrations": 9,
+        "shots": 9,
+        "tactical_modes": [
+          "hold",
+          "disengage",
+          "relocate",
+          "flank",
+          "pressure"
+        ],
+        "vehicle": "is2_1944"
+      },
+      {
+        "distance_m": 43.3598114665344,
+        "hits": 11,
+        "penetrations": 11,
+        "shots": 11,
+        "tactical_modes": [
+          "hold",
+          "disengage",
+          "relocate",
+          "flank",
+          "pressure"
+        ],
+        "vehicle": "panther_g"
+      },
+      {
+        "distance_m": 12.8235357641323,
+        "hits": 9,
+        "penetrations": 9,
+        "shots": 9,
+        "tactical_modes": [
+          "hold",
+          "disengage",
+          "relocate",
+          "flank",
+          "pressure"
+        ],
+        "vehicle": "tiger_i"
+      },
+      {
+        "distance_m": 13.9510562934126,
+        "hits": 6,
+        "penetrations": 6,
+        "shots": 6,
+        "tactical_modes": [
+          "hold",
+          "disengage",
+          "relocate",
+          "flank",
+          "pressure"
+        ],
+        "vehicle": "jagdpanther"
+      },
+      {
+        "distance_m": 18.5357928591128,
+        "hits": 6,
+        "penetrations": 6,
+        "shots": 6,
+        "tactical_modes": [
+          "hold",
+          "disengage",
+          "relocate",
+          "flank",
+          "pressure"
+        ],
+        "vehicle": "su100"
+      }
+    ]
+  },
+  "real_malecns_30s": {
+    "alive": [
+      1,
+      1
+    ],
+    "brain_tick_ms": 4.99566699727438,
+    "physics_ms": 1.5681419053964,
+    "sim_s": 30.0199999999994,
+    "wall_s": 30.004407,
+    "xRT": 1.00051969032414
+  }
+}

@@ -1,7 +1,9 @@
 # Open Day Beta 5: реализация и аппаратная проверка
 
 Дата: 28 октября 2026. MacBook Pro, Apple M2, 8 ГБ RAM, macOS 27.0.1,
-Godot 4.7.2, Metal Mobile. Работа в существующем репозитории на рабочем столе:
+Godot 4.7.2, Metal Mobile. Во время аппаратных прогонов заданы
+`OMP_NUM_THREADS=2` и `OPENBLAS_NUM_THREADS=2`, чтобы ограничить фоновую нагрузку библиотек.
+Работа в существующем репозитории на рабочем столе:
 RisingSail отсутствует в списке подключённых томов. Новых клонов/рабочих деревьев нет.
 Реализация непосредственно в `main` по последнему указанию владельца;
 ветка и релизы Student не меняются.
@@ -217,6 +219,7 @@ RisingSail по-прежнему не подключён; перенос реп�
 particle shaders. Они перечислены отдельно от результатов проверок.
 
 ```sh
+export OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2
 Godot --headless --fixed-fps 120 --path frontend/godot --script res://scripts/app/open_day_map_validation.gd
 Godot --headless --fixed-fps 120 --path frontend/godot --script res://scripts/app/open_day_motion_validation.gd
 FLY_DATA=/path/to/MaleCNS Godot --path frontend/godot --script res://scripts/app/open_day_five_match_validation.gd -- --matches=5 --output=/path/to/report.json

@@ -2,6 +2,7 @@ extends Node
 const Config=preload("res://scripts/app/session_config.gd")
 const I18n=preload("res://scripts/app/i18n.gd")
 const OpenDayController=preload("res://scripts/app/open_day_controller.gd")
+const DemoLayout=preload("res://scripts/demo/arena_layout.gd")
 var session=Config.new()
 var settings={"preset":1,"fullscreen":false,"resolution":0,"shadows":true,"vegetation":.6,"lod":1.0,"effects":1.0,"debug":false,"host":"127.0.0.1","port":8765,"audio":"no_audio","language":"en","appearance":"dark","dataset_path":"","environment_profile":"enhanced_visual","open_day_policy_mode":"baseline","open_day_policy_path":""}
 var root_path=""
@@ -31,6 +32,7 @@ var backend_dialog_open=false
 var open_day_mode=false
 var open_day_policy_mode := "baseline"
 var open_day_policy_path := ""
+var last_demo_spawn_variant := -1
 var marl_pid=-1
 var marl_output=""
 var marl_replay_path=""
@@ -393,6 +395,9 @@ func configure_demo(vehicle: String="t34_85"):
 	session.seconds=120
 	# Vary the deterministic opening movement between new Open Day matches.
 	session.battle_seed=int(Time.get_ticks_usec() & 0x7fffffff)
+	# A fresh seed may select the same placement as the preceding round.
+	if posmod(session.battle_seed,DemoLayout.SPAWN_VARIANTS)==last_demo_spawn_variant:
+		session.battle_seed+=1
 	session.blue_controller="rule"
 	session.red_controller="brain"
 	session.audio_mode="no_audio"
@@ -436,14 +441,20 @@ func stop_session():
 		OS.kill(marl_pid)
 	marl_pid=-1
 	stop_backend()
-	if is_instance_valid(battle):
-		if not battle.finished_report and not battle.replay_mode:battle.finish(false)
-		battle.bridge.tcp.disconnect_from_host()
-		if battle.recorder:battle.recorder.flush();battle.recorder.close();battle.recorder=null
-		battle.get_parent().remove_child(battle)
-		battle.queue_free()
-	battle=null
+	_dispose_battle()
 	backend_dialog_open=false
+func _dispose_battle():
+	# Drop the old reference before teardown, so no later route can resume it.
+	var previous=battle
+	battle=null
+	if not is_instance_valid(previous):return
+	if not previous.finished_report and not previous.replay_mode:previous.finish(false)
+	previous.paused=true
+	previous.process_mode=Node.PROCESS_MODE_DISABLED
+	previous.bridge.tcp.disconnect_from_host()
+	if previous.recorder:previous.recorder.flush();previous.recorder.close();previous.recorder=null
+	previous.get_parent().remove_child(previous)
+	previous.queue_free()
 func menu():
 	stop_session()
 	show_page("OpenDayMain" if open_day_mode else "MainMenu")
@@ -452,9 +463,15 @@ func launch():
 	if problem!="":view.notice(problem);return
 	generation+=1
 	var token=generation
+	# Every launch owns exactly one battle, including launches from HowItWorks.
+	stop_backend()
+	_dispose_battle()
+	backend_dialog_open=false
+	last_report={}
 	show_page("LoadingScreen")
 	loading_message="Preparing simulation…"
 	await get_tree().process_frame
+	if token!=generation:return
 	if session.mode=="replay":
 		var manifest=read_json(session.replay_path.get_base_dir().path_join("manifest.json"))
 		if manifest.has("session"):
@@ -477,6 +494,7 @@ func launch():
 	if token!=generation:return
 	loading_message="Loading battlefield · spawning vehicles"
 	await get_tree().process_frame
+	if token!=generation:return
 	session.output=new_output(session.mode) if session.mode!="replay" else ""
 	last_output=session.output
 	battle=load("res://scenes/TestRangeScene.tscn" if session.mode=="range" else "res://scenes/Battle.tscn").instantiate()
@@ -485,6 +503,7 @@ func launch():
 	battle.pause_requested.connect(pause_menu)
 	battle.backend_failed.connect(on_backend_failed)
 	get_tree().root.add_child(battle)
+	if session.mode=="demo":last_demo_spawn_variant=posmod(session.battle_seed,DemoLayout.SPAWN_VARIANTS)
 	clear_view()
 	current_page="Battle"
 	set_battle_overlay_visible(true)
@@ -552,6 +571,9 @@ func pause_menu():
 	battle.paused=true
 	show_page("PauseMenu")
 func resume():
+	if not is_instance_valid(battle) or battle.finished_report or battle.ended:
+		menu()
+		return
 	if is_instance_valid(battle):battle.resume_active_clock();battle.paused=false
 	clear_view()
 	current_page="Battle"
@@ -559,8 +581,17 @@ func resume():
 func on_completed(report: Dictionary):
 	last_report=report
 	stop_backend()
+	if is_instance_valid(battle):
+		# Retain the result snapshot until navigation, but stop input, ticks,
+		# cameras and the socket while any result/help page is displayed.
+		battle.paused=true
+		battle.process_mode=Node.PROCESS_MODE_DISABLED
+		battle.bridge.tcp.disconnect_from_host()
 	show_page("DemoResult" if session.mode=="demo" else "ResultsScreen")
 func rerun():
+	if session.mode=="demo":
+		start_demo(session.demo_vehicle)
+		return
 	stop_session()
 	launch()
 func start_job(evaluate=false):

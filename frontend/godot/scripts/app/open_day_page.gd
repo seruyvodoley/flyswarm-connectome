@@ -282,6 +282,7 @@ func _input(event):
 		if is_instance_valid(attract_label):attract_label.get_parent().visible=false
 
 func focus_first_controller_button() -> void:
+	if not is_inside_tree():return
 	var buttons=controller_buttons()
 	if not buttons.is_empty():buttons[0].grab_focus()
 

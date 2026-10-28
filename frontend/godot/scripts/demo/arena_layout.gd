@@ -3,6 +3,8 @@ extends RefCounted
 # Shared metre-scale geometry for the Open Day renderer, navigation and checks.
 # Scientific maps do not use this layout.
 const SIZE=700.0
+const SPAWN_SEPARATION_M=416.0
+const SPAWN_VARIANTS=12
 const BUILDINGS=[
 	[-54.0,-66.0,0.0,true],[-12.0,-66.0,PI,false],[32.0,-62.0,0.0,false],
 	[70.0,-60.0,PI,true],[-66.0,0.0,PI/2.0,false],[0.0,0.0,0.0,true],
@@ -16,9 +18,14 @@ const ROUTES=[
 ]
 
 static func spawn(team: int, seed_value: int) -> Vector2:
-	var offsets=[-36.0,-24.0,24.0,36.0]
-	var x=float(offsets[posmod(seed_value,offsets.size())])
-	return Vector2(x,-205.0) if team==0 else Vector2(-x,205.0)
+	# Opposite points on one circle keep the horizontal separation identical.
+	# Use the clear north/south fields, with the village between the tanks;
+	# the second half also exchanges which field belongs to the player.
+	var variant=posmod(seed_value,SPAWN_VARIANTS)
+	var angle=deg_to_rad(-25.0+10.0*float(variant%6))
+	var point=Vector2(sin(angle),-cos(angle))*(SPAWN_SEPARATION_M*.5)
+	if variant>=6:point=-point
+	return point if team==0 else -point
 
 static func route_distance(p: Vector2) -> float:
 	var best=INF

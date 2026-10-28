@@ -446,7 +446,8 @@ func _ready():
 			if i in [0,8]:
 				var spawn=ArenaLayout.spawn(0 if i==0 else 1,int(rng.seed))
 				tank.position=Vector3(spawn.x,terrain.height_at(spawn.x,spawn.y)+.1,spawn.y)
-				tank.rotation.y=0 if i==0 else PI
+				# Face the opposing spawn even when this round swaps map ends.
+				tank.rotation.y=atan2(-spawn.x,-spawn.y)
 			else:
 				tank.alive=false;tank.hide();tank.position=Vector3(1200+i*10,-100,1200)
 				tank.collision_layer=0;tank.collision_mask=0

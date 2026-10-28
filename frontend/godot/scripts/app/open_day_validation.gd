@@ -286,7 +286,7 @@ func run():
 	check(not battle.gunner_reticle.visible,"Free tactical view hides the gun sight")
 	battle.camera_mode=1;await process_frame
 	check(battle.gunner_reticle.visible,"Shared gun sight is visible in third-person battle view")
-	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
+	var vehicle=battle.vehicles[0];var original_yaw=vehicle.rotation.y;var original_hull_target=vehicle.manual_hull_target;var original_turret=vehicle.turret_angle;var original_gun=vehicle.gun_angle
 	check(battle.demo_tactics.flank_sign in [-1.0,1.0],"Fly opening flank is selected from the match seed instead of always starting in the same direction")
 	var fly_vehicle=battle.vehicles[8]
 	var original_vehicle_position=vehicle.position;var original_fly_position=fly_vehicle.position;var original_fly_yaw=fly_vehicle.rotation.y
@@ -341,7 +341,7 @@ func run():
 	check(absf((-battle.camera.global_basis.z).x)<.99,"Third-person camera remains stable independently of turret traverse")
 	var aimed_turret=vehicle.turret_angle;var aimed_gun=vehicle.gun_angle
 	battle.demo_apply_mouse_motion(Vector2(360,360),false)
-	check(vehicle.manual_hull_target==original_yaw and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Mouse aiming never steers the hull")
+	check(vehicle.manual_hull_target==original_hull_target and vehicle.turret_angle==aimed_turret and vehicle.gun_angle==aimed_gun,"Mouse aiming never steers the hull")
 	battle.camera_mode=1
 	var middle=InputEventMouseButton.new();middle.button_index=MOUSE_BUTTON_MIDDLE;middle.pressed=true;middle.position=Vector2(640,360)
 	var hull_target_before=vehicle.manual_hull_target

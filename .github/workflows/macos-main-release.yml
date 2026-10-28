@@ -141,4 +141,4 @@ jobs:
             "build/releases/$VERSION/SHA256SUMS.txt" \
             --target "$GITHUB_SHA" --prerelease \
             --title "FlySwarm $VERSION — macOS arm64" \
-            --notes-file docs/releases/1.0.0-beta.5.md
+            --notes-file "docs/releases/$VERSION.md"

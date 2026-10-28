@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import signal
 import socket
@@ -48,6 +49,9 @@ def git_state() -> dict:
     return {"commit": commit, "branch": branch, "dirty": bool(status), "status_porcelain": status.splitlines()}
 
 
+_SOURCE_FINGERPRINT_CACHE: dict[str, tuple[tuple[int, int, int, int], str]] = {}
+
+
 def source_fingerprint() -> dict:
     """Capture source and assets that can change the research environment."""
     candidates = [ROOT / "frontend/godot/project.godot", ROOT / "data/scenarios/krasny_valley.json"]
@@ -57,10 +61,45 @@ def source_fingerprint() -> dict:
         candidates.extend(ROOT.glob(pattern))
     rows = []
     for path in sorted(set(path for path in candidates if path.is_file())):
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        # macOS AppleDouble metadata (._name) is incidental filesystem noise and
+        # can appear while the SSD is being read; it is not project source.
+        if path.name.startswith("._"):
+            continue
+        stat = path.stat()
+        stamp = (int(stat.st_dev), int(stat.st_ino), int(stat.st_size), int(stat.st_mtime_ns))
+        cached = _SOURCE_FINGERPRINT_CACHE.get(str(path))
+        if cached and cached[0] == stamp:
+            digest = cached[1]
+        else:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            _SOURCE_FINGERPRINT_CACHE[str(path)] = (stamp, digest)
         rows.append({"path": path.relative_to(ROOT).as_posix(), "sha256": digest})
     encoded = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
     return {"sha256": hashlib.sha256(encoded).hexdigest(), "files": rows}
+
+
+def fatal_godot_log_lines(log_text: str) -> list[str]:
+    """Return actual Godot run errors, excluding its known headless teardown leak.
+
+    Godot 4.7.2's dummy headless renderer reports one leaked DummyShader RID
+    after an otherwise successful shutdown. An unconfigured physical gamepad
+    can also emit one exact mapping diagnostic even though headless research
+    runs do not read gamepad input. The original log is retained; process return
+    code, summary, step synchronization, and archive validators remain
+    authoritative.
+    """
+    fatal = []
+    for line in log_text.splitlines():
+        if "SCRIPT ERROR" in line:
+            fatal.append(line)
+        elif line.startswith("ERROR:"):
+            known_headless_diagnostics = (
+                r"ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit\.",
+                r"ERROR: Error opening gamepad at index 3: Couldn't find mapping for device \(3\)",
+            )
+            if not any(re.fullmatch(pattern, line) for pattern in known_headless_diagnostics):
+                fatal.append(line)
+    return fatal
 
 
 def software_metadata(godot: str | None = None) -> dict:
@@ -469,8 +508,18 @@ def summarize_interventions(game_log: Path, output: Path) -> dict:
 
 def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool,
             seconds: float, godot: str, config: dict, collect_nonneural: Path | None = None,
-            expected_source_fingerprint: str | None = None):
-    run_dir = experiment / "runs" / run_id
+            expected_source_fingerprint: str | None = None, arm_spec: dict | None = None,
+            run_subdir: str = "runs"):
+    arm_spec = arm_spec or {}
+    condition_label = str(arm_spec.get("label", condition))
+    controllers = {"blue": arm_spec.get("blue_controller", "brain"),
+                   "red": arm_spec.get("red_controller", "rule")}
+    if set(controllers.values()) - {"brain", "rule"}:
+        raise ValueError("research arm controllers must be brain or rule")
+    causal_spec = arm_spec.get("causal_communication", config.get("causal_communication"))
+    if Path(run_subdir).is_absolute() or ".." in Path(run_subdir).parts:
+        raise ValueError("run_subdir must be a safe relative path")
+    run_dir = experiment / run_subdir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     run_source_fingerprint=source_fingerprint()["sha256"]
     if expected_source_fingerprint and run_source_fingerprint!=expected_source_fingerprint:
@@ -482,7 +531,6 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
     audio_mode = config.get("audio_mode", "no_audio")
     if audio_mode not in ("no_audio", "team_audio", "all_audio"):
         raise ValueError("audio_mode must be no_audio, team_audio, or all_audio")
-    causal_spec = config.get("causal_communication")
     if causal_spec is not None:
         from flyswarm.research.causal_comm import CausalCommunication
         CausalCommunication(causal_spec)  # Fail before launching backend/Godot.
@@ -505,7 +553,7 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
             backend_status = run_dir / "backend-status.json"
             backend_args = [sys.executable, "-m", "flyswarm.bridge.server", "--port", str(port), "--seed", str(seed),
                             "--status-file", str(backend_status), "--parent-pid", str(os.getpid()),
-                            "--blue-controller", "brain", "--red-controller", "rule",
+                            "--blue-controller", controllers["blue"], "--red-controller", controllers["red"],
                             "--condition", condition, "--experiment-id", experiment.name, "--run-id", run_id]
             if condition == "NON_NEURAL_TRAINED":
                 backend_args += ["--non-neural-policy", str(config["non_neural_checkpoint"])]
@@ -532,11 +580,12 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
                     raise TimeoutError("MaleCNS backend startup exceeded 180 seconds")
                 time.sleep(.2)
         manifest = {"schema": "flyswarm.research.run.v1", "experiment_id": experiment.name, "run_id": run_id,
-                    "condition": condition_name, "seed": seed, "side_swap": swap, "pair_id": f"{condition_name}:{seed}",
+                    "condition": condition_label, "backend_condition": condition_name,
+                    "seed": seed, "side_swap": swap, "pair_id": f"{condition_label}:{seed}",
                     "duration_s": seconds, "map": "Krasny Valley", "map_seed": int(config.get("map_seed", 1944)),
                     "vehicle_composition": "normalized symmetric t34_85 mirror", "normalized": True,
                     "audio": audio_mode, "causal_communication": causal_spec,
-                    "blue_controller": condition_name, "red_controller": "RULE_BASED",
+                    "blue_controller": controllers["blue"], "red_controller": controllers["red"],
                     "git": git_state(), "godot": godot, "source_fingerprint": run_source_fingerprint,
                     "combat_event_schema": "flyswarm.combat_event.v1",
                     "step_semantics": "blocking_one_response_per_physics_step" if condition != "RULE_BASED" else "fixed_50hz_rule_step"}
@@ -545,7 +594,7 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
                "--normalized", "--mirror", "t34_85", "--seed", str(int(config.get("map_seed", 1944))),
                "--battle-seed", str(seed), "--seconds", str(seconds), "--quit", "--audio", audio_mode,
                "--record", str(run_dir), "--research-record", str(run_dir / "game_steps.jsonl"),
-               "--experiment-id", experiment.name, "--run-id", run_id, "--condition", condition_name]
+               "--experiment-id", experiment.name, "--run-id", run_id, "--condition", condition]
         if swap:
             cmd.append("--swap")
         if backend:
@@ -563,8 +612,9 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
         if source_fingerprint()["sha256"]!=run_source_fingerprint:
             raise RuntimeError("Research source changed during this run; preserving it as an invalid diagnostic run")
         log_text = (run_dir / "godot.log").read_text(errors="replace")
-        if "SCRIPT ERROR" in log_text or "ERROR:" in log_text:
-            raise RuntimeError(f"Godot log contains errors; inspect {run_dir / 'godot.log'}")
+        fatal_log_lines = fatal_godot_log_lines(log_text)
+        if fatal_log_lines:
+            raise RuntimeError(f"Godot log contains errors {fatal_log_lines}; inspect {run_dir / 'godot.log'}")
         summary_path = run_dir / "summary.json"
         if not summary_path.is_file():
             raise RuntimeError("Godot did not write summary.json")
@@ -572,7 +622,8 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
         godot_manifest_path = run_dir / "manifest.json"
         godot_manifest = json.loads(godot_manifest_path.read_text(encoding="utf-8")) if godot_manifest_path.exists() else {}
         manifest.update({"godot_manifest": godot_manifest, "git_state": manifest["git"],
-                         "condition": condition_name, "seed": seed, "side_swap": swap,
+                         "condition": condition_label, "backend_condition": condition_name,
+                         "seed": seed, "side_swap": swap,
                          "experiment_id": experiment.name, "run_id": run_id})
         atomic_json(godot_manifest_path, godot_manifest | manifest)
         event_summary = derive_events(run_dir / "game_steps.jsonl", run_dir / "events.jsonl")
@@ -616,7 +667,8 @@ def run_one(experiment: Path, run_id: str, condition: str, seed: int, swap: bool
         atomic_json(run_dir / "validation.json", validation)
         if not validation["valid"]:
             raise RuntimeError(f"Research run failed data-quality validation: {run_id}")
-        return {"run_id": run_id, "condition": condition, "seed": seed, "side_swap": swap,
+        return {"run_id": run_id, "condition": condition_label, "backend_condition": condition,
+                "seed": seed, "side_swap": swap,
                 "summary": summary, "validation": validation}
     finally:
         if backend and backend.poll() is None:

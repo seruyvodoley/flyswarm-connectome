@@ -92,6 +92,13 @@ def read_jsonl(path):
         return [json.loads(line) for line in f if line.strip()]
 
 
+def cumulative_presence_delta(first_values: dict[int, float], last_values: dict[int, float]) -> float:
+    """Return total per-agent occupancy accrued during a run from cumulative counters."""
+    return sum(max(0.0, float(last_values[agent_id]) - float(first_value))
+               for agent_id, first_value in first_values.items()
+               if agent_id in last_values)
+
+
 def analyze_run(run_dir: Path) -> dict:
     manifest=json.loads((run_dir/"manifest.json").read_text(encoding="utf-8"))
     summary=json.loads((run_dir/"summary.json").read_text(encoding="utf-8"))
@@ -106,8 +113,11 @@ def analyze_run(run_dir: Path) -> dict:
              "blue_target_concentration":None,"red_target_concentration":None,
              "blue_alive_fraction":None,"red_alive_fraction":None,
              "blue_mean_speed_m_s":None,"red_mean_speed_m_s":None}
-    # Sum per-agent zone-occupancy time, normalized by agent x zone opportunity.
-    teams={"blue":[],"red":[]}
+    # objective_presence_s is cumulative per agent in each frame. Keep the
+    # first and last values, then use the within-run increment; summing every
+    # frame repeatedly counts the same occupied seconds many times.
+    presence_start={"blue":{},"red":{}}
+    presence_end={"blue":{},"red":{}}
     cohesion={"blue":[],"red":[]}; alignment={"blue":[],"red":[]}
     alive={"blue":[],"red":[]}; speed={"blue":[],"red":[]}; concentration={"blue":[],"red":[]}
     for row in frames:
@@ -116,7 +126,10 @@ def analyze_run(run_dir: Path) -> dict:
             group=[a for a in agents if a.get("team")==team]
             living=[a for a in group if a.get("alive")]
             for a in group:
-                teams[team].append(float(a.get("metrics",{}).get("objective_presence_s",0.0)))
+                agent_id=int(a.get("agent_id", -1))
+                value=float(a.get("metrics",{}).get("objective_presence_s",0.0))
+                presence_start[team].setdefault(agent_id, value)
+                presence_end[team][agent_id]=value
             alive[team].append(len(living)/8.0)
             speed[team].append(float(np.mean([a.get("speed_m_s",0.0) for a in living])) if living else 0.0)
             positions=np.asarray([a.get("position",[0,0,0]) for a in living],dtype=float)
@@ -135,7 +148,8 @@ def analyze_run(run_dir: Path) -> dict:
                 concentration[team].append(float(np.sum(counts**2)))
     denom=8.0*duration*max(n_zones,1)
     for team in ("blue","red"):
-        metrics[f"{team}_objective_presence_fraction"]=sum(teams[team])/denom if denom else None
+        occupied_s=cumulative_presence_delta(presence_start[team],presence_end[team])
+        metrics[f"{team}_objective_presence_fraction"]=occupied_s/denom if denom else None
         metrics[f"mean_{team}_team_cohesion_m"]=float(np.mean(cohesion[team])) if cohesion[team] else None
         metrics[f"mean_{team}_heading_alignment"]=float(np.mean(alignment[team])) if alignment[team] else None
         metrics[f"{team}_target_concentration"]=float(np.mean(concentration[team])) if concentration[team] else None
